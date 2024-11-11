@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"path"
@@ -28,6 +29,9 @@ type (
 		id         string
 		parent     *Partial
 		oob        bool
+		isOOB      bool
+		isWrapper  bool
+		fs         fs.FS
 		templates  []string
 		functions  template.FuncMap
 		data       map[string]any
@@ -66,6 +70,12 @@ func New(templates ...string) *Partial {
 		oobChildren: make(map[string]struct{}),
 		partials:    make(map[string]template.HTML),
 	}
+}
+
+func (p *Partial) WithFS(fsys fs.FS) *Partial {
+	p.fs = fsys
+
+	return p
 }
 
 // NewID creates a new instance with the provided ID.
@@ -155,6 +165,7 @@ func (p *Partial) AddTemplate(template string) *Partial {
 // With adds a child partial to the partial.
 func (p *Partial) With(child *Partial) *Partial {
 	p.children[child.id] = child
+	p.children[child.id].fs = p.fs
 	p.children[child.id].globalData = p.globalData
 	p.children[child.id].parent = p
 
@@ -183,6 +194,21 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	p.url = r.URL
 	var renderTarget, doRenderPartial = renderPartial(r)
 
+	// safeguard against directly calling a parent which is also the wrapper
+	for k, v := range p.children {
+		if v.wrapper != nil && v.wrapper.id == p.id {
+			return "", fmt.Errorf("partial %s is a wrapper for %s, cannot render directly", p.id, k)
+		}
+	}
+
+	if (renderTarget == "" || renderTarget == p.id) && p.wrapper != nil {
+		parent := p.wrapper
+		parent.isWrapper = true
+		p.wrapper = nil
+
+		return parent.RenderWithRequest(ctx, r)
+	}
+
 	if renderTarget != "" {
 		// render the partial with the request
 		if c, ok := p.children[renderTarget]; ok {
@@ -197,13 +223,8 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 			}
 
 			// find all the oob children and add them to the output
-			for id := range c.oobChildren {
-				if child, cok := c.children[id]; cok {
-					child.AppendFuncs(p.functions)
-					if childData, err := child.renderNamed(ctx, path.Base(c.templates[0]), child.templates); err == nil {
-						out += childData
-					}
-				}
+			if c.parent != nil {
+				out += renderChildren(ctx, c.parent, true)
 			}
 
 			return out, nil
@@ -217,10 +238,6 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 
 	// gather all children and render them into a map
 	for id, child := range p.children {
-		if child.oob {
-			continue
-		}
-
 		if childData, err := child.RenderWithRequest(ctx, r); err == nil {
 			p.partials[id] = childData
 		} else {
@@ -228,14 +245,33 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 		}
 	}
 
-	if !doRenderPartial && p.wrapper != nil {
-		parent := p.wrapper
-		p.wrapper = nil
-
-		return parent.RenderWithRequest(ctx, r)
+	out, err := p.renderNamed(ctx, path.Base(p.templates[0]), p.templates)
+	if err != nil {
+		return template.HTML(err.Error()), err
 	}
 
-	return p.renderNamed(ctx, path.Base(p.templates[0]), p.templates)
+	// find all the oob children and add them to the output
+	if renderTarget != "" && doRenderPartial {
+		out += renderChildren(ctx, p, false)
+	}
+
+	return out, err
+}
+
+func renderChildren(ctx context.Context, p *Partial, isOOB bool) (out template.HTML) {
+	for id := range p.oobChildren {
+		if child, cok := p.children[id]; cok {
+			child.AppendFuncs(p.functions)
+			child.isOOB = isOOB
+			if childData, childErr := child.renderNamed(ctx, path.Base(child.templates[0]), child.templates); childErr == nil {
+				out += childData
+			} else {
+				out += template.HTML(childErr.Error())
+			}
+		}
+	}
+
+	return out
 }
 
 // Render renders the partial.
@@ -256,11 +292,19 @@ func (p *Partial) renderNamed(ctx context.Context, name string, templates []stri
 		}
 	}
 
+	functions["_isOOB"] = func() bool {
+		return p.isOOB
+	}
+
 	cacheKey := generateCacheKey(templates, functions)
 	tmpl, cached := templateCache.Load(cacheKey)
 	if !cached || !UseTemplateCache {
-		// Parse and cache template as before
-		tmpl, err = template.New(name).Funcs(functions).ParseFiles(templates...)
+		t := template.New(name).Funcs(functions)
+		if p.fs != nil {
+			tmpl, err = t.ParseFS(p.fs, templates...)
+		} else {
+			tmpl, err = t.ParseFiles(templates...)
+		}
 		if err != nil {
 			return "", err
 		}
