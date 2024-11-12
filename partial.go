@@ -21,32 +21,34 @@ var (
 	// DefaultPartialHeader is the default header used to determine which partial to render.
 	DefaultPartialHeader = "X-Partial"
 	// UseTemplateCache is a flag to enable or disable the template cache
-	UseTemplateCache = true
+	UseTemplateCache = false
 	// templateCache is the cache for parsed templates
 	templateCache = sync.Map{}
+	// mutexCache is a cache of mutexes for each template key
+	mutexCache = sync.Map{}
 )
 
 type (
 	// Partial represents a renderable component with optional children and data.
 	Partial struct {
-		id         string
-		parent     *Partial
-		oob        bool
-		isOOB      bool
-		isWrapper  bool
-		fs         fs.FS
-		templates  []string
-		functions  template.FuncMap
-		data       map[string]any
-		globalData *GlobalData
-		children   map[string]*Partial
-
-		// internal data
+		id          string
+		parent      *Partial
+		oob         bool
+		isOOB       bool
+		isWrapper   bool
+		fs          fs.FS
+		templates   []string
+		functions   template.FuncMap
+		data        map[string]any
+		globalData  *GlobalData
+		mu          sync.RWMutex
+		children    map[string]*Partial
 		oobChildren map[string]struct{}
 		partials    map[string]template.HTML
 		wrapper     *Partial
 	}
 
+	// Data represents the data available to the partial.
 	Data struct {
 		// Ctx is the context of the request
 		Ctx context.Context
@@ -60,6 +62,7 @@ type (
 		Partials map[string]template.HTML
 	}
 
+	// GlobalData represents the global data available to all partials.
 	GlobalData map[string]any
 )
 
@@ -77,33 +80,38 @@ func New(templates ...string) *Partial {
 	}
 }
 
-func (p *Partial) WithFS(fsys fs.FS) *Partial {
-	p.fs = fsys
-
-	return p
-}
-
 // NewID creates a new instance with the provided ID.
 func NewID(id string, templates ...string) *Partial {
 	return New(templates...).ID(id)
 }
 
+// ID sets the ID of the partial.
 func (p *Partial) ID(id string) *Partial {
 	p.id = id
 	return p
 }
 
+// Templates sets the templates for the partial.
 func (p *Partial) Templates(templates ...string) *Partial {
 	p.templates = templates
 	return p
 }
 
+// Reset resets the partial to its initial state.
 func (p *Partial) Reset() *Partial {
 	p.data = make(map[string]any)
 	p.globalData = &GlobalData{}
 	p.children = make(map[string]*Partial)
 	p.oobChildren = make(map[string]struct{})
 	p.partials = make(map[string]template.HTML)
+	p.wrapper = nil
+
+	return p
+}
+
+// WithFS sets the file system where the templates are located.
+func (p *Partial) WithFS(fsys fs.FS) *Partial {
+	p.fs = fsys
 
 	return p
 }
@@ -163,6 +171,9 @@ func (p *Partial) AddTemplate(template string) *Partial {
 
 // With adds a child partial to the partial.
 func (p *Partial) With(child *Partial) *Partial {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.children[child.id] = child
 	p.children[child.id].fs = p.fs
 	p.children[child.id].globalData = p.globalData
@@ -174,7 +185,9 @@ func (p *Partial) With(child *Partial) *Partial {
 // WithOOB adds an out-of-band child partial to the partial.
 func (p *Partial) WithOOB(child *Partial) *Partial {
 	p.With(child)
+	p.mu.Lock()
 	p.oobChildren[child.id] = struct{}{}
+	p.mu.Unlock()
 	child.oob = true
 
 	return p
@@ -205,11 +218,7 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	}
 
 	if (renderTarget == "" || renderTarget == p.id) && p.wrapper != nil {
-		parent := p.wrapper
-		parent.isWrapper = true
-		p.wrapper = nil
-
-		return parent.RenderWithRequest(ctx, r)
+		return p.renderWrapped(ctx, r)
 	}
 
 	if renderTarget != "" {
@@ -219,6 +228,16 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	return p.renderFullPage(ctx, r)
 }
 
+// renderWrapped renders the partial with the wrapper.
+func (p *Partial) renderWrapped(ctx context.Context, r *http.Request) (template.HTML, error) {
+	parent := p.wrapper
+	parent.isWrapper = true
+	p.wrapper = nil
+
+	return parent.RenderWithRequest(ctx, r)
+}
+
+// renderTargetPartial renders the partial with the target.
 func (p *Partial) renderTargetPartial(ctx context.Context, currentURL *url.URL, target string) (template.HTML, error) {
 	c := recursiveChildLookup(p, target, make(map[string]bool))
 	if c == nil {
@@ -239,14 +258,18 @@ func (p *Partial) renderTargetPartial(ctx context.Context, currentURL *url.URL, 
 	return out, nil
 }
 
+// renderFullPage renders the full page with all children.
 func (p *Partial) renderFullPage(ctx context.Context, r *http.Request) (template.HTML, error) {
 	// gather all children and render them into a map
 	for id, child := range p.children {
-		if childData, err := child.RenderWithRequest(ctx, r); err == nil {
+		childData, err := child.RenderWithRequest(ctx, r)
+		p.mu.Lock()
+		if err == nil {
 			p.partials[id] = childData
 		} else {
 			p.partials[id] = template.HTML(err.Error())
 		}
+		p.mu.Unlock()
 	}
 
 	out, err := p.renderNamed(ctx, r.URL, path.Base(p.templates[0]), p.templates)
@@ -323,16 +346,29 @@ func (p *Partial) renderNamed(ctx context.Context, currentURL *url.URL, name str
 	cacheKey := generateCacheKey(templates, functions)
 	tmpl, cached := templateCache.Load(cacheKey)
 	if !cached || !UseTemplateCache {
-		t := template.New(name).Funcs(functions)
-		if p.fs != nil {
-			tmpl, err = t.ParseFS(p.fs, templates...)
-		} else {
-			tmpl, err = t.ParseFiles(templates...)
+		// Obtain or create a mutex for this cache key
+		muInterface, _ := mutexCache.LoadOrStore(cacheKey, &sync.Mutex{})
+		mu := muInterface.(*sync.Mutex)
+
+		// Lock the mutex to ensure only one goroutine parses the template
+		mu.Lock()
+		defer mu.Unlock()
+
+		// Double-check if another goroutine has already parsed the template
+		tmpl, cached = templateCache.Load(cacheKey)
+		if !cached || !UseTemplateCache {
+			t := template.New(name).Funcs(functions)
+			var tErr error
+			if p.fs != nil {
+				tmpl, tErr = t.ParseFS(p.fs, templates...)
+			} else {
+				tmpl, tErr = t.ParseFiles(templates...)
+			}
+			if tErr != nil {
+				return "", fmt.Errorf("error executing template '%s': %w", name, tErr)
+			}
+			templateCache.Store(cacheKey, tmpl)
 		}
-		if err != nil {
-			return "", err
-		}
-		templateCache.Store(cacheKey, tmpl)
 	}
 
 	data := &Data{
@@ -359,7 +395,12 @@ func (p *Partial) renderNamed(ctx context.Context, currentURL *url.URL, name str
 // Generate a hash of the function names to include in the cache key
 func generateCacheKey(templates []string, funcMap template.FuncMap) string {
 	var builder strings.Builder
-	builder.WriteString(templates[0])
+
+	// Include all template names
+	for _, tmpl := range templates {
+		builder.WriteString(tmpl)
+		builder.WriteString(";")
+	}
 	builder.WriteString(":")
 
 	funcNames := make([]string, 0, len(funcMap))

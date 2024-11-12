@@ -346,6 +346,37 @@ func TestDeepNested(t *testing.T) {
 	})
 }
 
+func TestMissingPartial(t *testing.T) {
+	fsys := &InMemoryFS{
+		Files: map[string]string{
+			"templates/index.html": "<html><body>{{.Partials.content }}</body></html>",
+		},
+	}
+
+	p := New("templates/index.html").ID("root")
+	p.WithFS(fsys)
+
+	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
+		// ... setup code ...
+		out, err := p.RenderWithRequest(r.Context(), r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(out))
+	}
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	request.Header.Set("X-Partial", "nonexistent")
+	response := httptest.NewRecorder()
+
+	handleRequest(response, request)
+
+	if response.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", response.Code)
+	}
+}
+
 func TestTree(t *testing.T) {
 	p := New("template1", "template2").ID("root")
 	child := New("template1", "template2").ID("id")
