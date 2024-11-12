@@ -62,13 +62,13 @@ func TestNewRoot(t *testing.T) {
 func TestRequestBasic(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
-			files: map[string]string{
-				"templates/example.html": "<html><body>{{.Partials.content }}</body></html>",
+			Files: map[string]string{
+				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
 
-		p := New("templates/example.html").ID("root")
+		p := New("templates/index.html").ID("root")
 		p.WithFS(fsys)
 
 		// content
@@ -89,7 +89,6 @@ func TestRequestBasic(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -102,8 +101,7 @@ func TestRequestBasic(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
-		request.Header.Set("Hx-Partial", "content")
+		request.Header.Set("X-Partial", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -118,13 +116,13 @@ func TestRequestBasic(t *testing.T) {
 func TestRequestWrap(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
-			files: map[string]string{
-				"templates/example.html": "<html><body>{{.Partials.content }}</body></html>",
+			Files: map[string]string{
+				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
 
-		p := New("templates/example.html").ID("root")
+		p := New("templates/index.html").ID("root")
 		p.WithFS(fsys)
 
 		// content
@@ -145,12 +143,24 @@ func TestRequestWrap(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
 
 		expected := "<html><body><div>Welcome to the home page</div></body></html>"
+		if response.Body.String() != expected {
+			t.Errorf("expected %s, got %s", expected, response.Body.String())
+		}
+	})
+
+	t.Run("partial", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request.Header.Set("X-Partial", "content")
+		response := httptest.NewRecorder()
+
+		handleRequest(response, request)
+
+		expected := "<div>Welcome to the home page</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -162,14 +172,14 @@ func TestRequestOOB(t *testing.T) {
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
-			files: map[string]string{
-				"templates/example.html": "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
+			Files: map[string]string{
+				"templates/index.html":   "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 				"templates/footer.html":  "<div {{ if _isOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
-		p := New("templates/example.html").ID("root")
+		p := New("templates/index.html").ID("root")
 		p.WithFS(fsys)
 
 		// content
@@ -197,7 +207,6 @@ func TestRequestOOB(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -210,8 +219,7 @@ func TestRequestOOB(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
-		request.Header.Set("Hx-Partial", "content")
+		request.Header.Set("X-Partial", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -228,24 +236,25 @@ func TestRequestOOBSwap(t *testing.T) {
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
-			files: map[string]string{
-				"templates/example.html": "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
+			Files: map[string]string{
+				"templates/index.html":   "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 				"templates/footer.html":  "<div {{ if _isOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
-		p := New("templates/example.html").ID("root")
+		// the main template that will be rendered
+		p := New("templates/index.html").ID("root")
 		p.WithFS(fsys)
 
-		// oob
+		// oob footer that resides on the page
 		oob := New("templates/footer.html").ID("footer")
 		oob.SetData(map[string]any{
 			"Text": "This is the footer",
 		})
 		p.WithOOB(oob)
 
-		// content
+		// the actual content required for the page
 		content := New("templates/content.html").ID("content")
 		content.SetData(map[string]any{
 			"Text": "Welcome to the home page",
@@ -262,14 +271,74 @@ func TestRequestOOBSwap(t *testing.T) {
 
 	t.Run("basic", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("Hx-Request", "true")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
 
-		// <html><body><div>Welcome to the home page</div><div id='footer'>This is the footer</div></body></html>
-		// <html><body><html><body><div>Welcome to the home page</div><div id='footer'>This is the footer</div></body></html><div id='footer'>This is the footer</div></body></html>
 		expected := "<html><body><div>Welcome to the home page</div><div id='footer'>This is the footer</div></body></html>"
+		if response.Body.String() != expected {
+			t.Errorf("expected %s, got %s", expected, response.Body.String())
+		}
+	})
+
+	t.Run("partial", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request.Header.Set("X-Partial", "content")
+		response := httptest.NewRecorder()
+
+		handleRequest(response, request)
+
+		expected := "<div>Welcome to the home page</div><div hx-swap-oob='true' id='footer'>This is the footer</div>"
+		if response.Body.String() != expected {
+			t.Errorf("expected %s, got %s", expected, response.Body.String())
+		}
+	})
+}
+
+func TestDeepNested(t *testing.T) {
+	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
+		fsys := &InMemoryFS{
+			Files: map[string]string{
+				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
+				"templates/content.html": "<div>{{.Data.Text}}</div>",
+				"templates/nested.html":  "<div>{{.Data.Text}}</div>",
+			},
+		}
+
+		p := New("templates/index.html").ID("root")
+		p.WithFS(fsys)
+
+		// nested content
+		nested := New("templates/nested.html").ID("nested")
+		nested.SetData(map[string]any{
+			"Text": "This is the nested content",
+		})
+
+		// content
+		content := New("templates/content.html").ID("content")
+		content.SetData(map[string]any{
+			"Text": "Welcome to the home page",
+		}).With(nested)
+
+		p.With(content)
+
+		out, err := p.RenderWithRequest(r.Context(), r)
+		if err != nil {
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+
+		_, _ = w.Write([]byte(out))
+	}
+
+	t.Run("find nested item and return it", func(t *testing.T) {
+		request, _ := http.NewRequest(http.MethodGet, "/", nil)
+		request.Header.Set("X-Partial", "nested")
+		response := httptest.NewRecorder()
+
+		handleRequest(response, request)
+
+		expected := "<div>This is the nested content</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}

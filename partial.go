@@ -18,10 +18,14 @@ import (
 )
 
 var (
-	DefaultPartialHeader   = "Hx-Partial"
+	// DefaultPartialHeader is the default header used to determine which partial to render.
+	DefaultPartialHeader = "X-Partial"
+	// DefaultTemplateFuncMap are the default templates functions to use
 	DefaultTemplateFuncMap = template.FuncMap{}
-	UseTemplateCache       = true
-	templateCache          = sync.Map{}
+	// UseTemplateCache is a flag to enable or disable the template cache
+	UseTemplateCache = true
+	// templateCache is the cache for parsed templates
+	templateCache = sync.Map{}
 )
 
 type (
@@ -186,13 +190,17 @@ func (p *Partial) Wrap(renderer *Partial) *Partial {
 	p.wrapper = renderer
 	p.wrapper.With(p)
 
+	if renderer.fs != nil && p.fs == nil {
+		p.fs = renderer.fs
+	}
+
 	return p
 }
 
 // RenderWithRequest renders the partial with the request.
 func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
 	p.url = r.URL
-	var renderTarget, doRenderPartial = renderPartial(r)
+	var renderTarget = r.Header.Get(DefaultPartialHeader)
 
 	// safeguard against directly calling a parent which is also the wrapper
 	for k, v := range p.children {
@@ -210,30 +218,23 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	}
 
 	if renderTarget != "" {
-		// render the partial with the request
-		if c, ok := p.children[renderTarget]; ok {
-			var (
-				out template.HTML
-				err error
-			)
-			c.AppendFuncs(p.functions)
-			out, err = c.renderNamed(ctx, path.Base(c.templates[0]), c.templates)
-			if err != nil {
-				return "", err
-			}
-
-			// find all the oob children and add them to the output
-			if c.parent != nil {
-				out += renderChildren(ctx, c.parent, true)
-			}
-
-			return out, nil
+		c := recursiveChildLookup(p, renderTarget)
+		if c == nil {
+			return "", fmt.Errorf("requested partial %s not found", renderTarget)
 		}
 
-		if p.id != renderTarget {
-			return "", fmt.Errorf("partial %s not found, got %s", renderTarget, p.id)
+		c.AppendFuncs(p.functions)
+		out, err := c.renderNamed(ctx, path.Base(c.templates[0]), c.templates)
+		if err != nil {
+			return "", err
 		}
 
+		// find all the oob children and add them to the output
+		if c.parent != nil {
+			out += renderChildren(ctx, c.parent, true)
+		}
+
+		return out, nil
 	}
 
 	// gather all children and render them into a map
@@ -250,19 +251,32 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 		return template.HTML(err.Error()), err
 	}
 
-	// find all the oob children and add them to the output
-	if renderTarget != "" && doRenderPartial {
-		out += renderChildren(ctx, p, false)
-	}
-
 	return out, err
 }
 
-func renderChildren(ctx context.Context, p *Partial, isOOB bool) (out template.HTML) {
+func recursiveChildLookup(p *Partial, id string) *Partial {
+	if c, ok := p.children[id]; ok {
+		if c.fs == nil {
+			c.fs = p.fs
+		}
+
+		return c
+	}
+
+	for _, child := range p.children {
+		if c := recursiveChildLookup(child, id); c != nil {
+			return c
+		}
+	}
+
+	return nil
+}
+
+func renderChildren(ctx context.Context, p *Partial, attachOOB bool) (out template.HTML) {
 	for id := range p.oobChildren {
 		if child, cok := p.children[id]; cok {
 			child.AppendFuncs(p.functions)
-			child.isOOB = isOOB
+			child.isOOB = attachOOB
 			if childData, childErr := child.renderNamed(ctx, path.Base(child.templates[0]), child.templates); childErr == nil {
 				out += childData
 			} else {
@@ -331,14 +345,6 @@ func (p *Partial) renderNamed(ctx context.Context, name string, templates []stri
 	}
 
 	return "", errors.New("template is not a *template.Template")
-}
-
-func renderPartial(r *http.Request) (string, bool) {
-	hxRequest := r.Header.Get("Hx-Request")
-	hxBoosted := r.Header.Get("Hx-Boosted")
-	hxHistoryRestoreRequest := r.Header.Get("Hx-History-Restore-Request")
-
-	return r.Header.Get(DefaultPartialHeader), (hxRequest == "true" || hxBoosted == "true") && hxHistoryRestoreRequest != "true"
 }
 
 // Generate a hash of the function names to include in the cache key

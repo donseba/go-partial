@@ -7,11 +7,18 @@ import (
 )
 
 type InMemoryFS struct {
-	files map[string]string
+	Files map[string]string
 }
 
-func (fsys *InMemoryFS) Open(name string) (fs.File, error) {
-	content, ok := fsys.files[name]
+func (f *InMemoryFS) AddFile(name, content string) {
+	if f.Files == nil {
+		f.Files = make(map[string]string)
+	}
+	f.Files[name] = content
+}
+
+func (f *InMemoryFS) Open(name string) (fs.File, error) {
+	content, ok := f.Files[name]
 	if !ok {
 		return nil, fs.ErrNotExist
 	}
