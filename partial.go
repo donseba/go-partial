@@ -20,8 +20,6 @@ import (
 var (
 	// DefaultPartialHeader is the default header used to determine which partial to render.
 	DefaultPartialHeader = "X-Partial"
-	// DefaultTemplateFuncMap are the default templates functions to use
-	DefaultTemplateFuncMap = template.FuncMap{}
 	// UseTemplateCache is a flag to enable or disable the template cache
 	UseTemplateCache = true
 	// templateCache is the cache for parsed templates
@@ -29,6 +27,7 @@ var (
 )
 
 type (
+	// Partial represents a renderable component with optional children and data.
 	Partial struct {
 		id         string
 		parent     *Partial
@@ -39,7 +38,6 @@ type (
 		templates  []string
 		functions  template.FuncMap
 		data       map[string]any
-		any        any
 		globalData *GlobalData
 		children   map[string]*Partial
 
@@ -47,15 +45,18 @@ type (
 		oobChildren map[string]struct{}
 		partials    map[string]template.HTML
 		wrapper     *Partial
-		url         *url.URL
 	}
 
 	Data struct {
-		Ctx      context.Context
-		URL      *url.URL
-		Data     map[string]any
-		Global   map[string]any
-		Any      any
+		// Ctx is the context of the request
+		Ctx context.Context
+		// URL is the URL of the request
+		URL *url.URL
+		// Data contains the data specific to this partial
+		Data map[string]any
+		// Global contains global data available to all partials
+		Global map[string]any
+		// Partials contains the rendered HTML of child partials
 		Partials map[string]template.HTML
 	}
 
@@ -131,12 +132,6 @@ func (p *Partial) AddGlobalData(key string, value any) *Partial {
 	return p
 }
 
-// SetAny sets the any for the partial.
-func (p *Partial) SetAny(any any) *Partial {
-	p.any = any
-	return p
-}
-
 // SetFuncs sets the functions for the partial.
 func (p *Partial) SetFuncs(funcs template.FuncMap) *Partial {
 	p.functions = funcs
@@ -197,9 +192,9 @@ func (p *Partial) Wrap(renderer *Partial) *Partial {
 	return p
 }
 
-// RenderWithRequest renders the partial with the request.
+// RenderWithRequest renders the partial based on the provided HTTP request.
+// It respects the "X-Partial" header to determine which partial to render.
 func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	p.url = r.URL
 	var renderTarget = r.Header.Get(DefaultPartialHeader)
 
 	// safeguard against directly calling a parent which is also the wrapper
@@ -218,25 +213,33 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	}
 
 	if renderTarget != "" {
-		c := recursiveChildLookup(p, renderTarget)
-		if c == nil {
-			return "", fmt.Errorf("requested partial %s not found", renderTarget)
-		}
-
-		c.AppendFuncs(p.functions)
-		out, err := c.renderNamed(ctx, path.Base(c.templates[0]), c.templates)
-		if err != nil {
-			return "", err
-		}
-
-		// find all the oob children and add them to the output
-		if c.parent != nil {
-			out += renderChildren(ctx, c.parent, true)
-		}
-
-		return out, nil
+		return p.renderTargetPartial(ctx, r.URL, renderTarget)
 	}
 
+	return p.renderFullPage(ctx, r)
+}
+
+func (p *Partial) renderTargetPartial(ctx context.Context, currentURL *url.URL, target string) (template.HTML, error) {
+	c := recursiveChildLookup(p, target, make(map[string]bool))
+	if c == nil {
+		return "", fmt.Errorf("requested partial %s not found", target)
+	}
+
+	c.AppendFuncs(p.functions)
+	out, err := c.renderNamed(ctx, currentURL, path.Base(c.templates[0]), c.templates)
+	if err != nil {
+		return "", err
+	}
+
+	// find all the oob children and add them to the output
+	if c.parent != nil {
+		out += renderChildren(ctx, currentURL, c.parent, true)
+	}
+
+	return out, nil
+}
+
+func (p *Partial) renderFullPage(ctx context.Context, r *http.Request) (template.HTML, error) {
 	// gather all children and render them into a map
 	for id, child := range p.children {
 		if childData, err := child.RenderWithRequest(ctx, r); err == nil {
@@ -246,7 +249,7 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 		}
 	}
 
-	out, err := p.renderNamed(ctx, path.Base(p.templates[0]), p.templates)
+	out, err := p.renderNamed(ctx, r.URL, path.Base(p.templates[0]), p.templates)
 	if err != nil {
 		return template.HTML(err.Error()), err
 	}
@@ -254,7 +257,13 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	return out, err
 }
 
-func recursiveChildLookup(p *Partial, id string) *Partial {
+// recursiveChildLookup looks up a child recursively.
+func recursiveChildLookup(p *Partial, id string, visited map[string]bool) *Partial {
+	if visited[p.id] {
+		return nil
+	}
+	visited[p.id] = true
+
 	if c, ok := p.children[id]; ok {
 		if c.fs == nil {
 			c.fs = p.fs
@@ -264,7 +273,7 @@ func recursiveChildLookup(p *Partial, id string) *Partial {
 	}
 
 	for _, child := range p.children {
-		if c := recursiveChildLookup(child, id); c != nil {
+		if c := recursiveChildLookup(child, id, visited); c != nil {
 			return c
 		}
 	}
@@ -272,12 +281,13 @@ func recursiveChildLookup(p *Partial, id string) *Partial {
 	return nil
 }
 
-func renderChildren(ctx context.Context, p *Partial, attachOOB bool) (out template.HTML) {
+// renderChildren renders the children of the partial add sets the isOOB flag if attachOOB is true.
+func renderChildren(ctx context.Context, currentURL *url.URL, p *Partial, attachOOB bool) (out template.HTML) {
 	for id := range p.oobChildren {
 		if child, cok := p.children[id]; cok {
 			child.AppendFuncs(p.functions)
 			child.isOOB = attachOOB
-			if childData, childErr := child.renderNamed(ctx, path.Base(child.templates[0]), child.templates); childErr == nil {
+			if childData, childErr := child.renderNamed(ctx, currentURL, path.Base(child.templates[0]), child.templates); childErr == nil {
 				out += childData
 			} else {
 				out += template.HTML(childErr.Error())
@@ -288,10 +298,10 @@ func renderChildren(ctx context.Context, p *Partial, attachOOB bool) (out templa
 	return out
 }
 
-// Render renders the partial.
-func (p *Partial) renderNamed(ctx context.Context, name string, templates []string) (template.HTML, error) {
+// renderNamed renders the partial with the given name and templates.
+func (p *Partial) renderNamed(ctx context.Context, currentURL *url.URL, name string, templates []string) (template.HTML, error) {
 	if len(templates) == 0 {
-		return "", nil
+		return "", errors.New("no templates provided for rendering")
 	}
 
 	var err error
@@ -326,9 +336,8 @@ func (p *Partial) renderNamed(ctx context.Context, name string, templates []stri
 	}
 
 	data := &Data{
-		URL:      p.url,
+		URL:      currentURL,
 		Ctx:      ctx,
-		Any:      p.any,
 		Data:     p.data,
 		Global:   *p.globalData,
 		Partials: p.partials,
@@ -338,7 +347,7 @@ func (p *Partial) renderNamed(ctx context.Context, name string, templates []stri
 		var buf bytes.Buffer
 		err = t.Execute(&buf, data)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error parsing templates %v: %w", templates, err)
 		}
 
 		return template.HTML(buf.String()), nil // Return rendered content
@@ -349,12 +358,21 @@ func (p *Partial) renderNamed(ctx context.Context, name string, templates []stri
 
 // Generate a hash of the function names to include in the cache key
 func generateCacheKey(templates []string, funcMap template.FuncMap) string {
-	var funcNames []string
+	var builder strings.Builder
+	builder.WriteString(templates[0])
+	builder.WriteString(":")
+
+	funcNames := make([]string, 0, len(funcMap))
 	for name := range funcMap {
 		funcNames = append(funcNames, name)
 	}
-	// Sort function names to ensure consistent ordering
 	sort.Strings(funcNames)
-	hash := sha256.Sum256([]byte(strings.Join(funcNames, ",")))
-	return templates[0] + ":" + hex.EncodeToString(hash[:])
+
+	for _, name := range funcNames {
+		builder.WriteString(name)
+		builder.WriteString(",")
+	}
+
+	hash := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(hash[:])
 }

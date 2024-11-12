@@ -1,6 +1,7 @@
 package partial
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -343,4 +344,22 @@ func TestDeepNested(t *testing.T) {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
 	})
+}
+
+func TestTree(t *testing.T) {
+	p := New("template1", "template2").ID("root")
+	child := New("template1", "template2").ID("id")
+	oobChild := New("template1", "template2").ID("id1")
+
+	child.With(oobChild)
+
+	p.With(child)
+	p.WithOOB(oobChild)
+
+	tr := Tree(p)
+	js, err := json.MarshalIndent(tr, "", "  ")
+	if err != nil {
+		t.Errorf("error marshalling tree: %v", err)
+	}
+	t.Logf("%+v", string(js))
 }
