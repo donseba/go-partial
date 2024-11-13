@@ -2,13 +2,10 @@ package partial
 
 import (
 	"context"
-	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/url"
-	"path"
 )
 
 var (
@@ -121,116 +118,18 @@ func (l *Layout) AddData(key string, value any) *Layout {
 }
 
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	var renderTarget = r.Header.Get(l.service.config.PartialHeader)
-
-	// safeguard against directly calling a parent which is also the wrapper
-	if l.wrapper != nil {
-		if l.wrapper.id == l.content.id {
-			return "", fmt.Errorf("partial %s is a wrapper for itself, cannot render directly", l.content.id)
-		}
-
-		for k, v := range l.content.children {
-			if l.wrapper.id == v.id {
-				return "", fmt.Errorf("partial %s is a wrapper for %s, cannot render directly", v.id, k)
-			}
-		}
-	}
-
-	// set basics for rendering
+	// Apply configurations to content and wrapper
 	l.applyConfigToPartial(l.content)
 	if l.wrapper != nil {
 		l.applyConfigToPartial(l.wrapper)
+		// Set the wrapper as the parent of content
+		l.wrapper.With(l.content)
+		// Render the wrapper
+		return l.wrapper.RenderWithRequest(ctx, r)
+	} else {
+		// Render the content directly
+		return l.content.RenderWithRequest(ctx, r)
 	}
-
-	if renderTarget == "" && l.wrapper != nil {
-		return l.renderWrapped(ctx, r)
-	}
-
-	if renderTarget != "" {
-		if l.content.id == renderTarget {
-			out, err := l.content.render(ctx, r)
-
-			// we want to update the content with the wrapper's oob children
-			if l.wrapper != nil {
-				out += l.renderOOBChildren(ctx, r.URL, l.wrapper, true)
-			}
-
-			return out, err
-		}
-
-		return l.renderPartial(ctx, l.content, r.URL, renderTarget)
-	}
-
-	return l.content.render(ctx, r)
-}
-
-// renderWrapped renders the partial with the wrapper.
-func (l *Layout) renderWrapped(ctx context.Context, r *http.Request) (template.HTML, error) {
-	l.wrapper.With(l.content)
-
-	return l.wrapper.render(ctx, r)
-}
-
-// renderPartial renders the partial with the target.
-func (l *Layout) renderPartial(ctx context.Context, p *Partial, currentURL *url.URL, target string) (template.HTML, error) {
-	c := l.recursiveChildLookup(p, target, make(map[string]bool))
-	if c == nil {
-		return "", fmt.Errorf("requested partial %s not found", target)
-	}
-
-	out, err := c.renderNamed(ctx, currentURL, path.Base(c.templates[0]), c.templates)
-	if err != nil {
-		return "", err
-	}
-
-	// find all the oob children and add them to the output
-	if c.parent != nil {
-		out += l.renderOOBChildren(ctx, currentURL, c.parent, true)
-	}
-
-	return out, nil
-}
-
-// renderOOBChildren renders the children of the partial add sets the isOOB flag if attachOOB is true.
-func (l *Layout) renderOOBChildren(ctx context.Context, currentURL *url.URL, p *Partial, attachOOB bool) (out template.HTML) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	for id := range p.oobChildren {
-		if child, cok := p.children[id]; cok {
-			child.isOOB = attachOOB
-			if childData, childErr := child.renderNamed(ctx, currentURL, path.Base(child.templates[0]), child.templates); childErr == nil {
-				out += childData
-			} else {
-				out += template.HTML(childErr.Error())
-			}
-		}
-	}
-
-	return out
-}
-
-// recursiveChildLookup looks up a child recursively.
-func (l *Layout) recursiveChildLookup(p *Partial, id string, visited map[string]bool) *Partial {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if visited[p.id] {
-		return nil
-	}
-	visited[p.id] = true
-
-	if c, ok := p.children[id]; ok {
-		return c
-	}
-
-	for _, child := range p.children {
-		if c := l.recursiveChildLookup(child, id, visited); c != nil {
-			return c
-		}
-	}
-
-	return nil
 }
 
 func (l *Layout) applyConfigToPartial(p *Partial) {
@@ -239,4 +138,5 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	p.useCache = l.service.config.UseCache
 	p.globalData = l.service.data
 	p.layoutData = l.data
+	p.partialHeader = l.service.config.PartialHeader
 }

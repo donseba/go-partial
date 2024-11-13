@@ -27,20 +27,21 @@ var (
 type (
 	// Partial represents a renderable component with optional children and data.
 	Partial struct {
-		id          string
-		parent      *Partial
-		isOOB       bool
-		fs          fs.FS
-		useCache    bool
-		templates   []string
-		functions   template.FuncMap
-		data        map[string]any
-		layoutData  map[string]any
-		globalData  map[string]any
-		mu          sync.RWMutex
-		children    map[string]*Partial
-		oobChildren map[string]struct{}
-		partials    map[string]template.HTML
+		id            string
+		parent        *Partial
+		isOOB         bool
+		fs            fs.FS
+		partialHeader string
+		useCache      bool
+		templates     []string
+		functions     template.FuncMap
+		data          map[string]any
+		layoutData    map[string]any
+		globalData    map[string]any
+		mu            sync.RWMutex
+		children      map[string]*Partial
+		oobChildren   map[string]struct{}
+		partials      map[string]template.HTML
 	}
 
 	// Data represents the data available to the partial.
@@ -142,6 +143,36 @@ func (p *Partial) AppendFuncs(funcs template.FuncMap) *Partial {
 	return p
 }
 
+// SetFileSystem sets the file system for the partial.
+func (p *Partial) SetFileSystem(fs fs.FS) *Partial {
+	p.fs = fs
+	return p
+}
+
+// SetFuncMap sets the template function map for the partial.
+func (p *Partial) SetFuncMap(funcMap template.FuncMap) *Partial {
+	p.functions = funcMap
+	return p
+}
+
+// UseCache sets the cache usage flag for the partial.
+func (p *Partial) UseCache(useCache bool) *Partial {
+	p.useCache = useCache
+	return p
+}
+
+// SetGlobalData sets the global data for the partial.
+func (p *Partial) SetGlobalData(data map[string]any) *Partial {
+	p.globalData = data
+	return p
+}
+
+// SetLayoutData sets the layout data for the partial.
+func (p *Partial) SetLayoutData(data map[string]any) *Partial {
+	p.layoutData = data
+	return p
+}
+
 // AddTemplate adds a template to the partial.
 func (p *Partial) AddTemplate(template string) *Partial {
 	p.templates = append(p.templates, template)
@@ -157,6 +188,12 @@ func (p *Partial) With(child *Partial) *Partial {
 	p.children[child.id].globalData = p.globalData
 	p.children[child.id].parent = p
 
+	return p
+}
+
+// SetParent sets the parent of the partial.
+func (p *Partial) SetParent(parent *Partial) *Partial {
+	p.parent = parent
 	return p
 }
 
@@ -216,68 +253,108 @@ func (p *Partial) getLayoutData() map[string]any {
 	return p.layoutData
 }
 
+func (p *Partial) getPartialHeader() string {
+	if p.partialHeader != "" {
+		return p.partialHeader
+	}
+	if p.parent != nil {
+		return p.parent.getPartialHeader()
+	}
+	return ""
+}
+
+func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
+	renderTarget := r.Header.Get(p.getPartialHeader())
+	return p.renderWithTarget(ctx, r, renderTarget)
+}
+
+func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request, renderTarget string) (template.HTML, error) {
+	if renderTarget == "" || renderTarget == p.id {
+		out, err := p.render(ctx, r)
+		if err != nil {
+			return "", err
+		}
+		// Render OOB children of parent if necessary
+		if p.parent != nil {
+			oobOut, err := p.parent.renderOOBChildren(ctx, r.URL, true)
+			if err != nil {
+				return "", err
+			}
+			out += oobOut
+		}
+		return out, nil
+	} else {
+		c := p.recursiveChildLookup(renderTarget, make(map[string]bool))
+		if c == nil {
+			return "", fmt.Errorf("requested partial %s not found", renderTarget)
+		}
+		return c.renderWithTarget(ctx, r, renderTarget)
+	}
+}
+
+// recursiveChildLookup looks up a child recursively.
+func (p *Partial) recursiveChildLookup(id string, visited map[string]bool) *Partial {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if visited[p.id] {
+		return nil
+	}
+	visited[p.id] = true
+
+	if c, ok := p.children[id]; ok {
+		return c
+	}
+
+	for _, child := range p.children {
+		if c := child.recursiveChildLookup(id, visited); c != nil {
+			return c
+		}
+	}
+
+	return nil
+}
+
 // render renders the full page with all children.
 func (p *Partial) render(ctx context.Context, r *http.Request) (template.HTML, error) {
-	// gather all children and render them into a map
+	// Render children
+	if err := p.renderChildren(ctx, r); err != nil {
+		return "", err
+	}
+
+	// Render self
+	return p.renderSelf(ctx, r.URL)
+}
+
+func (p *Partial) renderChildren(ctx context.Context, r *http.Request) error {
+
 	for id, child := range p.children {
 		childData, err := child.render(ctx, r)
-		p.mu.Lock()
-		if err == nil {
-			p.partials[id] = childData
-		} else {
-			p.partials[id] = template.HTML(err.Error())
+		if err != nil {
+			return fmt.Errorf("error rendering child '%s': %w", id, err)
 		}
+		p.mu.Lock()
+		p.partials[id] = childData
 		p.mu.Unlock()
 	}
-
-	out, err := p.renderNamed(ctx, r.URL, path.Base(p.templates[0]), p.templates)
-	if err != nil {
-		return template.HTML(err.Error()), err
-	}
-
-	return out, err
+	return nil
 }
 
 // renderNamed renders the partial with the given name and templates.
-func (p *Partial) renderNamed(ctx context.Context, currentURL *url.URL, name string, templates []string) (template.HTML, error) {
-	if len(templates) == 0 {
+func (p *Partial) renderSelf(ctx context.Context, currentURL *url.URL) (template.HTML, error) {
+	if len(p.templates) == 0 {
 		return "", errors.New("no templates provided for rendering")
 	}
 
-	var err error
 	functions := p.getFuncs()
 	functions["_isOOB"] = func() bool {
 		return p.isOOB
 	}
 
-	cacheKey := generateCacheKey(templates, functions)
-	tmpl, cached := templateCache.Load(cacheKey)
-	if !cached || !p.useCache {
-		// Obtain or create a mutex for this cache key
-		muInterface, _ := mutexCache.LoadOrStore(cacheKey, &sync.Mutex{})
-		mu := muInterface.(*sync.Mutex)
-
-		// Lock the mutex to ensure only one goroutine parses the template
-		mu.Lock()
-		defer mu.Unlock()
-
-		// Double-check if another goroutine has already parsed the template
-		tmpl, cached = templateCache.Load(cacheKey)
-		if !cached || !p.useCache {
-			t := template.New(name).Funcs(functions)
-			var tErr error
-
-			if fsys := p.getFS(); fsys != nil {
-				tmpl, tErr = t.ParseFS(fsys, templates...)
-			} else {
-				tmpl, tErr = t.ParseFiles(templates...)
-			}
-
-			if tErr != nil {
-				return "", fmt.Errorf("error executing template '%s': %w", name, tErr)
-			}
-			templateCache.Store(cacheKey, tmpl)
-		}
+	cacheKey := generateCacheKey(p.templates, functions)
+	tmpl, err := p.getOrParseTemplate(cacheKey, functions)
+	if err != nil {
+		return "", err
 	}
 
 	data := &Data{
@@ -289,17 +366,70 @@ func (p *Partial) renderNamed(ctx context.Context, currentURL *url.URL, name str
 		Partials: p.partials,
 	}
 
-	if t, ok := tmpl.(*template.Template); ok {
-		var buf bytes.Buffer
-		err = t.Execute(&buf, data)
-		if err != nil {
-			return "", fmt.Errorf("error parsing templates %v: %w", templates, err)
-		}
-
-		return template.HTML(buf.String()), nil // Return rendered content
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("error executing template '%s': %w", p.templates[0], err)
 	}
 
-	return "", errors.New("template is not a *template.Template")
+	return template.HTML(buf.String()), nil
+}
+
+func (p *Partial) renderOOBChildren(ctx context.Context, currentURL *url.URL, attachOOB bool) (template.HTML, error) {
+	var out template.HTML
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for id := range p.oobChildren {
+		if child, ok := p.children[id]; ok {
+			child.isOOB = attachOOB
+			childData, err := child.renderSelf(ctx, currentURL)
+			if err != nil {
+				return "", fmt.Errorf("error rendering OOB child '%s': %w", id, err)
+			}
+			out += childData
+		}
+	}
+	return out, nil
+}
+
+func (p *Partial) getOrParseTemplate(cacheKey string, functions template.FuncMap) (*template.Template, error) {
+	if tmpl, cached := templateCache.Load(cacheKey); cached && p.useCache {
+		if t, ok := tmpl.(*template.Template); ok {
+			return t, nil
+		}
+	}
+
+	muInterface, _ := mutexCache.LoadOrStore(cacheKey, &sync.Mutex{})
+	mu := muInterface.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Double-check after acquiring lock
+	if tmpl, cached := templateCache.Load(cacheKey); cached && p.useCache {
+		if t, ok := tmpl.(*template.Template); ok {
+			return t, nil
+		}
+	}
+
+	t := template.New(path.Base(p.templates[0])).Funcs(functions)
+	var tmpl *template.Template
+	var err error
+
+	if fsys := p.getFS(); fsys != nil {
+		tmpl, err = t.ParseFS(fsys, p.templates...)
+	} else {
+		tmpl, err = t.ParseFiles(p.templates...)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error parsing templates: %w", err)
+	}
+
+	if p.useCache {
+		templateCache.Store(cacheKey, tmpl)
+	}
+
+	return tmpl, nil
 }
 
 // Generate a hash of the function names to include in the cache key

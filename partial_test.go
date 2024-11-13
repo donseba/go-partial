@@ -197,7 +197,6 @@ func TestRequestOOB(t *testing.T) {
 		})
 		p.WithOOB(oob)
 
-		//out, err := p.RenderWithRequest(r.Context(), r)
 		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
