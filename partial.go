@@ -263,9 +263,32 @@ func (p *Partial) getPartialHeader() string {
 	return ""
 }
 
+// RenderWithRequest renders the partial with the given http.Request.
 func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
 	renderTarget := r.Header.Get(p.getPartialHeader())
 	return p.renderWithTarget(ctx, r, renderTarget)
+}
+
+// WriteWithRequest writes the partial to the http.ResponseWriter.
+func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	out, err := p.RenderWithRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write([]byte(out))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Render renders the partial without requiring an http.Request.
+// It can be used when you don't need access to the request data.
+func (p *Partial) Render(ctx context.Context) (template.HTML, error) {
+	// Since we don't have an http.Request, we'll pass nil where appropriate.
+	return p.render(ctx, nil)
 }
 
 func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request, renderTarget string) (template.HTML, error) {

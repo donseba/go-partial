@@ -117,6 +117,7 @@ func (l *Layout) AddData(key string, value any) *Layout {
 	return l
 }
 
+// RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
 	// Apply configurations to content and wrapper
 	l.applyConfigToPartial(l.content)
@@ -132,7 +133,26 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 	}
 }
 
+// WriteWithRequest writes the layout to the response writer.
+func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	out, err := l.RenderWithRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write([]byte(out))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (l *Layout) applyConfigToPartial(p *Partial) {
+	if p == nil {
+		return
+	}
+
 	p.fs = l.filesystem
 	p.functions = l.service.config.FuncMap
 	p.useCache = l.service.config.UseCache
