@@ -267,22 +267,54 @@ func (p *Partial) Clone() *Partial {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	clone := *p
-	clone.mu = sync.RWMutex{}
-	clone.children = make(map[string]*Partial)
-	for k, v := range p.children {
-		clone.children[k] = v
+	// Create a new Partial instance
+	clone := &Partial{
+		id:                p.id,
+		parent:            p.parent,
+		swapOOB:           p.swapOOB,
+		fs:                p.fs,
+		logger:            p.logger,
+		partialHeader:     p.partialHeader,
+		requestHeader:     p.requestHeader,
+		useCache:          p.useCache,
+		templates:         append([]string{}, p.templates...), // Copy the slice
+		combinedFunctions: make(template.FuncMap),
+		data:              make(map[string]any),
+		layoutData:        make(map[string]any),
+		globalData:        make(map[string]any),
+		children:          make(map[string]*Partial),
+		oobChildren:       make(map[string]struct{}),
+		// Do not copy the mutex (mu)
 	}
-	clone.data = make(map[string]any)
-	for k, v := range p.data {
-		clone.data[k] = v
-	}
-	clone.combinedFunctions = make(template.FuncMap)
+
+	// Copy the maps
 	for k, v := range p.combinedFunctions {
 		clone.combinedFunctions[k] = v
 	}
 
-	return &clone
+	for k, v := range p.data {
+		clone.data[k] = v
+	}
+
+	for k, v := range p.layoutData {
+		clone.layoutData[k] = v
+	}
+
+	for k, v := range p.globalData {
+		clone.globalData[k] = v
+	}
+
+	// Copy the children map
+	for k, v := range p.children {
+		clone.children[k] = v
+	}
+
+	// Copy the out-of-band children set
+	for k, v := range p.oobChildren {
+		clone.oobChildren[k] = v
+	}
+
+	return clone
 }
 
 func (p *Partial) getFuncs(data *Data) template.FuncMap {

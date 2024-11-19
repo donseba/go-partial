@@ -31,7 +31,6 @@ type (
 		FuncMap       template.FuncMap
 		Logger        Logger
 		fs            fs.FS
-		funcMapLock   sync.RWMutex // Add a read-write mutex
 	}
 
 	Service struct {
@@ -212,7 +211,7 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	}
 
 	// Combine functions only once
-	combinedFunctions := l.combinedFunctions
+	combinedFunctions := l.getFuncMap()
 
 	p.mergeFuncMapInternal(combinedFunctions)
 
