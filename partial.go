@@ -179,13 +179,16 @@ func (p *Partial) mergeFuncMapInternal(funcMap template.FuncMap) {
 }
 
 func (p *Partial) getFuncMap() template.FuncMap {
-	if p.parent != nil {
-		p.mergeFuncMapInternal(p.parent.getFuncMap())
-		return p.combinedFunctions
-	}
-
 	p.mu.RLock()
 	defer p.mu.RUnlock()
+
+	if p.parent != nil {
+		for k, v := range p.parent.getFuncMap() {
+			p.combinedFunctions[k] = v
+		}
+
+		return p.combinedFunctions
+	}
 
 	return p.combinedFunctions
 }
@@ -502,7 +505,10 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[st
 	child, ok := p.children[id]
 	p.mu.RUnlock()
 	if !ok {
-		return "", fmt.Errorf("child partial '%s' not found", id)
+		if p.logger != nil {
+			p.logger.Warn("child partial not found", "id", id)
+		}
+		return "", nil
 	}
 
 	// Clone the child partial to avoid modifying the original and prevent data races
