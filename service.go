@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"sync"
 )
 
 var (
@@ -30,19 +31,25 @@ type (
 		FuncMap       template.FuncMap
 		Logger        Logger
 		fs            fs.FS
+		funcMapLock   sync.RWMutex // Add a read-write mutex
 	}
 
 	Service struct {
-		config *Config
-		data   map[string]any
+		config            *Config
+		data              map[string]any
+		combinedFunctions template.FuncMap
+		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
 
 	Layout struct {
-		service    *Service
-		filesystem fs.FS
-		content    *Partial
-		wrapper    *Partial
-		data       map[string]any
+		service           *Service
+		filesystem        fs.FS
+		content           *Partial
+		wrapper           *Partial
+		data              map[string]any
+		requestHeader     string
+		combinedFunctions template.FuncMap
+		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
 )
 
@@ -61,17 +68,20 @@ func NewService(cfg *Config) *Service {
 	}
 
 	return &Service{
-		config: cfg,
-		data:   make(map[string]any),
+		config:            cfg,
+		data:              make(map[string]any),
+		funcMapLock:       sync.RWMutex{},
+		combinedFunctions: cfg.FuncMap,
 	}
 }
 
 // NewLayout returns a new layout.
 func (svc *Service) NewLayout() *Layout {
 	return &Layout{
-		service:    svc,
-		data:       make(map[string]any),
-		filesystem: svc.config.fs,
+		service:           svc,
+		data:              make(map[string]any),
+		filesystem:        svc.config.fs,
+		combinedFunctions: svc.getFuncMap(),
 	}
 }
 
@@ -87,6 +97,27 @@ func (svc *Service) AddData(key string, value any) *Service {
 	return svc
 }
 
+// MergeFuncMap merges the given FuncMap with the existing FuncMap.
+func (svc *Service) MergeFuncMap(funcMap template.FuncMap) {
+	svc.funcMapLock.Lock()
+	defer svc.funcMapLock.Unlock()
+
+	for k, v := range funcMap {
+		if _, ok := protectedFunctionNames[k]; ok {
+			svc.config.Logger.Warn("function name is protected and cannot be overwritten", "function", k)
+			continue
+		}
+		// Modify the existing map directly
+		svc.combinedFunctions[k] = v
+	}
+}
+
+func (svc *Service) getFuncMap() template.FuncMap {
+	svc.funcMapLock.RLock()
+	defer svc.funcMapLock.RUnlock()
+	return svc.combinedFunctions
+}
+
 // FS sets the filesystem for the Layout.
 func (l *Layout) FS(fs fs.FS) *Layout {
 	l.filesystem = fs
@@ -96,12 +127,14 @@ func (l *Layout) FS(fs fs.FS) *Layout {
 // Set sets the content for the layout.
 func (l *Layout) Set(p *Partial) *Layout {
 	l.content = p
+	l.applyConfigToPartial(l.content)
 	return l
 }
 
 // Wrap sets the wrapper for the layout.
 func (l *Layout) Wrap(p *Partial) *Layout {
 	l.wrapper = p
+	l.applyConfigToPartial(l.wrapper)
 	return l
 }
 
@@ -117,17 +150,42 @@ func (l *Layout) AddData(key string, value any) *Layout {
 	return l
 }
 
+// MergeFuncMap merges the given FuncMap with the existing FuncMap in the Layout.
+func (l *Layout) MergeFuncMap(funcMap template.FuncMap) {
+	l.funcMapLock.Lock()
+	defer l.funcMapLock.Unlock()
+
+	for k, v := range funcMap {
+		if _, ok := protectedFunctionNames[k]; ok {
+			l.service.config.Logger.Warn("function name is protected and cannot be overwritten", "function", k)
+			continue
+		}
+		// Modify the existing map directly
+		l.combinedFunctions[k] = v
+	}
+}
+
+func (l *Layout) getFuncMap() template.FuncMap {
+	l.funcMapLock.RLock()
+	defer l.funcMapLock.RUnlock()
+
+	return l.combinedFunctions
+}
+
 // RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	// Apply configurations to content and wrapper
-	l.applyConfigToPartial(l.content)
+	// get partial header from request
+	header := r.Header.Get(l.service.config.PartialHeader)
+	// add header to data
+	l.requestHeader = header
+
 	if l.wrapper != nil {
-		l.applyConfigToPartial(l.wrapper)
-		// Set the wrapper as the parent of content
+		l.wrapper.requestHeader = l.requestHeader
 		l.wrapper.With(l.content)
 		// Render the wrapper
 		return l.wrapper.RenderWithRequest(ctx, r)
 	} else {
+		l.content.requestHeader = l.requestHeader
 		// Render the content directly
 		return l.content.RenderWithRequest(ctx, r)
 	}
@@ -153,10 +211,16 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		return
 	}
 
+	// Combine functions only once
+	combinedFunctions := l.combinedFunctions
+
+	p.mergeFuncMapInternal(combinedFunctions)
+
 	p.fs = l.filesystem
-	p.functions = l.service.config.FuncMap
+	p.logger = l.service.config.Logger
 	p.useCache = l.service.config.UseCache
 	p.globalData = l.service.data
 	p.layoutData = l.data
 	p.partialHeader = l.service.config.PartialHeader
+	p.requestHeader = l.requestHeader
 }

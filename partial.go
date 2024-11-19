@@ -3,8 +3,6 @@ package partial
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"html/template"
@@ -12,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"sort"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -22,26 +20,36 @@ var (
 	templateCache = sync.Map{}
 	// mutexCache is a cache of mutexes for each template key
 	mutexCache = sync.Map{}
+	// protectedFunctionNames is a set of function names that are protected from being overridden
+	protectedFunctionNames = map[string]struct{}{
+		"child":         {},
+		"context":       {},
+		"partialHeader": {},
+		"requestHeader": {},
+		"swapOOB":       {},
+		"url":           {},
+	}
 )
 
 type (
 	// Partial represents a renderable component with optional children and data.
 	Partial struct {
-		id            string
-		parent        *Partial
-		isOOB         bool
-		fs            fs.FS
-		partialHeader string
-		useCache      bool
-		templates     []string
-		functions     template.FuncMap
-		data          map[string]any
-		layoutData    map[string]any
-		globalData    map[string]any
-		mu            sync.RWMutex
-		children      map[string]*Partial
-		oobChildren   map[string]struct{}
-		partials      map[string]template.HTML
+		id                string
+		parent            *Partial
+		swapOOB           bool
+		fs                fs.FS
+		logger            Logger
+		partialHeader     string
+		requestHeader     string
+		useCache          bool
+		templates         []string
+		combinedFunctions template.FuncMap
+		data              map[string]any
+		layoutData        map[string]any
+		globalData        map[string]any
+		mu                sync.RWMutex
+		children          map[string]*Partial
+		oobChildren       map[string]struct{}
 	}
 
 	// Data represents the data available to the partial.
@@ -56,8 +64,6 @@ type (
 		Service map[string]any
 		// LayoutData contains data specific to the service
 		Layout map[string]any
-		// Partials contains the rendered HTML of child partials
-		Partials map[string]template.HTML
 	}
 
 	// GlobalData represents the global data available to all partials.
@@ -67,15 +73,14 @@ type (
 // New creates a new root.
 func New(templates ...string) *Partial {
 	return &Partial{
-		id:          "root",
-		templates:   templates,
-		functions:   make(template.FuncMap),
-		data:        make(map[string]any),
-		layoutData:  make(map[string]any),
-		globalData:  make(map[string]any),
-		children:    make(map[string]*Partial),
-		oobChildren: make(map[string]struct{}),
-		partials:    make(map[string]template.HTML),
+		id:                "root",
+		templates:         templates,
+		combinedFunctions: make(template.FuncMap),
+		data:              make(map[string]any),
+		layoutData:        make(map[string]any),
+		globalData:        make(map[string]any),
+		children:          make(map[string]*Partial),
+		oobChildren:       make(map[string]struct{}),
 	}
 }
 
@@ -103,7 +108,6 @@ func (p *Partial) Reset() *Partial {
 	p.globalData = make(map[string]any)
 	p.children = make(map[string]*Partial)
 	p.oobChildren = make(map[string]struct{})
-	p.partials = make(map[string]template.HTML)
 
 	return p
 }
@@ -120,38 +124,80 @@ func (p *Partial) AddData(key string, value any) *Partial {
 	return p
 }
 
-// SetFuncs sets the functions for the partial.
-func (p *Partial) SetFuncs(funcs template.FuncMap) *Partial {
-	p.functions = funcs
+// MergeData merges the data into the partial.
+func (p *Partial) MergeData(data map[string]any, override bool) *Partial {
+	for k, v := range data {
+		if _, ok := p.data[k]; ok && !override {
+			continue
+		}
+
+		p.data[k] = v
+	}
 	return p
 }
 
 // AddFunc adds a function to the partial.
 func (p *Partial) AddFunc(name string, fn interface{}) *Partial {
-	p.functions[name] = fn
+	if _, ok := protectedFunctionNames[name]; ok {
+		if p.logger != nil {
+			p.logger.Warn("function name is protected and cannot be overwritten", "function", name)
+		}
+		return p
+	}
+
+	p.mu.Lock()
+	p.combinedFunctions[name] = fn
+	p.mu.Unlock()
+
 	return p
 }
 
-// AppendFuncs appends functions to the partial if they do not exist.
-func (p *Partial) AppendFuncs(funcs template.FuncMap) *Partial {
-	for k, v := range funcs {
-		if _, ok := p.functions[k]; !ok {
-			p.functions[k] = v
+// MergeFuncMap merges the given FuncMap with the existing FuncMap in the Partial.
+func (p *Partial) MergeFuncMap(funcMap template.FuncMap) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for k, v := range funcMap {
+		if _, ok := protectedFunctionNames[k]; ok {
+			if p.logger != nil {
+				p.logger.Warn("function name is protected and cannot be overwritten", "function", k)
+			}
+			continue
 		}
+
+		p.combinedFunctions[k] = v
+	}
+}
+
+func (p *Partial) mergeFuncMapInternal(funcMap template.FuncMap) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for k, v := range funcMap {
+		p.combinedFunctions[k] = v
+	}
+}
+
+func (p *Partial) getFuncMap() template.FuncMap {
+	if p.parent != nil {
+		p.mergeFuncMapInternal(p.parent.getFuncMap())
+		return p.combinedFunctions
 	}
 
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	return p.combinedFunctions
+}
+
+func (p *Partial) SetLogger(logger Logger) *Partial {
+	p.logger = logger
 	return p
 }
 
 // SetFileSystem sets the file system for the partial.
 func (p *Partial) SetFileSystem(fs fs.FS) *Partial {
 	p.fs = fs
-	return p
-}
-
-// SetFuncMap sets the template function map for the partial.
-func (p *Partial) SetFuncMap(funcMap template.FuncMap) *Partial {
-	p.functions = funcMap
 	return p
 }
 
@@ -217,17 +263,74 @@ func (p *Partial) getFS() fs.FS {
 	return nil
 }
 
-func (p *Partial) getFuncs() template.FuncMap {
-	funcs := make(template.FuncMap)
-	if p.parent != nil {
-		parentFuncs := p.parent.getFuncs()
-		for k, v := range parentFuncs {
-			funcs[k] = v
+func (p *Partial) Clone() *Partial {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	clone := *p
+	clone.mu = sync.RWMutex{}
+	clone.children = make(map[string]*Partial)
+	for k, v := range p.children {
+		clone.children[k] = v
+	}
+	clone.data = make(map[string]any)
+	for k, v := range p.data {
+		clone.data[k] = v
+	}
+	clone.combinedFunctions = make(template.FuncMap)
+	for k, v := range p.combinedFunctions {
+		clone.combinedFunctions[k] = v
+	}
+
+	return &clone
+}
+
+func (p *Partial) getFuncs(data *Data) template.FuncMap {
+	funcs := p.getFuncMap()
+
+	funcs["swapOOB"] = func() bool {
+		return p.swapOOB
+	}
+
+	funcs["child"] = func(id string, vals ...any) template.HTML {
+		if len(vals) > 0 && len(vals)%2 != 0 {
+			return template.HTML(fmt.Sprintf("invalid child data for partial '%s'", id))
 		}
+
+		d := make(map[string]any)
+		for i := 0; i < len(vals); i += 2 {
+			key, ok := vals[i].(string)
+			if !ok {
+				return template.HTML(fmt.Sprintf("invalid child data key for partial '%s'", id))
+			}
+			d[key] = vals[i+1]
+		}
+
+		html, err := p.renderChildPartial(data.Ctx, id, d)
+		if err != nil {
+			// Handle error: you can log it and return an empty string or an error message
+			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
+		}
+
+		return html
 	}
-	for k, v := range p.functions {
-		funcs[k] = v
+
+	funcs["url"] = func() *url.URL {
+		return data.URL
 	}
+
+	funcs["context"] = func() context.Context {
+		return data.Ctx
+	}
+
+	funcs["requestHeader"] = func() string {
+		return p.getRequestHeader()
+	}
+
+	funcs["partialHeader"] = func() string {
+		return p.getPartialHeader()
+	}
+
 	return funcs
 }
 
@@ -263,14 +366,34 @@ func (p *Partial) getPartialHeader() string {
 	return ""
 }
 
+func (p *Partial) getRequestHeader() string {
+	if p.requestHeader != "" {
+		return p.requestHeader
+	}
+	if p.parent != nil {
+		return p.parent.getRequestHeader()
+	}
+	return ""
+}
+
 // RenderWithRequest renders the partial with the given http.Request.
 func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
+	if p == nil {
+		return "", errors.New("partial is not initialized")
+	}
+
 	renderTarget := r.Header.Get(p.getPartialHeader())
+
 	return p.renderWithTarget(ctx, r, renderTarget)
 }
 
 // WriteWithRequest writes the partial to the http.ResponseWriter.
 func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	if p == nil {
+		_, err := fmt.Fprintf(w, "partial is not initialized")
+		return err
+	}
+
 	out, err := p.RenderWithRequest(ctx, r)
 	if err != nil {
 		return err
@@ -287,13 +410,17 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 // Render renders the partial without requiring an http.Request.
 // It can be used when you don't need access to the request data.
 func (p *Partial) Render(ctx context.Context) (template.HTML, error) {
+	if p == nil {
+		return "", errors.New("partial is not initialized")
+	}
+
 	// Since we don't have an http.Request, we'll pass nil where appropriate.
-	return p.render(ctx, nil)
+	return p.renderSelf(ctx, nil)
 }
 
 func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request, renderTarget string) (template.HTML, error) {
 	if renderTarget == "" || renderTarget == p.id {
-		out, err := p.render(ctx, r)
+		out, err := p.renderSelf(ctx, r.URL)
 		if err != nil {
 			return "", err
 		}
@@ -338,29 +465,27 @@ func (p *Partial) recursiveChildLookup(id string, visited map[string]bool) *Part
 	return nil
 }
 
-// render renders the full page with all children.
-func (p *Partial) render(ctx context.Context, r *http.Request) (template.HTML, error) {
-	// Render children
-	if err := p.renderChildren(ctx, r); err != nil {
-		return "", err
+func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[string]any) (template.HTML, error) {
+	p.mu.RLock()
+	child, ok := p.children[id]
+	p.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("child partial '%s' not found", id)
 	}
 
-	// Render self
-	return p.renderSelf(ctx, r.URL)
-}
+	// Clone the child partial to avoid modifying the original and prevent data races
+	childClone := child.Clone()
 
-func (p *Partial) renderChildren(ctx context.Context, r *http.Request) error {
+	// Set the parent of the cloned child to the current partial
+	childClone.parent = p
 
-	for id, child := range p.children {
-		childData, err := child.render(ctx, r)
-		if err != nil {
-			return fmt.Errorf("error rendering child '%s': %w", id, err)
-		}
-		p.mu.Lock()
-		p.partials[id] = childData
-		p.mu.Unlock()
+	// If additional data is provided, set it on the cloned child partial
+	if data != nil {
+		childClone.MergeData(data, true)
 	}
-	return nil
+
+	// Render the cloned child partial
+	return childClone.renderSelf(ctx, nil)
 }
 
 // renderNamed renders the partial with the given name and templates.
@@ -369,24 +494,21 @@ func (p *Partial) renderSelf(ctx context.Context, currentURL *url.URL) (template
 		return "", errors.New("no templates provided for rendering")
 	}
 
-	functions := p.getFuncs()
-	functions["_isOOB"] = func() bool {
-		return p.isOOB
+	data := &Data{
+		URL:     currentURL,
+		Ctx:     ctx,
+		Data:    p.data,
+		Service: p.getGlobalData(),
+		Layout:  p.getLayoutData(),
 	}
 
-	cacheKey := generateCacheKey(p.templates, functions)
+	functions := p.getFuncs(data)
+	funcMapPtr := reflect.ValueOf(functions).Pointer()
+
+	cacheKey := generateCacheKey(p.templates, funcMapPtr)
 	tmpl, err := p.getOrParseTemplate(cacheKey, functions)
 	if err != nil {
 		return "", err
-	}
-
-	data := &Data{
-		URL:      currentURL,
-		Ctx:      ctx,
-		Data:     p.data,
-		Service:  p.getGlobalData(),
-		Layout:   p.getLayoutData(),
-		Partials: p.partials,
 	}
 
 	var buf bytes.Buffer
@@ -397,14 +519,14 @@ func (p *Partial) renderSelf(ctx context.Context, currentURL *url.URL) (template
 	return template.HTML(buf.String()), nil
 }
 
-func (p *Partial) renderOOBChildren(ctx context.Context, currentURL *url.URL, attachOOB bool) (template.HTML, error) {
+func (p *Partial) renderOOBChildren(ctx context.Context, currentURL *url.URL, swapOOB bool) (template.HTML, error) {
 	var out template.HTML
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	for id := range p.oobChildren {
 		if child, ok := p.children[id]; ok {
-			child.isOOB = attachOOB
+			child.swapOOB = swapOOB
 			childData, err := child.renderSelf(ctx, currentURL)
 			if err != nil {
 				return "", fmt.Errorf("error rendering OOB child '%s': %w", id, err)
@@ -456,7 +578,7 @@ func (p *Partial) getOrParseTemplate(cacheKey string, functions template.FuncMap
 }
 
 // Generate a hash of the function names to include in the cache key
-func generateCacheKey(templates []string, funcMap template.FuncMap) string {
+func generateCacheKey(templates []string, funcMapPtr uintptr) string {
 	var builder strings.Builder
 
 	// Include all template names
@@ -464,19 +586,9 @@ func generateCacheKey(templates []string, funcMap template.FuncMap) string {
 		builder.WriteString(tmpl)
 		builder.WriteString(";")
 	}
-	builder.WriteString(":")
 
-	funcNames := make([]string, 0, len(funcMap))
-	for name := range funcMap {
-		funcNames = append(funcNames, name)
-	}
-	sort.Strings(funcNames)
+	// Include function map pointer
+	builder.WriteString(fmt.Sprintf("funcMap:%x", funcMapPtr))
 
-	for _, name := range funcNames {
-		builder.WriteString(name)
-		builder.WriteString(",")
-	}
-
-	hash := sha256.Sum256([]byte(builder.String()))
-	return hex.EncodeToString(hash[:])
+	return builder.String()
 }
