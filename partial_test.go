@@ -1,9 +1,11 @@
 package partial
 
 import (
-	"encoding/json"
+	"context"
+	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -39,14 +41,6 @@ func TestNewRoot(t *testing.T) {
 		t.Errorf("NewRoot should have 0 oobChildren, got %d", len(root.oobChildren))
 	}
 
-	if len(root.partials) != 0 {
-		t.Errorf("NewRoot should have 0 partials, got %d", len(root.partials))
-	}
-
-	if root.functions == nil {
-		t.Error("NewRoot should have non-nil functions")
-	}
-
 	if root.data == nil {
 		t.Error("NewRoot should have non-nil data")
 	}
@@ -61,16 +55,17 @@ func TestNewRoot(t *testing.T) {
 }
 
 func TestRequestBasic(t *testing.T) {
+	svc := NewService(&Config{})
+
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
+				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
 
 		p := New("templates/index.html").ID("root")
-		p.WithFS(fsys)
 
 		// content
 		content := New("templates/content.html").ID("content")
@@ -79,7 +74,7 @@ func TestRequestBasic(t *testing.T) {
 		})
 		p.With(content)
 
-		out, err := p.RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -115,25 +110,25 @@ func TestRequestBasic(t *testing.T) {
 }
 
 func TestRequestWrap(t *testing.T) {
+	svc := NewService(&Config{})
+
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
+				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
 
-		p := New("templates/index.html").ID("root")
-		p.WithFS(fsys)
+		index := New("templates/index.html").ID("root")
 
 		// content
 		content := New("templates/content.html").ID("content")
 		content.SetData(map[string]any{
 			"Text": "Welcome to the home page",
 		})
-		content.Wrap(p)
 
-		out, err := content.RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(index).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -169,19 +164,18 @@ func TestRequestWrap(t *testing.T) {
 }
 
 func TestRequestOOB(t *testing.T) {
-	UseTemplateCache = false
+	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
+				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if _isOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
 		p := New("templates/index.html").ID("root")
-		p.WithFS(fsys)
 
 		// content
 		content := New("templates/content.html").ID("content")
@@ -197,7 +191,7 @@ func TestRequestOOB(t *testing.T) {
 		})
 		p.WithOOB(oob)
 
-		out, err := p.RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -233,20 +227,19 @@ func TestRequestOOB(t *testing.T) {
 }
 
 func TestRequestOOBSwap(t *testing.T) {
-	UseTemplateCache = false
+	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   "<html><body>{{.Partials.content }}{{.Partials.footer }}</body></html>",
+				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if _isOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
 		// the main template that will be rendered
 		p := New("templates/index.html").ID("root")
-		p.WithFS(fsys)
 
 		// oob footer that resides on the page
 		oob := New("templates/footer.html").ID("footer")
@@ -259,9 +252,9 @@ func TestRequestOOBSwap(t *testing.T) {
 		content := New("templates/content.html").ID("content")
 		content.SetData(map[string]any{
 			"Text": "Welcome to the home page",
-		}).Wrap(p)
+		})
 
-		out, err := content.RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -297,17 +290,18 @@ func TestRequestOOBSwap(t *testing.T) {
 }
 
 func TestDeepNested(t *testing.T) {
+	svc := NewService(&Config{})
+
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &InMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
+				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/nested.html":  "<div>{{.Data.Text}}</div>",
+				"templates/nested.html":  `<div>{{ upper .Data.Text }}</div>`,
 			},
 		}
 
 		p := New("templates/index.html").ID("root")
-		p.WithFS(fsys)
 
 		// nested content
 		nested := New("templates/nested.html").ID("nested")
@@ -323,7 +317,7 @@ func TestDeepNested(t *testing.T) {
 
 		p.With(content)
 
-		out, err := p.RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -339,7 +333,7 @@ func TestDeepNested(t *testing.T) {
 
 		handleRequest(response, request)
 
-		expected := "<div>This is the nested content</div>"
+		expected := "<div>THIS IS THE NESTED CONTENT</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -347,18 +341,18 @@ func TestDeepNested(t *testing.T) {
 }
 
 func TestMissingPartial(t *testing.T) {
-	fsys := &InMemoryFS{
-		Files: map[string]string{
-			"templates/index.html": "<html><body>{{.Partials.content }}</body></html>",
-		},
-	}
-
-	p := New("templates/index.html").ID("root")
-	p.WithFS(fsys)
+	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		// ... setup code ...
-		out, err := p.RenderWithRequest(r.Context(), r)
+		fsys := &InMemoryFS{
+			Files: map[string]string{
+				"templates/index.html": `<html><body>{{ child "content" }}</body></html>`,
+			},
+		}
+
+		p := New("templates/index.html").ID("root")
+
+		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -377,20 +371,174 @@ func TestMissingPartial(t *testing.T) {
 	}
 }
 
-func TestTree(t *testing.T) {
-	p := New("template1", "template2").ID("root")
-	child := New("template1", "template2").ID("id")
-	oobChild := New("template1", "template2").ID("id1")
+func TestDataInTemplates(t *testing.T) {
+	svc := NewService(&Config{})
+	svc.AddData("Title", "My Page")
 
-	child.With(oobChild)
+	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
+		// Create a new layout
+		layout := svc.NewLayout()
 
-	p.With(child)
-	p.WithOOB(oobChild)
+		// Set LayoutData
+		layout.SetData(map[string]any{
+			"PageTitle": "Home Page",
+			"User":      "John Doe",
+		})
 
-	tr := Tree(p)
-	js, err := json.MarshalIndent(tr, "", "  ")
-	if err != nil {
-		t.Errorf("error marshalling tree: %v", err)
+		fsys := &InMemoryFS{
+			Files: map[string]string{
+				"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
+				"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
+			},
+		}
+
+		content := New("templates/content.html").ID("content")
+		content.SetData(map[string]any{
+			"Articles": []string{"Article 1", "Article 2", "Article 3"},
+		})
+
+		p := New("templates/index.html").ID("root")
+		p.With(content)
+
+		out, err := layout.FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(out))
 	}
-	t.Logf("%+v", string(js))
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	response := httptest.NewRecorder()
+
+	handleRequest(response, request)
+
+	expected := "<html><head><title>My Page</title></head><body><div>Home Page</div><div>John Doe</div><div>[Article 1 Article 2 Article 3]</div></body></html>"
+	if response.Body.String() != expected {
+		t.Errorf("expected %s, got %s", expected, response.Body.String())
+	}
+}
+
+func BenchmarkRenderWithRequest(b *testing.B) {
+	// Setup configuration and service
+	cfg := &Config{
+		PartialHeader: "X-Partial",
+		UseCache:      false,
+	}
+
+	// Benchmark results before function passing
+	// with cache    : BenchmarkRenderWithRequest-12    	  169927	      6551 ns/op
+	// without cache : BenchmarkRenderWithRequest-12    	   51270	     22398 ns/op
+
+	// Benchmark results after function passing
+	// with cache    : BenchmarkRenderWithRequest-12    	   65800	      2240 ns/op
+	// without cache : BenchmarkRenderWithRequest-12    	   42045	     17857 ns/op
+
+	// Benchmark results after function passing and optimization
+	// with cache    : BenchmarkRenderWithRequest-12    	  530058	      2240 ns/op
+	// without cache : BenchmarkRenderWithRequest-12    	   65800	     17857 ns/op
+
+	service := NewService(cfg)
+
+	fsys := &InMemoryFS{
+		Files: map[string]string{
+			"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
+			"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
+		},
+	}
+
+	// Create a new layout
+	layout := service.NewLayout().FS(fsys)
+
+	// Create content partial
+	content := NewID("content", "templates/content.html")
+	content.SetData(map[string]any{
+		"Title":   "Benchmark Test",
+		"Message": "This is a benchmark test.",
+	})
+
+	// Set the content partial in the layout
+	layout.Set(content)
+
+	// Create a sample HTTP request
+	req := httptest.NewRequest("GET", "/", nil)
+
+	// Reset the timer after setup
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Call the function you want to benchmark
+		_, err := layout.RenderWithRequest(context.Background(), req)
+		if err != nil {
+			b.Fatalf("Error rendering: %v", err)
+		}
+	}
+}
+
+func TestRenderTable(t *testing.T) {
+	svc := NewService(&Config{})
+
+	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
+		// Define in-memory templates for the table and the row
+		fsys := &InMemoryFS{
+			Files: map[string]string{
+				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" "RowNumber" $i }}{{ end }}</table>`,
+				"templates/row.html":   `<tr><td>Row {{ .Data.RowNumber }}</td></tr>`,
+			},
+		}
+
+		// Create the row partial
+		rowPartial := New("templates/row.html").ID("row")
+
+		// Create the table partial and set data
+		tablePartial := New("templates/table.html").ID("table")
+		tablePartial.SetData(map[string]any{
+			"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
+		})
+		tablePartial.With(rowPartial)
+
+		// Render the table partial
+		out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(r.Context(), r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write([]byte(out))
+	}
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	response := httptest.NewRecorder()
+
+	handleRequest(response, request)
+
+	expected := `<table><tr><td>Row 1</td></tr><tr><td>Row 2</td></tr><tr><td>Row 3</td></tr><tr><td>Row 4</td></tr><tr><td>Row 5</td></tr></table>`
+
+	if strings.TrimSpace(response.Body.String()) != expected {
+		t.Errorf("expected %s, got %s", expected, response.Body.String())
+	}
+}
+
+func TestMergeFuncMap(t *testing.T) {
+	svc := NewService(&Config{
+		FuncMap: template.FuncMap{
+			"existingFunc": func() string { return "existing" },
+		},
+	})
+
+	svc.MergeFuncMap(template.FuncMap{
+		"newFunc": func() string { return "new" },
+		"child":   func() string { return "should not overwrite" },
+	})
+
+	if _, ok := svc.config.FuncMap["newFunc"]; !ok {
+		t.Error("newFunc should be added to FuncMap")
+	}
+
+	if svc.config.FuncMap["newFunc"].(func() string)() != "new" {
+		t.Error("newFunc should return 'new'")
+	}
+
+	if _, ok := svc.config.FuncMap["child"]; ok {
+		t.Error("child should not be overwritten in FuncMap")
+	}
 }

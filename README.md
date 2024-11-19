@@ -1,15 +1,15 @@
-# Go Partial
+# Go Partial - Partial Template Rendering for Go
 
-A Go package for rendering partial HTML snippets based on specific HTTP headers. It supports nested partials, out-of-band (OOB) partials, template caching, and more.
-
+This package provides a flexible and efficient way to manage and render partial templates in Go (Golang). It allows you to create reusable, hierarchical templates with support for layouts, global data, caching, and more.
 ## Features
 
-- **Partial Rendering**: Render specific parts of a webpage based on an HTTP header.
-- **Nested Partials**: Support for nesting partials within each other.
-- **Out-of-Band (OOB) Partials**: Render OOB partials for dynamic content updates without a full page reload.
-- **Template Caching**: Optional template caching with concurrency safety.
-- **Template Functions**: Support for custom template functions.
-- **File System Support**: Use any fs.FS as the template file system.
+- **Partial Templates**: Define and render partial templates with their own data and functions.
+- **Layouts**: Use layouts to wrap content and share data across multiple partials.
+- **Global Data**: Set global data accessible to all partials.
+- **Template Caching**: Enable caching of parsed templates for improved performance.
+- **Out-of-Band Rendering**: Support for rendering out-of-band (OOB) partials.
+- **File System Support**: Use custom fs.FS implementations for template file access.
+- **Thread-Safe**: Designed for concurrent use in web applications.
 
 ## Installation
 To install the package, run:
@@ -17,92 +17,102 @@ To install the package, run:
 go get github.com/donseba/go-partial
 ```
 
-## Usage
-Below are examples demonstrating how to use the partial package in your Go projects.
+## Basic Usage
 
-### Basic Usage
-```go
-package main
+Here's a simple example of how to use the package to render a template.
 
-import (
-    "context"
-    "net/http"
+### 1. Create a Service
 
-    "github.com/donseba/go-partial"
-)
+The `Service` holds global configurations and data.
 
-func main() {
-    http.HandleFunc("/", handleRequest)
-    http.ListenAndServe(":8080", nil)
+```go 
+cfg := &partial.Config{
+    PartialHeader: "X-Partial",          // Optional: Header to determine which partial to render
+    UseCache:      true,                 // Enable template caching
+    FuncMap:       template.FuncMap{},   // Global template functions
+    Logger:        myLogger,             // Implement the Logger interface or use nil
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-	// cstom filesystem with the templates for mini website
-	fsys := &partial.InMemoryFS{
-		Files: map[string]string{
-			"templates/index.html":   "<html><body>{{.Partials.content }}</body></html>",
-			"templates/content.html": "<div>{{.Data.Text}}</div>",
-		},
-	}
-
-    // Create the root partial
-    p := partial.New("templates/index.html").ID("root").WithFS(fsys)
-
-    // Create a child partial
-    content := partial.New("templates/content.html").ID("content")
-    content.SetData(map[string]any{
-        "Text": "Welcome to the home page",
-    })
-
-    // Add the child partial to the root
-    p.With(content)
-
-    // Render the partial based on the request
-    out, err := p.RenderWithRequest(context.Background(), r)
-    if err != nil {
-        http.Error(w, "An error occurred while rendering the page", http.StatusInternalServerError)
-        return
-    }
-
-    w.Write([]byte(out))
-}
-```
-
-### Handling Partial Rendering
-
-To render only a specific partial based on an HTTP header:
-```go
-func handleRequest(w http.ResponseWriter, r *http.Request) {
-    // ... (setup code as before)
-
-    // Render the partial based on the request
-    out, err := p.RenderWithRequest(context.Background(), r)
-    if err != nil {
-        http.Error(w, "An error occurred while rendering the partial", http.StatusInternalServerError)
-        return
-    }
-
-    w.Write([]byte(out))
-}
-
-// Setting the header to request a specific partial
-request, _ := http.NewRequest(http.MethodGet, "/", nil)
-request.Header.Set("X-Partial", "content")
-```
-
-### Using Out-of-Band (OOB) Partials
-Out-of-Band partials allow you to update parts of the page without reloading:
-
-```go
-// Create the OOB partial
-footer := partial.New("templates/footer.html").ID("footer")
-footer.SetData(map[string]any{
-    "Text": "This is the footer",
+service := partial.NewService(cfg)
+service.SetData(map[string]any{
+    "AppName": "My Application",
 })
 
-// Add the OOB partial
-p.WithOOB(footer)
 ```
+
+## 2. Create a Layout
+
+The `Layout` manages the overall structure of your templates.
+```go
+layout := service.NewLayout()
+layout.SetData(map[string]any{
+    "PageTitle": "Home Page",
+})
+```
+
+### 3. Define Partials
+
+Create `Partial` instances for the content and any other components.
+
+```go 
+func handler(w http.ResponseWriter, r *http.Request) {
+    // Create the main content partial
+    content := partial.NewID("content", "templates/content.html")
+    content.SetData(map[string]any{
+        "Message": "Welcome to our website!",
+    })
+    
+    // Optionally, create a wrapper partial (layout)
+    wrapper := partial.NewID("wrapper", "templates/layout.html")
+    
+    layout.Set(content)
+    layout.Wrap(wrapper)
+    
+    output, err := layout.RenderWithRequest(r.Context(), r)
+    if err != nil {
+        http.Error(w, "An error occurred while rendering the page.", http.StatusInternalServerError)
+        return
+    }
+    w.Write([]byte(output))
+}
+```
+
+## Template Files
+
+templates/layout.html
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Layout.PageTitle}} - {{.Service.AppName}}</title>
+</head>
+<body>
+    {{ child "content" }}
+</body>
+</html>
+```
+templates/content.html
+```html 
+<h1>{{.Data.Message}}</h1>
+```
+
+Note: In the layout template, we use {{ child "content" }} to render the content partial on demand.
+
+
+### Using Global and Layout Data
+
+- **Global Data (ServiceData)**: Set on the Service, accessible via {{.Service}} in templates.
+- **Layout Data (LayoutData)**: Set on the Layout, accessible via {{.Layout}} in templates.
+- **Partial Data (Data)**: Set on individual Partial instances, accessible via {{.Data}} in templates.
+
+### Accessing Data in Templates
+
+You can access data in your templates using dot notation:
+
+- **Partial Data**: `{{ .Data.Key }}`
+- **Layout Data**: `{{ .Layout.Key }}`
+- **Global Data**: `{{ .Service.Key }}`
+
 
 ### Wrapping Partials
 You can wrap a partial with another partial, such as wrapping content with a layout:
@@ -115,7 +125,62 @@ layout := partial.New("templates/layout.html").ID("layout")
 content.Wrap(layout)
 ```
 
-### Template Functions
+## Rendering Child Partials on Demand
+Use the child function to render child partials within your templates.
+
+### Syntax
+```html
+{{ child "partial_id" }}
+```
+You can also pass data to the child partial using key-value pairs:
+
+```html
+{{ child "sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
+```
+Child Partial (sidebar):
+```html 
+<div>
+    <p>User: {{ .Data.UserName }}</p>
+    <p>Notifications: {{ .Data.Notifications }}</p>
+</div>
+```
+
+## Using Out-of-Band (OOB) Partials
+Out-of-Band partials allow you to update parts of the page without reloading:
+
+### Defining an OOB Partial
+```go
+// Create the OOB partial
+footer := partial.New("templates/footer.html").ID("footer")
+footer.SetData(map[string]any{
+    "Text": "This is the footer",
+})
+
+// Add the OOB partial
+p.WithOOB(footer)
+```
+
+### Using OOB Partials in Templates
+In your templates, you can use the swapOOB function to conditionally render OOB attributes.
+
+templates/footer.html
+```html
+<div {{ if swapOOB }}hx-swap-oob="true"{{ end }} id="footer">{{ .Data.Text }}</div>
+```
+
+## Wrapping Partials
+You can wrap a partial with another partial, such as wrapping content with a layout.
+
+```go
+// Create the wrapper partial (e.g., layout)
+layoutPartial := partial.New("templates/layout.html").ID("layout")
+
+// Wrap the content partial with the layout
+content.Wrap(layoutPartial)
+
+```
+
+## Template Functions
 You can add custom functions to be used within your templates:
 
 ```go
@@ -128,6 +193,11 @@ funcs := template.FuncMap{
 
 // Set the functions for the partial
 p.SetFuncs(funcs)
+```
+
+### Usage in Template:
+```html
+{{ upper .Data.Message }}
 ```
 
 ### Using a Custom File System
@@ -146,56 +216,53 @@ p.WithFS(content)
 
 If you do not use a custom file system, the package will use the default file system and look for templates relative to the current working directory.
 
-## API Reference
+## Rendering Tables and Dynamic Content
+You can render dynamic content like tables by rendering child partials within loops.
 
-### Types
-`type Partial`
+Example: Rendering a Table with Dynamic Rows
 
-Represents a renderable component with optional children and data.
-
-`type Data`
-
-The data passed to templates during rendering.
-```go
-type Data struct {
-    Ctx      context.Context
-    URL      *url.URL
-    Data     map[string]any
-    Global   map[string]any
-    Partials map[string]template.HTML
-}
+templates/table.html
+```html
+<table>
+    {{ range $i := .Data.Rows }}
+    {{ child "row" "RowNumber" $i }}
+    {{ end }}
+</table>
 ```
 
-### Functions and Methods
-- **New(templates ...string) \*Partial**: Creates a new root partial.
-- **NewID(id string, templates ...string) \*Partial**: Creates a new partial with a specific ID.
-- **(\*Partial) WithFS(fsys fs.FS) \*Partial**: Sets the file system for template files.
-- **(\*Partial) ID(id string) \*Partial**: Sets the ID of the partial.
-- **(\*Partial) Templates(templates ...string) \*Partial**: Sets the templates for the partial.
-- **(\*Partial) SetData(data map[string]any) \*Partial**: Sets the data for the partial.
-- **(\*Partial) AddData(key string, value any) \*Partial**: Adds a data key-value pair to the partial.
-- **(\*Partial) SetGlobalData(data map[string]any) \*Partial**: Sets global data available to all partials.
-- **(\*Partial) AddGlobalData(key string, value any) \*Partial**: Adds a global data key-value pair.
-- **(\*Partial) SetFuncs(funcs template.FuncMap) \*Partial**: Sets template functions for the partial.
-- **(\*Partial) AddFunc(name string, fn interface{}) \*Partial**: Adds a single template function.
-- **(\*Partial) AppendFuncs(funcs template.FuncMap) \*Partial**: Appends template functions if they don't exist.
-- **(\*Partial) AddTemplate(template string) \*Partial**: Adds an additional template to the partial.
-- **(\*Partial) With(child \*Partial) \*Partial**: Adds a child partial.
-- **(\*Partial) WithOOB(child \*Partial) \*Partial**: Adds an out-of-band child partial.
-- **(\*Partial) Wrap(renderer \*Partial) \*Partial**: Wraps the partial with another partial.
-- **(\*Partial) RenderWithRequest(ctx context.Context, r \*http.Request) (template.HTML, error)**: Renders the partial based on the HTTP request.
+templates/row.html
+```html
+<tr>
+    <td>{{ .Data.RowNumber }}</td>
+</tr>
+```
 
+Go Code:
+```go
+// Create the row partial
+rowPartial := partial.New("templates/row.html").ID("row")
 
-### Template Data
+// Create the table partial and set data
+tablePartial := partial.New("templates/table.html").ID("table")
+tablePartial.SetData(map[string]any{
+"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
+})
+tablePartial.With(rowPartial)
+
+// Render the table partial
+out, err := layout.Set(tablePartial).RenderWithRequest(r.Context(), r)
+```
+
+## Template Data
 In your templates, you can access the following data:
 
 - **{{.Ctx}}**: The context of the request.
 - **{{.URL}}**: The URL of the request.
 - **{{.Data}}**: Data specific to this partial.
-- **{{.Global}}**: Global data available to all partials.
-- **{{.Partials}}**: Rendered HTML of child partials.
+- **{{.Service}}**: Global data available to all partials.
+- **{{.Layout}}**: Data specific to the layout.
 
-### Concurrency and Template Caching
+## Concurrency and Template Caching
 The package includes concurrency safety measures for template caching:
 
 - Templates are cached using a sync.Map.
@@ -203,8 +270,57 @@ The package includes concurrency safety measures for template caching:
 - Set UseTemplateCache to true to enable template caching.
 
 ```go
-partial.UseTemplateCache = true
+cfg := &partial.Config{
+    UseCache: true,
+}
 ```
+
+## Handling Partial Rendering via HTTP Headers
+You can render specific partials based on the X-Partial header (or your custom header).
+
+Example:
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+    output, err := layout.RenderWithRequest(r.Context(), r)
+    if err != nil {
+        http.Error(w, "An error occurred while rendering the page.", http.StatusInternalServerError)
+        return
+    }
+    w.Write([]byte(output))
+}
+```
+
+To request a specific partial:
+```bash
+curl -H "X-Partial: sidebar" http://localhost:8080
+```
+
+## Useless benchmark results
+
+with caching enabled 
+```bash
+goos: darwin
+goarch: arm64
+pkg: github.com/donseba/go-partial
+cpu: Apple M2 Pro
+BenchmarkRenderWithRequest
+BenchmarkRenderWithRequest-12    	  526102	      2254 ns/op
+PASS
+```
+
+with caching disabled
+```bash
+goos: darwin
+goarch: arm64
+pkg: github.com/donseba/go-partial
+cpu: Apple M2 Pro
+BenchmarkRenderWithRequest
+BenchmarkRenderWithRequest-12    	   57529	     19891 ns/op
+PASS
+```
+
+which would mean that caching is rougly 9-10 times faster than without caching
+
 
 ## Contributing
 
