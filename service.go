@@ -16,13 +16,8 @@ var (
 
 type (
 	Logger interface {
-		Info(msg string, args ...any)
 		Warn(msg string, args ...any)
 		Error(msg string, args ...any)
-
-		InfoContext(ctx context.Context, msg string, args ...any)
-		WarnContext(ctx context.Context, msg string, args ...any)
-		ErrorContext(ctx context.Context, msg string, args ...any)
 	}
 
 	Config struct {
@@ -194,11 +189,17 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	out, err := l.RenderWithRequest(ctx, r)
 	if err != nil {
+		if l.service.config.Logger != nil {
+			l.service.config.Logger.Error("error rendering layout", "error", err)
+		}
 		return err
 	}
 
 	_, err = w.Write([]byte(out))
 	if err != nil {
+		if l.service.config.Logger != nil {
+			l.service.config.Logger.Error("error writing layout to response", "error", err)
+		}
 		return err
 	}
 

@@ -1,4 +1,4 @@
-# Go Partial - Partial Template Rendering for Go
+# Go Partial - Partial Page Rendering for Go
 
 This package provides a flexible and efficient way to manage and render partial templates in Go (Golang). It allows you to create reusable, hierarchical templates with support for layouts, global data, caching, and more.
 ## Features
