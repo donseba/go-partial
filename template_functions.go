@@ -144,3 +144,90 @@ func parseDate(layout, value string) (time.Time, error) {
 func debug(v any) string {
 	return fmt.Sprintf("%+v", v)
 }
+
+func selectionFunc(p *Partial, data *Data) func() template.HTML {
+	return func() template.HTML {
+		var selectedPartial *Partial
+
+		partials := p.getSelectionPartials()
+		if partials == nil {
+			p.getLogger().Error("no selection partials found", "id", p.id)
+			return template.HTML(fmt.Sprintf("no selection partials found in parent '%s'", p.id))
+		}
+
+		requestedSelect := p.getRequestedSelect()
+		if requestedSelect != "" {
+			selectedPartial = partials[requestedSelect]
+		} else {
+			selectedPartial = partials[p.selection.Default]
+		}
+
+		if selectedPartial == nil {
+			p.getLogger().Error("selected partial not found", "id", requestedSelect, "parent", p.id)
+			return template.HTML(fmt.Sprintf("selected partial '%s' not found in parent '%s'", requestedSelect, p.id))
+		}
+
+		selectedPartial.fs = p.fs
+		selectedPartial.parent = p
+
+		html, err := selectedPartial.renderSelf(data.Ctx, p.getRequest())
+		if err != nil {
+			p.getLogger().Error("error rendering selected partial", "id", requestedSelect, "parent", p.id, "error", err)
+			return template.HTML(fmt.Sprintf("error rendering selected partial '%s'", requestedSelect))
+		}
+
+		return html
+	}
+}
+
+func childFunc(p *Partial, data *Data) func(id string, vals ...any) template.HTML {
+	return func(id string, vals ...any) template.HTML {
+		if len(vals) > 0 && len(vals)%2 != 0 {
+			p.getLogger().Warn("invalid child data for partial, they come in key-value pairs", "id", id)
+			return template.HTML(fmt.Sprintf("invalid child data for partial '%s'", id))
+		}
+
+		d := make(map[string]any)
+		for i := 0; i < len(vals); i += 2 {
+			key, ok := vals[i].(string)
+			if !ok {
+				p.getLogger().Warn("invalid child data key for partial, it must be a string", "id", id, "key", vals[i])
+				return template.HTML(fmt.Sprintf("invalid child data key for partial '%s', want string, got %T", id, vals[i]))
+			}
+			d[key] = vals[i+1]
+		}
+
+		html, err := p.renderChildPartial(data.Ctx, id, d)
+		if err != nil {
+			p.getLogger().Error("error rendering partial", "id", id, "error", err)
+			// Handle error: you can log it and return an empty string or an error message
+			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
+		}
+
+		return html
+	}
+}
+
+func actionFunc(p *Partial, data *Data) func() template.HTML {
+	return func() template.HTML {
+		if p.templateAction == nil {
+			p.getLogger().Error("no action callback found", "id", p.id)
+			return template.HTML(fmt.Sprintf("no action callback found in partial '%s'", p.id))
+		}
+
+		// Use the selector to get the appropriate partial
+		actionPartial, err := p.templateAction(data.Ctx, data)
+		if err != nil {
+			p.getLogger().Error("error in selector function", "error", err)
+			return template.HTML(fmt.Sprintf("error in action function: %v", err))
+		}
+
+		// Render the selected partial instead
+		html, err := actionPartial.renderSelf(data.Ctx, p.getRequest())
+		if err != nil {
+			p.getLogger().Error("error rendering action partial", "error", err)
+			return template.HTML(fmt.Sprintf("error rendering action partial: %v", err))
+		}
+		return html
+	}
+}

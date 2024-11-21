@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -22,12 +23,18 @@ var (
 	mutexCache = sync.Map{}
 	// protectedFunctionNames is a set of function names that are protected from being overridden
 	protectedFunctionNames = map[string]struct{}{
-		"child":         {},
-		"context":       {},
-		"partialHeader": {},
-		"requestHeader": {},
-		"swapOOB":       {},
-		"url":           {},
+		"action":           {},
+		"actionHeader":     {},
+		"child":            {},
+		"context":          {},
+		"partialHeader":    {},
+		"requestedPartial": {},
+		"requestedAction":  {},
+		"requestedSelect":  {},
+		"selectHeader":     {},
+		"selection":        {},
+		"swapOOB":          {},
+		"url":              {},
 	}
 )
 
@@ -36,11 +43,16 @@ type (
 	Partial struct {
 		id                string
 		parent            *Partial
+		request           *http.Request
 		swapOOB           bool
 		fs                fs.FS
 		logger            Logger
 		partialHeader     string
-		requestHeader     string
+		selectHeader      string
+		actionHeader      string
+		requestedPartial  string
+		requestedAction   string
+		requestedSelect   string
 		useCache          bool
 		templates         []string
 		combinedFunctions template.FuncMap
@@ -50,6 +62,14 @@ type (
 		mu                sync.RWMutex
 		children          map[string]*Partial
 		oobChildren       map[string]struct{}
+		selection         *Selection
+		templateAction    func(ctx context.Context, data *Data) (*Partial, error)
+		action            func(ctx context.Context, data *Data) (*Partial, error)
+	}
+
+	Selection struct {
+		Partials map[string]*Partial
+		Default  string
 	}
 
 	// Data represents the data available to the partial.
@@ -139,9 +159,7 @@ func (p *Partial) MergeData(data map[string]any, override bool) *Partial {
 // AddFunc adds a function to the partial.
 func (p *Partial) AddFunc(name string, fn interface{}) *Partial {
 	if _, ok := protectedFunctionNames[name]; ok {
-		if p.logger != nil {
-			p.logger.Warn("function name is protected and cannot be overwritten", "function", name)
-		}
+		p.getLogger().Warn("function name is protected and cannot be overwritten", "function", name)
 		return p
 	}
 
@@ -159,9 +177,7 @@ func (p *Partial) MergeFuncMap(funcMap template.FuncMap) {
 
 	for k, v := range funcMap {
 		if _, ok := protectedFunctionNames[k]; ok {
-			if p.logger != nil {
-				p.logger.Warn("function name is protected and cannot be overwritten", "function", k)
-			}
+			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", k)
 			continue
 		}
 
@@ -217,6 +233,30 @@ func (p *Partial) With(child *Partial) *Partial {
 	return p
 }
 
+// WithAction adds callback action to the partial, which can do some logic and return a partial to render.
+func (p *Partial) WithAction(action func(ctx context.Context, data *Data) (*Partial, error)) *Partial {
+	p.action = action
+	return p
+}
+
+func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, data *Data) (*Partial, error)) *Partial {
+	p.templateAction = templateAction
+	return p
+}
+
+// WithSelectMap adds a selection partial to the partial.
+func (p *Partial) WithSelectMap(defaultKey string, partialsMap map[string]*Partial) *Partial {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.selection = &Selection{
+		Default:  defaultKey,
+		Partials: partialsMap,
+	}
+
+	return p
+}
+
 // SetParent sets the parent of the partial.
 func (p *Partial) SetParent(parent *Partial) *Partial {
 	p.parent = parent
@@ -239,9 +279,12 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 		return "", errors.New("partial is not initialized")
 	}
 
-	renderTarget := r.Header.Get(p.getPartialHeader())
+	p.request = r
+	p.requestedPartial = r.Header.Get(p.getPartialHeader())
+	p.requestedAction = r.Header.Get(p.getActionHeader())
+	p.requestedSelect = r.Header.Get(p.getSelectHeader())
 
-	return p.renderWithTarget(ctx, r, renderTarget)
+	return p.renderWithTarget(ctx, r)
 }
 
 // WriteWithRequest writes the partial to the http.ResponseWriter.
@@ -253,17 +296,13 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 
 	out, err := p.RenderWithRequest(ctx, r)
 	if err != nil {
-		if p.logger != nil {
-			p.logger.Error("error rendering partial", "error", err)
-		}
+		p.getLogger().Error("error rendering partial", "error", err)
 		return err
 	}
 
 	_, err = w.Write([]byte(out))
 	if err != nil {
-		if p.logger != nil {
-			p.logger.Error("error writing partial to response", "error", err)
-		}
+		p.getLogger().Error("error writing partial to response", "error", err)
 		return err
 	}
 
@@ -313,37 +352,9 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return p.swapOOB
 	}
 
-	funcs["child"] = func(id string, vals ...any) template.HTML {
-		if len(vals) > 0 && len(vals)%2 != 0 {
-			if p.logger != nil {
-				p.logger.Warn("invalid child data for partial, they come in key-value pairs", "id", id)
-			}
-			return template.HTML(fmt.Sprintf("invalid child data for partial '%s'", id))
-		}
-
-		d := make(map[string]any)
-		for i := 0; i < len(vals); i += 2 {
-			key, ok := vals[i].(string)
-			if !ok {
-				if p.logger != nil {
-					p.logger.Warn("invalid child data key for partial, it must be a string", "id", id, "key", vals[i])
-				}
-				return template.HTML(fmt.Sprintf("invalid child data key for partial '%s', want string, got %T", id, vals[i]))
-			}
-			d[key] = vals[i+1]
-		}
-
-		html, err := p.renderChildPartial(data.Ctx, id, d)
-		if err != nil {
-			if p.logger != nil {
-				p.logger.Error("error rendering partial", "id", id, "error", err)
-			}
-			// Handle error: you can log it and return an empty string or an error message
-			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
-		}
-
-		return html
-	}
+	funcs["child"] = childFunc(p, data)
+	funcs["selection"] = selectionFunc(p, data)
+	funcs["action"] = actionFunc(p, data)
 
 	funcs["url"] = func() *url.URL {
 		return data.URL
@@ -353,12 +364,28 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return data.Ctx
 	}
 
-	funcs["requestHeader"] = func() string {
-		return p.getRequestHeader()
-	}
-
 	funcs["partialHeader"] = func() string {
 		return p.getPartialHeader()
+	}
+
+	funcs["requestedPartial"] = func() string {
+		return p.getRequestedPartial()
+	}
+
+	funcs["selectHeader"] = func() string {
+		return p.getSelectHeader()
+	}
+
+	funcs["requestedSelect"] = func() string {
+		return p.getRequestedSelect()
+	}
+
+	funcs["actionHeader"] = func() string {
+		return p.getActionHeader()
+	}
+
+	funcs["requestedAction"] = func() string {
+		return p.getRequestedAction()
 	}
 
 	return funcs
@@ -393,17 +420,44 @@ func (p *Partial) getPartialHeader() string {
 	if p.parent != nil {
 		return p.parent.getPartialHeader()
 	}
-	return ""
+	return defaultPartialHeader
 }
 
-func (p *Partial) getRequestHeader() string {
-	if p.requestHeader != "" {
-		return p.requestHeader
+func (p *Partial) getSelectHeader() string {
+	if p.selectHeader != "" {
+		return p.selectHeader
 	}
 	if p.parent != nil {
-		return p.parent.getRequestHeader()
+		return p.parent.getSelectHeader()
 	}
-	return ""
+	return defaultSelectHeader
+}
+
+func (p *Partial) getSelectionPartials() map[string]*Partial {
+	if p.selection != nil {
+		return p.selection.Partials
+	}
+	return nil
+}
+
+func (p *Partial) getActionHeader() string {
+	if p.actionHeader != "" {
+		return p.actionHeader
+	}
+	if p.parent != nil {
+		return p.parent.getActionHeader()
+	}
+	return defaultActionHeader
+}
+
+func (p *Partial) getRequest() *http.Request {
+	if p.request != nil {
+		return p.request
+	}
+	if p.parent != nil {
+		return p.parent.getRequest()
+	}
+	return &http.Request{}
 }
 
 func (p *Partial) getFS() fs.FS {
@@ -416,33 +470,78 @@ func (p *Partial) getFS() fs.FS {
 	return nil
 }
 
-func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request, renderTarget string) (template.HTML, error) {
-	if renderTarget == "" || renderTarget == p.id {
-		out, err := p.renderSelf(ctx, r.URL)
+func (p *Partial) getLogger() Logger {
+	if p == nil {
+		return slog.Default().WithGroup("partial")
+	}
+
+	if p.logger != nil {
+		return p.logger
+	}
+
+	if p.parent != nil {
+		return p.parent.getLogger()
+	}
+
+	// Cache the default logger in p.logger
+	p.logger = slog.Default().WithGroup("partial")
+
+	return p.logger
+}
+
+func (p *Partial) getRequestedPartial() string {
+	if p.requestedPartial != "" {
+		return p.requestedPartial
+	}
+	if p.parent != nil {
+		return p.parent.getRequestedPartial()
+	}
+	return ""
+}
+
+func (p *Partial) getRequestedAction() string {
+	if p.requestedAction != "" {
+		return p.requestedAction
+	}
+	if p.parent != nil {
+		return p.parent.getRequestedAction()
+	}
+	return ""
+}
+
+func (p *Partial) getRequestedSelect() string {
+	if p.requestedSelect != "" {
+		return p.requestedSelect
+	}
+	if p.parent != nil {
+		return p.parent.getRequestedSelect()
+	}
+	return ""
+}
+
+func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request) (template.HTML, error) {
+	if p.getRequestedPartial() == "" || p.getRequestedPartial() == p.id {
+		out, err := p.renderSelf(ctx, r)
 		if err != nil {
 			return "", err
 		}
 		// Render OOB children of parent if necessary
 		if p.parent != nil {
-			oobOut, oobErr := p.parent.renderOOBChildren(ctx, r.URL, true)
+			oobOut, oobErr := p.parent.renderOOBChildren(ctx, r, true)
 			if oobErr != nil {
-				if p.logger != nil {
-					p.logger.Error("error rendering OOB children of parent", "error", oobErr, "parent", p.parent.id)
-				}
+				p.getLogger().Error("error rendering OOB children of parent", "error", oobErr, "parent", p.parent.id)
 				return "", fmt.Errorf("error rendering OOB children of parent with ID '%s': %w", p.parent.id, oobErr)
 			}
 			out += oobOut
 		}
 		return out, nil
 	} else {
-		c := p.recursiveChildLookup(renderTarget, make(map[string]bool))
+		c := p.recursiveChildLookup(p.getRequestedPartial(), make(map[string]bool))
 		if c == nil {
-			if p.logger != nil {
-				p.logger.Error("requested partial not found in parent", "id", renderTarget, "parent", p.id)
-			}
-			return "", fmt.Errorf("requested partial %s not found in parent %s", renderTarget, p.id)
+			p.getLogger().Error("requested partial not found in parent", "id", p.getRequestedPartial(), "parent", p.id)
+			return "", fmt.Errorf("requested partial %s not found in parent %s", p.getRequestedPartial(), p.id)
 		}
-		return c.renderWithTarget(ctx, r, renderTarget)
+		return c.renderWithTarget(ctx, r)
 	}
 }
 
@@ -474,9 +573,7 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[st
 	child, ok := p.children[id]
 	p.mu.RUnlock()
 	if !ok {
-		if p.logger != nil {
-			p.logger.Warn("child partial not found", "id", id)
-		}
+		p.getLogger().Warn("child partial not found", "id", id)
 		return "", nil
 	}
 
@@ -492,16 +589,19 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[st
 	}
 
 	// Render the cloned child partial
-	return childClone.renderSelf(ctx, nil)
+	return childClone.renderSelf(ctx, p.getRequest())
 }
 
 // renderNamed renders the partial with the given name and templates.
-func (p *Partial) renderSelf(ctx context.Context, currentURL *url.URL) (template.HTML, error) {
+func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTML, error) {
 	if len(p.templates) == 0 {
-		if p.logger != nil {
-			p.logger.Error("no templates provided for rendering")
-		}
+		p.getLogger().Error("no templates provided for rendering")
 		return "", errors.New("no templates provided for rendering")
+	}
+
+	var currentURL *url.URL
+	if r != nil {
+		currentURL = r.URL
 	}
 
 	data := &Data{
@@ -512,30 +612,35 @@ func (p *Partial) renderSelf(ctx context.Context, currentURL *url.URL) (template
 		Layout:  p.getLayoutData(),
 	}
 
+	if p.action != nil {
+		actionPartial, err := p.action(ctx, data)
+		if err != nil {
+			p.getLogger().Error("error in action function", "error", err)
+			return "", fmt.Errorf("error in action function: %w", err)
+		}
+		return actionPartial.renderSelf(ctx, r)
+	}
+
 	functions := p.getFuncs(data)
 	funcMapPtr := reflect.ValueOf(functions).Pointer()
 
 	cacheKey := p.generateCacheKey(p.templates, funcMapPtr)
 	tmpl, err := p.getOrParseTemplate(cacheKey, functions)
 	if err != nil {
-		if p.logger != nil {
-			p.logger.Error("error getting or parsing template", "error", err)
-		}
+		p.getLogger().Error("error getting or parsing template", "error", err)
 		return "", err
 	}
 
 	var buf bytes.Buffer
 	if err = tmpl.Execute(&buf, data); err != nil {
-		if p.logger != nil {
-			p.logger.Error("error executing template", "template", p.templates[0], "error", err)
-		}
+		p.getLogger().Error("error executing template", "template", p.templates[0], "error", err)
 		return "", fmt.Errorf("error executing template '%s': %w", p.templates[0], err)
 	}
 
 	return template.HTML(buf.String()), nil
 }
 
-func (p *Partial) renderOOBChildren(ctx context.Context, currentURL *url.URL, swapOOB bool) (template.HTML, error) {
+func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, swapOOB bool) (template.HTML, error) {
 	var out template.HTML
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -543,7 +648,7 @@ func (p *Partial) renderOOBChildren(ctx context.Context, currentURL *url.URL, sw
 	for id := range p.oobChildren {
 		if child, ok := p.children[id]; ok {
 			child.swapOOB = swapOOB
-			childData, err := child.renderSelf(ctx, currentURL)
+			childData, err := child.renderSelf(ctx, r)
 			if err != nil {
 				return "", fmt.Errorf("error rendering OOB child '%s': %w", id, err)
 			}
@@ -601,12 +706,16 @@ func (p *Partial) clone() *Partial {
 	clone := &Partial{
 		id:                p.id,
 		parent:            p.parent,
+		request:           p.request,
 		swapOOB:           p.swapOOB,
 		fs:                p.fs,
 		logger:            p.logger,
 		partialHeader:     p.partialHeader,
-		requestHeader:     p.requestHeader,
+		selectHeader:      p.selectHeader,
+		actionHeader:      p.actionHeader,
+		requestedPartial:  p.requestedPartial,
 		useCache:          p.useCache,
+		selection:         p.selection,
 		templates:         append([]string{}, p.templates...), // Copy the slice
 		combinedFunctions: make(template.FuncMap),
 		data:              make(map[string]any),
