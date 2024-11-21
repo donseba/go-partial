@@ -12,6 +12,10 @@ import (
 var (
 	// defaultPartialHeader is the default header used to determine which partial to render.
 	defaultPartialHeader = "X-Partial"
+	// defaultSelectHeader is the default header used to determine which partial to select.
+	defaultSelectHeader = "X-Select"
+	// defaultActionHeader is the default header used to determine which action to take.
+	defaultActionHeader = "X-Action"
 )
 
 type (
@@ -22,6 +26,8 @@ type (
 
 	Config struct {
 		PartialHeader string
+		SelectHeader  string
+		ActionHeader  string
 		UseCache      bool
 		FuncMap       template.FuncMap
 		Logger        Logger
@@ -41,7 +47,10 @@ type (
 		content           *Partial
 		wrapper           *Partial
 		data              map[string]any
-		requestHeader     string
+		requestedPartial  string
+		requestedAction   string
+		requestedSelect   string
+		request           *http.Request
 		combinedFunctions template.FuncMap
 		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
@@ -55,6 +64,14 @@ func NewService(cfg *Config) *Service {
 
 	if cfg.PartialHeader == "" {
 		cfg.PartialHeader = defaultPartialHeader
+	}
+
+	if cfg.SelectHeader == "" {
+		cfg.SelectHeader = defaultSelectHeader
+	}
+
+	if cfg.ActionHeader == "" {
+		cfg.ActionHeader = defaultActionHeader
 	}
 
 	if cfg.Logger == nil {
@@ -168,18 +185,16 @@ func (l *Layout) getFuncMap() template.FuncMap {
 
 // RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	// get partial header from request
-	header := r.Header.Get(l.service.config.PartialHeader)
-	// add header to data
-	l.requestHeader = header
+	l.requestedPartial = r.Header.Get(l.service.config.PartialHeader)
+	l.requestedAction = r.Header.Get(l.service.config.ActionHeader)
+	l.requestedSelect = r.Header.Get(l.service.config.SelectHeader)
+	l.request = r
 
 	if l.wrapper != nil {
-		l.wrapper.requestHeader = l.requestHeader
 		l.wrapper.With(l.content)
 		// Render the wrapper
 		return l.wrapper.RenderWithRequest(ctx, r)
 	} else {
-		l.content.requestHeader = l.requestHeader
 		// Render the content directly
 		return l.content.RenderWithRequest(ctx, r)
 	}
@@ -221,6 +236,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	p.useCache = l.service.config.UseCache
 	p.globalData = l.service.data
 	p.layoutData = l.data
+	p.request = l.request
 	p.partialHeader = l.service.config.PartialHeader
-	p.requestHeader = l.requestHeader
+	p.selectHeader = l.service.config.SelectHeader
+	p.actionHeader = l.service.config.ActionHeader
+	p.requestedPartial = l.requestedPartial
 }

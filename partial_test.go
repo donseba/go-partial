@@ -3,6 +3,7 @@ package partial
 import (
 	"context"
 	"html/template"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -419,24 +420,161 @@ func TestDataInTemplates(t *testing.T) {
 	}
 }
 
+func TestWithSelectMap(t *testing.T) {
+	fsys := &InMemoryFS{
+		Files: map[string]string{
+			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
+			"content.gohtml": `<div class="content">{{selection}}</div>`,
+			"tab1.gohtml":    "Tab 1 Content",
+			"tab2.gohtml":    "Tab 2 Content",
+			"default.gohtml": "Default Tab Content",
+		},
+	}
+
+	// Create a map of selection keys to partials
+	partialsMap := map[string]*Partial{
+		"tab1":    New("tab1.gohtml").ID("tab1"),
+		"tab2":    New("tab2.gohtml").ID("tab2"),
+		"default": New("default.gohtml").ID("default"),
+	}
+
+	// Create the content partial with the selection map
+	contentPartial := New("content.gohtml").
+		ID("content").
+		WithSelectMap("default", partialsMap)
+
+	// Create the layout partial
+	index := New("index.gohtml")
+
+	// Set up the service and layout
+	svc := NewService(&Config{
+		fs: fsys, // Set the file system in the service config
+	})
+	layout := svc.NewLayout().
+		Set(contentPartial).
+		Wrap(index)
+
+	// Set up a test server
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		err := layout.WriteWithRequest(ctx, w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	// Create a test server
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	// Define test cases
+	testCases := []struct {
+		name            string
+		selectHeader    string
+		expectedContent string
+	}{
+		{
+			name:            "Select tab1",
+			selectHeader:    "tab1",
+			expectedContent: "Tab 1 Content",
+		},
+		{
+			name:            "Select tab2",
+			selectHeader:    "tab2",
+			expectedContent: "Tab 2 Content",
+		},
+		{
+			name:            "Select default",
+			selectHeader:    "",
+			expectedContent: "Default Tab Content",
+		},
+		{
+			name:            "Invalid selection",
+			selectHeader:    "invalid",
+			expectedContent: "selected partial 'invalid' not found in parent 'content'",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", server.URL, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			if tc.selectHeader != "" {
+				req.Header.Set("X-Select", tc.selectHeader)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to send request: %v", err)
+			}
+			defer resp.Body.Close()
+
+			// Read response body
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatalf("Failed to read response body: %v", err)
+			}
+			bodyString := string(bodyBytes)
+
+			// Check if the expected content is in the response
+			if !strings.Contains(bodyString, tc.expectedContent) {
+				t.Errorf("Expected response to contain %q, but got %q", tc.expectedContent, bodyString)
+			}
+		})
+	}
+}
+
+func BenchmarkWithSelectMap(b *testing.B) {
+	fsys := &InMemoryFS{
+		Files: map[string]string{
+			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
+			"content.gohtml": `<div class="content">{{selection}}</div>`,
+			"tab1.gohtml":    "Tab 1 Content",
+			"tab2.gohtml":    "Tab 2 Content",
+			"default.gohtml": "Default Tab Content",
+		},
+	}
+
+	service := NewService(&Config{
+		PartialHeader: "X-Partial",
+		UseCache:      false,
+	})
+	layout := service.NewLayout().FS(fsys)
+
+	content := New("content.gohtml").
+		ID("content").
+		WithSelectMap("default", map[string]*Partial{
+			"tab1":    New("tab1.gohtml").ID("tab1"),
+			"tab2":    New("tab2.gohtml").ID("tab2"),
+			"default": New("default.gohtml").ID("default"),
+		})
+
+	index := New("index.gohtml")
+
+	layout.Set(content).Wrap(index)
+
+	req := httptest.NewRequest("GET", "/", nil)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		// Call the function you want to benchmark
+		_, err := layout.RenderWithRequest(context.Background(), req)
+		if err != nil {
+			b.Fatalf("Error rendering: %v", err)
+		}
+	}
+}
+
 func BenchmarkRenderWithRequest(b *testing.B) {
 	// Setup configuration and service
 	cfg := &Config{
 		PartialHeader: "X-Partial",
 		UseCache:      false,
 	}
-
-	// Benchmark results before function passing
-	// with cache    : BenchmarkRenderWithRequest-12    	  169927	      6551 ns/op
-	// without cache : BenchmarkRenderWithRequest-12    	   51270	     22398 ns/op
-
-	// Benchmark results after function passing
-	// with cache    : BenchmarkRenderWithRequest-12    	   65800	      2240 ns/op
-	// without cache : BenchmarkRenderWithRequest-12    	   42045	     17857 ns/op
-
-	// Benchmark results after function passing and optimization
-	// with cache    : BenchmarkRenderWithRequest-12    	  530058	      2240 ns/op
-	// without cache : BenchmarkRenderWithRequest-12    	   65800	     17857 ns/op
 
 	service := NewService(cfg)
 
@@ -457,8 +595,10 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 		"Message": "This is a benchmark test.",
 	})
 
+	index := NewID("index", "templates/index.html")
+
 	// Set the content partial in the layout
-	layout.Set(content)
+	layout.Set(content).Wrap(index)
 
 	// Create a sample HTTP request
 	req := httptest.NewRequest("GET", "/", nil)

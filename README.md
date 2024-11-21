@@ -17,6 +17,9 @@ To install the package, run:
 go get github.com/donseba/go-partial
 ```
 
+## Advanced use cases 
+Advanced usecases are documented in the [ADVANCED.md](ADVANCED.md) file
+
 ## Basic Usage
 
 Here's a simple example of how to use the package to render a template.
