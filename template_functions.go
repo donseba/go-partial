@@ -26,6 +26,7 @@ var DefaultTemplateFuncMap = template.FuncMap{
 	"replace":     strings.Replace,
 	"split":       strings.Split,
 	"join":        strings.Join,
+	"stringSlice": stringSlice,
 	"title":       title,
 	"substr":      substr,
 	"ucfirst":     ucfirst,
@@ -63,6 +64,10 @@ func ucfirst(s string) string {
 	runes := []rune(s)
 	runes[0] = unicode.ToUpper(runes[0])
 	return string(runes)
+}
+
+func stringSlice(values ...string) []string {
+	return values
 }
 
 // title capitalizes the first character of each word in the string.
@@ -168,7 +173,7 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 		}
 
 		selectedPartial.fs = p.fs
-		selectedPartial.parent = p
+		//selectedPartial.parent = p
 
 		html, err := selectedPartial.renderSelf(data.Ctx, p.getRequest())
 		if err != nil {

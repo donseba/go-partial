@@ -23,18 +23,22 @@ var (
 	mutexCache = sync.Map{}
 	// protectedFunctionNames is a set of function names that are protected from being overridden
 	protectedFunctionNames = map[string]struct{}{
-		"action":           {},
-		"actionHeader":     {},
-		"child":            {},
-		"context":          {},
-		"partialHeader":    {},
-		"requestedPartial": {},
-		"requestedAction":  {},
-		"requestedSelect":  {},
-		"selectHeader":     {},
-		"selection":        {},
-		"swapOOB":          {},
-		"url":              {},
+		"action":             {},
+		"actionHeader":       {},
+		"child":              {},
+		"context":            {},
+		"ifRequestedAction":  {},
+		"ifRequestedPartial": {},
+		"ifRequestedSelect":  {},
+		"ifSwapOOB":          {},
+		"partialHeader":      {},
+		"requestedPartial":   {},
+		"requestedAction":    {},
+		"requestedSelect":    {},
+		"selectHeader":       {},
+		"selection":          {},
+		"swapOOB":            {},
+		"url":                {},
 	}
 )
 
@@ -78,6 +82,8 @@ type (
 		Ctx context.Context
 		// URL is the URL of the request
 		URL *url.URL
+		// Request contains the http.Request
+		Request *http.Request
 		// Data contains the data specific to this partial
 		Data map[string]any
 		// Service contains global data available to all partials
@@ -348,10 +354,6 @@ func (p *Partial) getFuncMap() template.FuncMap {
 func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	funcs := p.getFuncMap()
 
-	funcs["swapOOB"] = func() bool {
-		return p.swapOOB
-	}
-
 	funcs["child"] = childFunc(p, data)
 	funcs["selection"] = selectionFunc(p, data)
 	funcs["action"] = actionFunc(p, data)
@@ -372,12 +374,33 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return p.getRequestedPartial()
 	}
 
+	funcs["ifRequestedPartial"] = func(out any, in ...string) any {
+		for _, v := range in {
+			if v == p.getRequestedPartial() {
+				return out
+			}
+		}
+		return nil
+	}
+
 	funcs["selectHeader"] = func() string {
 		return p.getSelectHeader()
 	}
 
 	funcs["requestedSelect"] = func() string {
+		if p.getRequestedSelect() == "" {
+			return p.selection.Default
+		}
 		return p.getRequestedSelect()
+	}
+
+	funcs["ifRequestedSelect"] = func(out any, in ...string) any {
+		for _, v := range in {
+			if v == p.getRequestedSelect() {
+				return out
+			}
+		}
+		return nil
 	}
 
 	funcs["actionHeader"] = func() string {
@@ -385,7 +408,28 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	}
 
 	funcs["requestedAction"] = func() string {
-		return p.getRequestedAction()
+		return p.GetRequestedAction()
+	}
+
+	funcs["ifRequestedAction"] = func(out any, in ...string) any {
+		for _, v := range in {
+			if v == p.GetRequestedAction() {
+				return out
+			}
+		}
+		return nil
+	}
+
+	funcs["swapOOB"] = func() bool {
+		return p.swapOOB
+	}
+
+	funcs["ifSwapOOB"] = func(v string) template.HTML {
+		if p.swapOOB {
+			return template.HTML("x-swap-oob=\" + v + \"")
+		}
+		// Return an empty trusted HTML instead of a plain empty string
+		return template.HTML("")
 	}
 
 	return funcs
@@ -499,12 +543,12 @@ func (p *Partial) getRequestedPartial() string {
 	return ""
 }
 
-func (p *Partial) getRequestedAction() string {
+func (p *Partial) GetRequestedAction() string {
 	if p.requestedAction != "" {
 		return p.requestedAction
 	}
 	if p.parent != nil {
-		return p.parent.getRequestedAction()
+		return p.parent.GetRequestedAction()
 	}
 	return ""
 }
@@ -525,6 +569,7 @@ func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request) (templa
 		if err != nil {
 			return "", err
 		}
+
 		// Render OOB children of parent if necessary
 		if p.parent != nil {
 			oobOut, oobErr := p.parent.renderOOBChildren(ctx, r, true)
@@ -606,6 +651,7 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 
 	data := &Data{
 		URL:     currentURL,
+		Request: r,
 		Ctx:     ctx,
 		Data:    p.data,
 		Service: p.getGlobalData(),
