@@ -1,6 +1,6 @@
 <div class="container mt-5">
     <!-- Example Form with JSON Serialization -->
-    <form x-post="/submit" x-serialize="json" x-target="#form" x-action="submit">
+    <form x-post="/" x-serialize="json" x-target="#form" x-action="submit" x-confirm="are we sure?" x-params='{"hiddenField": "abc123"}'>
         <input type="text" name="username" />
         <input type="password" name="password" />
         <button type="submit">Submit</button>

@@ -24,31 +24,147 @@ This will automatically scan the document for elements with x-* attributes and s
 ## Attributes
 partial.js leverages custom HTML attributes to define actions and behaviors:
 
-- Action Attributes:
-  - **x-get**: Defines a GET request.
-  - **x-post**: Defines a POST request.
-  - **x-put**: Defines a PUT request.
-  - **x-delete**: Defines a DELETE request.
-- Targeting:
-  - **x-target**: Specifies the selector of the element where the response content will be injected.
-- Trigger Events:
-    - **x-trigger**: Defines the event that triggers the action (e.g., click, submit). Defaults to click for most elements and submit for forms.
-- Serialization:
-    - **x-serialize**: When set to json, form data will be serialized as JSON.
-- Custom Headers and Data:
-  - **x-json**: Provides a JSON string to be sent as the request body.
-  - **x-params**: Provides JSON parameters to be appended to the URL for GET requests.
-- Out-of-Band Swapping:
-  - **x-swap-oob**: Indicates elements that should be swapped out-of-band (e.g., updating elements outside the main content area).
-- Browser History:
-    - **x-push-state**: When set to 'false', disables updating the browser history. Defaults to updating history.
-- Focus Management:
-    - **x-focus**: When set to 'false', disables auto-focus on the target element after content update.
-- Debouncing:
-    - **x-debounce**: Specifies the debounce time in milliseconds for the event handler.
-- Before and after hooks:
-    - **x-before**: Specifies an event to be triggered before the request is sent.
-    - **x-after**: Specifies an event to be triggered after the response is received.
+### Action Attributes
+Define the HTTP method and URL for the request.
+
+- `x-get`: Defines a GET request.
+  - Usage: `<button x-get="/data">Load Data</button>`
+- `x-post`: Defines a POST request.
+  - Usage: `<form x-post="/submit">...</form>`
+- `x-put`: Defines a PUT request.
+- `x-delete`: Defines a DELETE request.
+### Targeting:
+Specify where the response content should be injected.
+
+- `x-target`: Specifies the CSS selector of the element where the response content will be injected.
+  - Usage: `<button x-get="/data" x-target="#content">Load Data</button>`
+
+### Trigger Events
+Define the event that triggers the action.
+
+- `x-trigger`: Specifies the event that triggers the action (e.g., `click`, `submit`, `input`).
+  - Defaults to `click` for most elements and `submit` for forms.
+  - Usage: `<input x-get="/search" x-trigger="input" x-target="#results">`
+
+### Serialization
+Control how form data is serialized in the request.
+
+- `x-serialize`: When set to `json`, `nested-json` or `xml`, form data will be serialized to the selected format.
+  - Usage: `<form x-post="/submit" x-serialize="json">...</form>`
+
+### Custom Request Data
+Provide custom data to include in the request.
+
+- `x-json`: Provides a JSON string to be sent as the request body.
+  - Usage: `<button x-post="/api" x-json='{"id":123}'>Submit</button>`
+- `x-params`: Provides JSON parameters to be included in the request.
+  - Usage: 
+    - With GET requests: Parameters are appended to the URL.
+    - With other methods: Parameters are merged into the request body.
+  - Example:
+  ```html
+  <button x-get="/search" x-params='{"q":"test"}' x-target="#results">Search</button>
+  ```
+
+### Out-of-Band Swapping
+Update elements outside the main content area.
+
+- `x-swap-oob`: Indicates elements that should be swapped out-of-band.
+  - When included in a response, elements with x-swap-oob will replace elements with the same id in the current document.
+  - Usage: In the server response: `<div id="notification" x-swap-oob>New Notification</div>`
+
+### Browser History Management
+Control how the browser history is updated.
+
+- `x-push-state`: When set to 'false', disables updating the browser history. Defaults to updating history.
+  - Usage: `<button x-get="/page2" x-target="#content" x-push-state="false">Load Page Without History</button>`
+
+### Focus Management
+Control focus behavior after content updates.
+
+- `x-focus`: When set to 'true', enables auto-focus on the target element after content update.
+  - Usage: `<button x-get="/data" x-target="#content" x-focus="false">Load Data</button>`
+
+### Debouncing
+Limit how frequently an event handler can fire.
+
+- `x-debounce`: Specifies the debounce time in milliseconds for the event handler.
+  - Usage: `<input x-get="/search" x-trigger="input" x-target="#results" x-debounce="500">`
+
+### Before and After Hooks
+Trigger custom events before and after the request.
+
+- `x-before`: Specifies one or more events (comma-separated) to be dispatched before the request is sent.
+  - Usage: `<button x-get="/data" x-before="showLoading">Load Data</button>`
+- `x-after`: Specifies one or more events (comma-separated) to be dispatched after the response is received.
+  - Usage: `<button x-get="/data" x-after="hideLoading">Load Data</button>`
+
+### Server-Sent Events (SSE)
+Establish a connection to receive real-time updates from the server.
+
+- `x-sse`: Specifies a URL to establish a Server-Sent Events (SSE) connection.
+  - The element will handle incoming SSE messages from the specified URL.
+  - Usage: `<div x-sse="/sse/updates"></div>`
+
+### Loading Indicators
+Display an indicator during the request.
+
+- `x-indicator`: Specifies a selector for an element to show before the request is sent and hide after the response is received.
+  - Useful for displaying a loading spinner or message.
+  - Usage:
+    ```html
+    <div id="loading" style="display: none;">Loading...</div>
+    <button x-get="/data" x-target="#content" x-indicator="#loading">Load Data</button>
+    ```
+
+### Confirmation Prompt
+Prompt the user for confirmation before proceeding.
+
+- `x-confirm`: Specifies a confirmation message to display before proceeding with the action.
+  - If the user cancels, the action is aborted.
+  - Usage: `<button x-delete="/item/1" x-confirm="Are you sure you want to delete this item?">Delete</button>`
+
+### Request Timeout
+Set a maximum time to wait for a response.
+
+- `x-timeout`: Specifies a timeout in milliseconds for the request.
+  - If the request does not complete within this time, it will be aborted.
+  - Usage: `<button x-get="/data" x-target="#content" x-timeout="5000">Load Data</button>`
+
+### Request Retries
+Automatically retry failed requests.
+
+- `x-retry`: Specifies the number of times to retry the request if it fails.
+  - Usage: `<button x-get="/data" x-target="#content" x-retry="3">Load Data</button>`
+
+### Custom Error Handling
+Define custom behavior when an error occurs.
+
+- `x-on-error`: Specifies the name of a global function to call if an error occurs during the request.
+  - Usage:
+    ```javascript
+    <script>
+      function handleError(error, element) {
+        alert('An error occurred: ' + error.message);
+      }
+    </script>
+    <button x-get="/data" x-target="#content" x-on-error="handleError">Load Data</button>
+    ```
+
+
+### Loading Classes
+Apply CSS classes to elements during the request.
+- `x-loading-class`: Specifies a CSS class to add to the target element during the request. The class is removed after the request completes.
+  - Useful for adding styles like opacity changes or loading animations.
+  - Usage:
+    ```html
+    <style>
+      .loading {
+        opacity: 0.5;
+      }
+    </style>
+    <button x-get="/data" x-target="#content" x-loading-class="loading">Load Data</button>
+    ```
 
 ## Configuration Options
 When instantiating partial.js, you can provide a configuration object to customize its behavior:
