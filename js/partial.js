@@ -37,42 +37,54 @@ class Partial {
                 PUT:    'x-put',
                 DELETE: 'x-delete',
             },
-            TARGET:     'x-target',
-            TRIGGER:    'x-trigger',
-            SERIALIZE:  'x-serialize',
-            JSON:       'x-json',
-            PARAMS:     'x-params',
-            SWAP_OOB:   'x-swap-oob',
-            PUSH_STATE: 'x-push-state',
-            FOCUS:      'x-focus',
-            DEBOUNCE:   'x-debounce',
-            BEFORE:     'x-before',
-            AFTER:      'x-after',
-            SSE:        'x-sse',
+            TARGET:        'x-target',
+            TRIGGER:       'x-trigger',
+            SERIALIZE:     'x-serialize',
+            JSON:          'x-json',
+            PARAMS:        'x-params',
+            SWAP_OOB:      'x-swap-oob',
+            PUSH_STATE:    'x-push-state',
+            FOCUS:         'x-focus',
+            DEBOUNCE:      'x-debounce',
+            BEFORE:        'x-before',
+            AFTER:         'x-after',
+            SSE:           'x-sse',
+            INDICATOR:     'x-indicator',
+            CONFIRM:       'x-confirm',
+            TIMEOUT:       'x-timeout',
+            RETRY:         'x-retry',
+            ON_ERROR:      'x-on-error',
+            LOADING_CLASS: 'x-loading-class',
+        };
+
+        this.SERIALIZE_TYPES = {
+            JSON: 'json',
+            NESTED_JSON: 'nested-json',
+            XML: 'xml',
         };
 
         // Store options with default values
-        this.onError = options.onError || null;
-        this.csrfToken = options.csrfToken || null;
+        this.onError           = options.onError || null;
+        this.csrfToken         = options.csrfToken || null;
         this.defaultSwapOption = options.defaultSwapOption || 'outerHTML';
-        this.beforeRequest = options.beforeRequest || null;
-        this.afterResponse = options.afterResponse || null;
-        this.autoFocus = options.autoFocus !== undefined ? options.autoFocus : false;
-        this.debounceTime = options.debounceTime || 0;
+        this.beforeRequest     = options.beforeRequest || null;
+        this.afterResponse     = options.afterResponse || null;
+        this.autoFocus         = options.autoFocus !== undefined ? options.autoFocus : false;
+        this.debounceTime      = options.debounceTime || 0;
 
-        this.eventTarget = new EventTarget();
+        this.eventTarget    = new EventTarget();
         this.eventListeners = {};
 
         // Map to store SSE connections per element
         this.sseConnections = new Map();
 
         // Bind methods to ensure correct 'this' context
-        this.scanForElements = this.scanForElements.bind(this);
-        this.setupElement = this.setupElement.bind(this);
-        this.setupSSEElement = this.setupSSEElement.bind(this);
-        this.handleAction = this.handleAction.bind(this);
+        this.scanForElements   = this.scanForElements.bind(this);
+        this.setupElement      = this.setupElement.bind(this);
+        this.setupSSEElement   = this.setupSSEElement.bind(this);
+        this.handleAction      = this.handleAction.bind(this);
         this.handleOobSwapping = this.handleOobSwapping.bind(this);
-        this.handlePopState = this.handlePopState.bind(this);
+        this.handlePopState    = this.handlePopState.bind(this);
 
         // Initialize the handler on DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => this.scanForElements());
@@ -246,9 +258,16 @@ class Partial {
      * @param {HTMLElement} element
      */
     async handleAction(event, element) {
-        const requestParams = this.extractRequestParams(element);
+        // Get confirmation message from x-confirm
+        const confirmMessage = element.getAttribute(this.ATTRIBUTES.CONFIRM);
+        if (confirmMessage) {
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                return; // Abort the action
+            }
+        }
 
-        // Ensure 'element' is included in the request parameters
+        const requestParams = this.extractRequestParams(element);
         requestParams.element = element;
 
         if (!requestParams.url) {
@@ -282,7 +301,41 @@ class Partial {
         // Set the X-Target header to the request
         requestParams.headers["X-Target"] = requestParams.partialId;
 
+        // Get the indicator selector from x-indicator
+        const indicatorSelector = element.getAttribute(this.ATTRIBUTES.INDICATOR);
+        let indicatorElement = null;
+        if (indicatorSelector) {
+            indicatorElement = document.querySelector(indicatorSelector);
+        }
+
+        // Get loading class from x-loading-class
+        const loadingClass = element.getAttribute(this.ATTRIBUTES.LOADING_CLASS);
+
+        // Handle x-focus
+        const focusEnabled = element.getAttribute(this.ATTRIBUTES.FOCUS) !== 'false';
+
+        // Handle x-push-state
+        const shouldPushState = element.getAttribute(this.ATTRIBUTES.PUSH_STATE) !== 'false';
+
+        // Handle x-timeout
+        const timeoutValue = element.getAttribute(this.ATTRIBUTES.TIMEOUT);
+        const timeout = parseInt(timeoutValue, 10);
+
+        // Handle x-retry
+        const retryValue = element.getAttribute(this.ATTRIBUTES.RETRY);
+        const maxRetries = parseInt(retryValue, 10) || 0;
+
         try {
+            // Show the indicator before the request
+            if (indicatorElement) {
+                indicatorElement.style.display = ''; // Or apply a CSS class to show
+            }
+
+            // Add loading class to target element
+            if (loadingClass && targetElement) {
+                targetElement.classList.add(loadingClass);
+            }
+
             // Dispatch x-before event(s) if specified
             const beforeEvents = element.getAttribute(this.ATTRIBUTES.BEFORE);
             if (beforeEvents) {
@@ -297,7 +350,12 @@ class Partial {
             // Dispatch beforeSend event
             this.dispatchEvent('beforeSend', { ...requestParams, element });
 
-            const responseText = await this.performRequest(requestParams);
+            // Call performRequest with the correct parameters
+            const responseText = await this.performRequest({
+                ...requestParams,
+                timeout,
+                maxRetries,
+            });
 
             // After response hook
             if (typeof this.afterResponse === 'function') {
@@ -311,7 +369,6 @@ class Partial {
             await this.processResponse(responseText, targetElement, element);
 
             // After successfully updating content
-            const shouldPushState = element.getAttribute(this.ATTRIBUTES.PUSH_STATE) !== 'false';
             if (shouldPushState) {
                 const newUrl = new URL(requestParams.url, window.location.origin);
                 history.pushState({ xPartial: true }, '', newUrl);
@@ -322,14 +379,35 @@ class Partial {
             if (afterEvents) {
                 await this.dispatchCustomEvents(afterEvents, { element, event });
             }
-        } catch (error) {
-            console.error('Request failed:', error);
 
-            if (typeof this.onError === 'function') {
+            // Auto-focus if enabled
+            if (this.autoFocus && focusEnabled) {
+                if (targetElement.getAttribute('tabindex') === null) {
+                    targetElement.setAttribute('tabindex', '-1');
+                }
+                targetElement.focus();
+            }
+
+        } catch (error) {
+            const onErrorAttr = element.getAttribute(this.ATTRIBUTES.ON_ERROR);
+            if (onErrorAttr && typeof window[onErrorAttr] === 'function') {
+                window[onErrorAttr](error, element);
+            } else if (typeof this.onError === 'function') {
                 this.onError(error, element);
             } else {
-                // Optionally, handle error display in the UI
+                // Default error handling
+                console.error('Request failed:', error);
                 targetElement.innerHTML = `<div class="error">An error occurred: ${error.message}</div>`;
+            }
+        } finally {
+            // Hide the indicator after the request completes or fails
+            if (indicatorElement) {
+                indicatorElement.style.display = 'none'; // Or remove the CSS class
+            }
+
+            // Remove loading class from target element
+            if (loadingClass && targetElement) {
+                targetElement.classList.remove(loadingClass);
             }
         }
     }
@@ -430,21 +508,24 @@ class Partial {
      * @param {Object} requestParams - Parameters including method, url, headers, body, etc.
      * @returns {Promise<string>} Response text
      */
-    performRequest(requestParams) {
-        const { method, url, headers, element } = requestParams;
+    async performRequest(requestParams) {
+        const { method, url, headers, element, timeout, maxRetries } = requestParams;
+
+        const controller = new AbortController();
         const options = {
             method,
             headers,
             credentials: 'same-origin',
+            signal: controller.signal,
         };
 
         // Handle request body
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
             let body = null;
 
-            // Check if the element or the closest form has x-serialize="json"
-            const serializeAsJson = element && (element.getAttribute(this.ATTRIBUTES.SERIALIZE) === 'json' ||
-                (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE) === 'json'));
+            // Check for x-serialize attribute
+            const serializeType = element && (element.getAttribute(this.ATTRIBUTES.SERIALIZE) ||
+                (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE)));
 
             // Check for x-json attribute
             const xJson = element && element.getAttribute(this.ATTRIBUTES.JSON);
@@ -460,24 +541,18 @@ class Partial {
                 }
             } else if (element && (element.tagName === 'FORM' || element.closest('form'))) {
                 const form = element.tagName === 'FORM' ? element : element.closest('form');
-                if (serializeAsJson) {
-                    // Serialize form data as JSON
-                    const formData = new FormData(form);
-                    const jsonObject = {};
-                    formData.forEach((value, key) => {
-                        // Handle multiple values per key (e.g., checkboxes)
-                        if (jsonObject[key]) {
-                            if (Array.isArray(jsonObject[key])) {
-                                jsonObject[key].push(value);
-                            } else {
-                                jsonObject[key] = [jsonObject[key], value];
-                            }
-                        } else {
-                            jsonObject[key] = value;
-                        }
-                    });
-                    body = JSON.stringify(jsonObject);
+                if (serializeType === this.SERIALIZE_TYPES.JSON) {
+                    // Serialize form data as flat JSON
+                    body = this.serializeFormToJson(form);
                     headers['Content-Type'] = 'application/json';
+                } else if (serializeType === this.SERIALIZE_TYPES.NESTED_JSON) {
+                    // Serialize form data as nested JSON
+                    body = this.serializeFormToNestedJson(form);
+                    headers['Content-Type'] = 'application/json';
+                } else if (serializeType === this.SERIALIZE_TYPES.XML) {
+                    // Serialize form data as XML
+                    body = this.serializeFormToXml(form);
+                    headers['Content-Type'] = 'application/xml';
                 } else {
                     // Use FormData
                     body = new FormData(form);
@@ -489,16 +564,162 @@ class Partial {
             }
         }
 
-        return fetch(url, options).then(response => {
-            // Store the response for event handling
-            this.lastResponse = response;
+        // Start the timeout if specified
+        let timeoutId;
+        if (!isNaN(timeout) && timeout > 0) {
+            timeoutId = setTimeout(() => {
+                controller.abort();
+            }, timeout);
+        }
 
-            if (!response.ok) {
-                return response.text().then(text => {
+        let attempts = 0;
+        const maxAttempts = maxRetries + 1;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            try {
+                const response = await fetch(url, options);
+                clearTimeout(timeoutId);
+
+                this.lastResponse = response;
+
+                if (!response.ok) {
+                    const text = await response.text();
                     throw new Error(`HTTP error ${response.status}: ${text}`);
-                });
+                }
+                return response.text();
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('Request timed out');
+                }
+
+                if (attempts >= maxAttempts) {
+                    throw error;
+                }
+                // Optionally, implement a delay before retrying
             }
-            return response.text();
+        }
+    }
+
+    /**
+     * Serializes form data to a flat JSON string.
+     * @param {HTMLFormElement} form
+     * @returns {string} JSON string
+     */
+    serializeFormToJson(form) {
+        const formData = new FormData(form);
+        const jsonObject = {};
+        formData.forEach((value, key) => {
+            if (jsonObject[key]) {
+                if (Array.isArray(jsonObject[key])) {
+                    jsonObject[key].push(value);
+                } else {
+                    jsonObject[key] = [jsonObject[key], value];
+                }
+            } else {
+                jsonObject[key] = value;
+            }
+        });
+        return JSON.stringify(jsonObject);
+    }
+
+    /**
+     * Serializes form data to a nested JSON string.
+     * @param {HTMLFormElement} form
+     * @returns {string} Nested JSON string
+     */
+    serializeFormToNestedJson(form) {
+        const formData = new FormData(form);
+        const serializedData = {};
+
+        for (let [name, value] of formData) {
+            const inputElement = form.querySelector(`[name="${name}"]`);
+            const checkBoxCustom = form.querySelector(`[data-custom="true"]`);
+            const inputType = inputElement ? inputElement.type : null;
+            const inputStep = inputElement ? inputElement.step : null;
+
+            // Check if the input type is number and convert the value if so
+            if (inputType === 'number') {
+                if (inputStep && inputStep !== "any" && Number(inputStep) % 1 === 0) {
+                    value = parseInt(value, 10);
+                } else if (inputStep === "any") {
+                    value = value.includes('.') ? parseFloat(value) : parseInt(value, 10);
+                } else {
+                    value = parseFloat(value);
+                }
+            }
+
+            // Check if the input type is checkbox and convert the value to boolean
+            if (inputType === 'checkbox' && !checkBoxCustom) {
+                value = inputElement.checked; // value will be true if checked, false otherwise
+            }
+
+            // Check if the input type is select-one and has data-bool attribute
+            if (inputType === 'select-one' && inputElement.getAttribute('data-bool') === 'true') {
+                value = value === "true"; // Value will be true if selected, false otherwise
+            }
+
+            // Attempt to parse JSON strings
+            try {
+                value = JSON.parse(value);
+            } catch (e) {
+                // If parsing fails, treat as a simple string
+            }
+
+            const keys = name.split(/[.[\]]+/).filter(Boolean); // split by dot or bracket notation
+            let obj = serializedData;
+
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (!obj[keys[i]]) {
+                    obj[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {}; // create an array if the next key is an index
+                }
+                obj = obj[keys[i]];
+            }
+
+            const lastKey = keys[keys.length - 1];
+            if (lastKey in obj && Array.isArray(obj[lastKey])) {
+                obj[lastKey].push(value); // add to array if the key already exists
+            } else if (lastKey in obj) {
+                obj[lastKey] = [obj[lastKey], value];
+            } else {
+                obj[lastKey] = value; // set value for key
+            }
+        }
+
+        return JSON.stringify(serializedData);
+    }
+
+    /**
+     * Serializes form data to an XML string.
+     * @param {HTMLFormElement} form
+     * @returns {string} XML string
+     */
+    serializeFormToXml(form) {
+        const formData = new FormData(form);
+        let xmlString = '<?xml version="1.0" encoding="UTF-8"?><form>';
+
+        formData.forEach((value, key) => {
+            xmlString += `<${key}>${this.escapeXml(value)}</${key}>`;
+        });
+
+        xmlString += '</form>';
+        return xmlString;
+    }
+
+    /**
+     * Escapes XML special characters.
+     * @param {string} unsafe
+     * @returns {string}
+     */
+    escapeXml(unsafe) {
+        return unsafe.replace(/[<>&'"]/g, function (c) {
+            switch (c) {
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '&': return '&amp;';
+                case '\'': return '&apos;';
+                case '"': return '&quot;';
+            }
         });
     }
 
@@ -534,15 +755,6 @@ class Partial {
 
         // Handle any x-event-* headers from the response
         await this.handleResponseEvents();
-
-        // Auto-focus if enabled
-        const focusEnabled = element.getAttribute(this.ATTRIBUTES.FOCUS) !== 'false';
-        if (this.autoFocus && focusEnabled) {
-            if (targetElement.getAttribute('tabindex') === null) {
-                targetElement.setAttribute('tabindex', '-1');
-            }
-            targetElement.focus();
-        }
     }
 
     /**
