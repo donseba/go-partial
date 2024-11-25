@@ -221,7 +221,7 @@ func actionFunc(p *Partial, data *Data) func() template.HTML {
 		}
 
 		// Use the selector to get the appropriate partial
-		actionPartial, err := p.templateAction(data.Ctx, data)
+		actionPartial, err := p.templateAction(data.Ctx, p, data)
 		if err != nil {
 			p.getLogger().Error("error in selector function", "error", err)
 			return template.HTML(fmt.Sprintf("error in action function: %v", err))

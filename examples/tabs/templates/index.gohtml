@@ -3,7 +3,7 @@
     <head>
         <title>Tab Example</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css">
-        <script type="application/javascript" src="/js/standalone.js"></script>
+		<script type="application/javascript" src="/js/partial.js"></script>
     </head>
 
     <body>
@@ -44,11 +44,7 @@
 
     <script>
         // Initialize the handler with optional configuration
-        const xP = new XPartial({
-            enableUrlParam: true,          // Enable URL parameter setting
-            urlParamName: 'x-select',      // Name of the query parameter (e.g., 'selected', 'tab')
-            replaceState: false             // Use pushState (false) or replaceState (true) when updating the URL
-        });
+        const partial = new Partial();
     </script>
     </body>
 </html>

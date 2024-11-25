@@ -98,7 +98,7 @@ func TestRequestBasic(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Partial", "content")
+		request.Header.Set("X-Target", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -152,7 +152,7 @@ func TestRequestWrap(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Partial", "content")
+		request.Header.Set("X-Target", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -215,7 +215,7 @@ func TestRequestOOB(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Partial", "content")
+		request.Header.Set("X-Target", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -278,7 +278,7 @@ func TestRequestOOBSwap(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Partial", "content")
+		request.Header.Set("X-Target", "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -329,7 +329,7 @@ func TestDeepNested(t *testing.T) {
 
 	t.Run("find nested item and return it", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Partial", "nested")
+		request.Header.Set("X-Target", "nested")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -362,7 +362,7 @@ func TestMissingPartial(t *testing.T) {
 	}
 
 	request, _ := http.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set("X-Partial", "nonexistent")
+	request.Header.Set("X-Target", "nonexistent")
 	response := httptest.NewRecorder()
 
 	handleRequest(response, request)
@@ -539,7 +539,7 @@ func BenchmarkWithSelectMap(b *testing.B) {
 	}
 
 	service := NewService(&Config{
-		PartialHeader: "X-Partial",
+		PartialHeader: "X-Target",
 		UseCache:      false,
 	})
 	layout := service.NewLayout().FS(fsys)
@@ -572,7 +572,7 @@ func BenchmarkWithSelectMap(b *testing.B) {
 func BenchmarkRenderWithRequest(b *testing.B) {
 	// Setup configuration and service
 	cfg := &Config{
-		PartialHeader: "X-Partial",
+		PartialHeader: "X-Target",
 		UseCache:      false,
 	}
 

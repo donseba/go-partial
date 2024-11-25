@@ -67,8 +67,8 @@ type (
 		children          map[string]*Partial
 		oobChildren       map[string]struct{}
 		selection         *Selection
-		templateAction    func(ctx context.Context, data *Data) (*Partial, error)
-		action            func(ctx context.Context, data *Data) (*Partial, error)
+		templateAction    func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		action            func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
 	}
 
 	Selection struct {
@@ -240,12 +240,12 @@ func (p *Partial) With(child *Partial) *Partial {
 }
 
 // WithAction adds callback action to the partial, which can do some logic and return a partial to render.
-func (p *Partial) WithAction(action func(ctx context.Context, data *Data) (*Partial, error)) *Partial {
+func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
 	p.action = action
 	return p
 }
 
-func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, data *Data) (*Partial, error)) *Partial {
+func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
 	p.templateAction = templateAction
 	return p
 }
@@ -464,7 +464,7 @@ func (p *Partial) getPartialHeader() string {
 	if p.parent != nil {
 		return p.parent.getPartialHeader()
 	}
-	return defaultPartialHeader
+	return defaultTargetHeader
 }
 
 func (p *Partial) getSelectHeader() string {
@@ -659,12 +659,13 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 	}
 
 	if p.action != nil {
-		actionPartial, err := p.action(ctx, data)
+		var err error
+		p, err = p.action(ctx, p, data)
 		if err != nil {
 			p.getLogger().Error("error in action function", "error", err)
 			return "", fmt.Errorf("error in action function: %w", err)
 		}
-		return actionPartial.renderSelf(ctx, r)
+		//return actionPartial.renderSelf(ctx, r)
 	}
 
 	functions := p.getFuncs(data)

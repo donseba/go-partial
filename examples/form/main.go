@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/donseba/go-partial"
 	"log/slog"
@@ -11,6 +13,11 @@ import (
 type (
 	App struct {
 		PartialService *partial.Service
+	}
+
+	FormData struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 )
 
@@ -26,8 +33,8 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.Handle("GET /js/", http.StripPrefix("/js/", http.FileServer(http.Dir("../../js"))))
-
 	mux.HandleFunc("GET /", app.home)
+	mux.HandleFunc("POST /", app.home)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -41,23 +48,26 @@ func main() {
 	}
 }
 
-// super simple example of how to use the partial service to render a layout with a content partial
 func (a *App) home(w http.ResponseWriter, r *http.Request) {
-	// the tabs for this page.
-	selectMap := map[string]*partial.Partial{
-		"tab1": partial.New(filepath.Join("templates", "tab1.gohtml")),
-		"tab2": partial.New(filepath.Join("templates", "tab2.gohtml")),
-		"tab3": partial.New(filepath.Join("templates", "tab3.gohtml")),
-	}
-
-	// layout, footer, index could be abstracted away and shared over multiple handlers within the same module, for instance.
 	layout := a.PartialService.NewLayout()
 	footer := partial.NewID("footer", filepath.Join("templates", "footer.gohtml"))
 	index := partial.NewID("index", filepath.Join("templates", "index.gohtml")).WithOOB(footer)
+	content := partial.NewID("form", filepath.Join("templates", "form.gohtml")).WithAction(func(ctx context.Context, p *partial.Partial, data *partial.Data) (*partial.Partial, error) {
+		switch p.GetRequestedAction() {
+		case "submit":
+			formData := &FormData{}
+			err := json.NewDecoder(r.Body).Decode(formData)
+			if err != nil {
+				return nil, fmt.Errorf("error decoding form data: %w", err)
+			}
 
-	content := partial.NewID("content", filepath.Join("templates", "content.gohtml")).WithSelectMap("tab1", selectMap)
+			w.Header().Set("X-Event-Notify", `{"type": "success", "message": "Form submitted successfully"}`)
+			p = p.Templates(filepath.Join("templates", "submitted.gohtml")).AddData("formData", formData)
+		}
 
-	// set the layout content and wrap it with the main template
+		return p, nil
+	})
+
 	layout.Set(content).Wrap(index)
 
 	err := layout.WriteWithRequest(r.Context(), w, r)
