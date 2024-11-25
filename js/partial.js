@@ -431,25 +431,22 @@ class Partial {
         const targetElement = document.querySelector(targetSelector);
         const partialId = targetElement ? targetElement.getAttribute('id') : null;
 
-        // Handle x-params for GET requests
-        if (method === 'GET') {
-            const xParams = element.getAttribute(this.ATTRIBUTES.PARAMS);
-            if (xParams) {
-                try {
-                    const paramsObject = JSON.parse(xParams);
-                    const urlParams = new URLSearchParams(paramsObject).toString();
-                    url += (url.includes('?') ? '&' : '?') + urlParams;
-                } catch (e) {
-                    console.error('Invalid JSON in x-params attribute:', e);
-                    const error = new Error('Invalid JSON in x-params attribute');
-                    if (typeof this.onError === 'function') {
-                        this.onError(error, element);
-                    }
+        const xParams = element.getAttribute(this.ATTRIBUTES.PARAMS);
+        let paramsObject = {};
+
+        if (xParams) {
+            try {
+                paramsObject = JSON.parse(xParams);
+            } catch (e) {
+                console.error('Invalid JSON in x-params attribute:', e);
+                const error = new Error('Invalid JSON in x-params attribute');
+                if (typeof this.onError === 'function') {
+                    this.onError(error, element);
                 }
             }
         }
 
-        return { method, url, headers, targetSelector, partialId };
+        return { method, url, headers, targetSelector, partialId, paramsObject };
     }
 
     /**
@@ -509,7 +506,8 @@ class Partial {
      * @returns {Promise<string>} Response text
      */
     async performRequest(requestParams) {
-        const { method, url, headers, element, timeout, maxRetries } = requestParams;
+        const { method, url, headers, element, timeout, maxRetries, paramsObject } = requestParams;
+        let requestUrl = url;
 
         const controller = new AbortController();
         const options = {
@@ -519,22 +517,23 @@ class Partial {
             signal: controller.signal,
         };
 
+        // Handle x-serialize attribute
+        const serializeType = element && (
+            element.getAttribute(this.ATTRIBUTES.SERIALIZE) ||
+            (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE))
+        );
+
+        // Check for x-json attribute
+        const xJson = element && element.getAttribute(this.ATTRIBUTES.JSON);
+
         // Handle request body
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-            let body = null;
-
-            // Check for x-serialize attribute
-            const serializeType = element && (element.getAttribute(this.ATTRIBUTES.SERIALIZE) ||
-                (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE)));
-
-            // Check for x-json attribute
-            const xJson = element && element.getAttribute(this.ATTRIBUTES.JSON);
+            let bodyData = {};
 
             if (xJson) {
                 // Parse x-json attribute
                 try {
-                    body = JSON.stringify(JSON.parse(xJson));
-                    headers['Content-Type'] = 'application/json';
+                    bodyData = JSON.parse(xJson);
                 } catch (e) {
                     console.error('Invalid JSON in x-json attribute:', e);
                     throw new Error('Invalid JSON in x-json attribute');
@@ -543,24 +542,51 @@ class Partial {
                 const form = element.tagName === 'FORM' ? element : element.closest('form');
                 if (serializeType === this.SERIALIZE_TYPES.JSON) {
                     // Serialize form data as flat JSON
-                    body = this.serializeFormToJson(form);
-                    headers['Content-Type'] = 'application/json';
+                    bodyData = JSON.parse(this.serializeFormToJson(form));
                 } else if (serializeType === this.SERIALIZE_TYPES.NESTED_JSON) {
                     // Serialize form data as nested JSON
-                    body = this.serializeFormToNestedJson(form);
-                    headers['Content-Type'] = 'application/json';
+                    bodyData = JSON.parse(this.serializeFormToNestedJson(form));
                 } else if (serializeType === this.SERIALIZE_TYPES.XML) {
                     // Serialize form data as XML
-                    body = this.serializeFormToXml(form);
+                    bodyData = this.serializeFormToXml(form);
                     headers['Content-Type'] = 'application/xml';
                 } else {
                     // Use FormData
-                    body = new FormData(form);
+                    bodyData = new FormData(form);
                 }
             }
 
-            if (body) {
-                options.body = body;
+            // Merge paramsObject with bodyData
+            console.log(paramsObject)
+            if (paramsObject && Object.keys(paramsObject).length > 0) {
+                if (bodyData instanceof FormData) {
+                    // Append params to FormData
+                    for (const key in paramsObject) {
+                        bodyData.append(key, paramsObject[key]);
+                    }
+                } else if (typeof bodyData === 'string') {
+                    // Parse existing bodyData and merge
+                    bodyData = { ...JSON.parse(bodyData), ...paramsObject };
+                } else {
+                    // Merge objects
+                    bodyData = { ...bodyData, ...paramsObject };
+                }
+            }
+
+            if (bodyData instanceof FormData) {
+                options.body = bodyData;
+            } else if (typeof bodyData === 'string') {
+                options.body = bodyData;
+                headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+            } else {
+                options.body = JSON.stringify(bodyData);
+                headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+            }
+        } else {
+            // For GET requests, append params to URL
+            if (paramsObject && Object.keys(paramsObject).length > 0) {
+                const urlParams = new URLSearchParams(paramsObject).toString();
+                requestUrl += (requestUrl.includes('?') ? '&' : '?') + urlParams;
             }
         }
 
@@ -578,7 +604,7 @@ class Partial {
         while (attempts < maxAttempts) {
             attempts++;
             try {
-                const response = await fetch(url, options);
+                const response = await fetch(requestUrl, options);
                 clearTimeout(timeoutId);
 
                 this.lastResponse = response;

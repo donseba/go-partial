@@ -57,8 +57,14 @@ Provide custom data to include in the request.
 
 - `x-json`: Provides a JSON string to be sent as the request body.
   - Usage: `<button x-post="/api" x-json='{"id":123}'>Submit</button>`
-- `x-params`: Provides JSON parameters to be appended to the URL for GET requests.
-  - Usage: `<button x-get="/search" x-params='{"q":"test"}' x-target="#results">Search</button>`
+- `x-params`: Provides JSON parameters to be included in the request.
+  - Usage: 
+    - With GET requests: Parameters are appended to the URL.
+    - With other methods: Parameters are merged into the request body.
+  - Example:
+  ```html
+  <button x-get="/search" x-params='{"q":"test"}' x-target="#results">Search</button>
+  ```
 
 ### Out-of-Band Swapping
 Update elements outside the main content area.
