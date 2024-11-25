@@ -12,7 +12,16 @@
  */
 
 /**
- * Class representing Partial.
+ * @typedef {Object} SseMessage
+ * @property {string} content - The HTML content to insert.
+ * @property {string} [xTarget] - The CSS selector for the target element.
+ * @property {string} [xFocus] - Whether to focus the target element ('true' or 'false').
+ * @property {string} [xSwap] - The swap method ('outerHTML' or 'innerHTML').
+ * @property {string} [xEvent] - Custom events to dispatch.
+ */
+
+/**
+ * Class representing Partial.js.
  */
 class Partial {
     /**
@@ -21,7 +30,26 @@ class Partial {
      */
     constructor(options = {}) {
         // Define the custom action attributes
-        this.actionAttributes = ['x-get', 'x-post', 'x-put', 'x-delete'];
+        this.ATTRIBUTES = {
+            ACTIONS: {
+                GET:    'x-get',
+                POST:   'x-post',
+                PUT:    'x-put',
+                DELETE: 'x-delete',
+            },
+            TARGET:     'x-target',
+            TRIGGER:    'x-trigger',
+            SERIALIZE:  'x-serialize',
+            JSON:       'x-json',
+            PARAMS:     'x-params',
+            SWAP_OOB:   'x-swap-oob',
+            PUSH_STATE: 'x-push-state',
+            FOCUS:      'x-focus',
+            DEBOUNCE:   'x-debounce',
+            BEFORE:     'x-before',
+            AFTER:      'x-after',
+            SSE:        'x-sse',
+        };
 
         // Store options with default values
         this.onError = options.onError || null;
@@ -35,9 +63,13 @@ class Partial {
         this.eventTarget = new EventTarget();
         this.eventListeners = {};
 
+        // Map to store SSE connections per element
+        this.sseConnections = new Map();
+
         // Bind methods to ensure correct 'this' context
         this.scanForElements = this.scanForElements.bind(this);
         this.setupElement = this.setupElement.bind(this);
+        this.setupSSEElement = this.setupSSEElement.bind(this);
         this.handleAction = this.handleAction.bind(this);
         this.handleOobSwapping = this.handleOobSwapping.bind(this);
         this.handlePopState = this.handlePopState.bind(this);
@@ -54,9 +86,113 @@ class Partial {
      * @param {HTMLElement | Document} [container=document]
      */
     scanForElements(container = document) {
-        const selector = this.actionAttributes.map(attr => `[${attr}]`).join(',');
-        const elements = container.querySelectorAll(selector);
-        elements.forEach(this.setupElement);
+        const actionSelector = Object.values(this.ATTRIBUTES.ACTIONS).map(attr => `[${attr}]`).join(',');
+        const sseSelector = `[${this.ATTRIBUTES.SSE}]`;
+        const combinedSelector = `${actionSelector}, ${sseSelector}`;
+        const elements = container.querySelectorAll(combinedSelector);
+
+        elements.forEach(element => {
+            if (element.hasAttribute(this.ATTRIBUTES.SSE)) {
+                this.setupSSEElement(element);
+            } else {
+                this.setupElement(element);
+            }
+        });
+    }
+
+    /**
+     * Sets up an element with x-sse attribute to handle SSE connections.
+     * @param {HTMLElement} element
+     */
+    setupSSEElement(element) {
+        // Avoid attaching multiple listeners
+        if (element.__xSSEInitialized) return;
+
+        const sseUrl = element.getAttribute(this.ATTRIBUTES.SSE);
+        if (!sseUrl) {
+            console.error('No URL specified in x-sse attribute on element:', element);
+            return;
+        }
+
+        const eventSource = new EventSource(sseUrl);
+
+        eventSource.onmessage = (event) => {
+            this.handleSSEMessage(event, element);
+        };
+
+        eventSource.onerror = (error) => {
+            console.error('SSE connection error on element:', element, error);
+            if (typeof this.onError === 'function') {
+                this.onError(error, element);
+            }
+        };
+
+        // Store the connection to manage it later if needed
+        this.sseConnections.set(element, eventSource);
+
+        // Mark the element as initialized
+        element.__xSSEInitialized = true;
+    }
+
+    /**
+     * Handles incoming SSE messages for a specific element.
+     * @param {MessageEvent} event
+     * @param {HTMLElement} element
+     */
+    async handleSSEMessage(event, element) {
+        try {
+            /** @type {SseMessage} */
+            const data = JSON.parse(event.data);
+
+            const targetSelector = data.xTarget;
+            const targetElement = document.querySelector(targetSelector);
+
+            if (!targetElement) {
+                console.error(`No element found with selector '${targetSelector}' for SSE message.`);
+                return;
+            }
+
+            // Decide swap method
+            const swapOption = data.xSwap || this.defaultSwapOption;
+
+            if (swapOption === 'outerHTML') {
+                targetElement.outerHTML = data.content;
+            } else if (swapOption === 'innerHTML') {
+                targetElement.innerHTML = data.content;
+            } else {
+                console.error(`Invalid x-swap option '${swapOption}' in SSE message. Use 'outerHTML' or 'innerHTML'.`);
+                return;
+            }
+
+            // Optionally focus the target element
+            const focusEnabled = data.xFocus !== 'false';
+            if (this.autoFocus && focusEnabled) {
+                const newTargetElement = document.querySelector(targetSelector);
+                if (newTargetElement) {
+                    if (newTargetElement.getAttribute('tabindex') === null) {
+                        newTargetElement.setAttribute('tabindex', '-1');
+                    }
+                    newTargetElement.focus();
+                }
+            }
+
+            // Re-scan the updated content for Partial elements
+            this.scanForElements();
+
+            // Dispatch custom events if specified
+            if (data.xEvent) {
+                await this.dispatchCustomEvents(data.xEvent, { element, event, data });
+            }
+
+            // Dispatch an event after the content is replaced
+            this.dispatchEvent('sseContentReplaced', { targetElement, data, element });
+
+        } catch (error) {
+            console.error('Error processing SSE message:', error);
+            if (typeof this.onError === 'function') {
+                this.onError(error, element);
+            }
+        }
     }
 
     /**
@@ -70,14 +206,14 @@ class Partial {
         // Set a default trigger based on the element type
         let trigger;
         if (element.tagName === 'FORM') {
-            trigger = element.getAttribute('x-trigger') || 'submit';
+            trigger = element.getAttribute(this.ATTRIBUTES.TRIGGER) || 'submit';
         } else {
-            trigger = element.getAttribute('x-trigger') || 'click';
+            trigger = element.getAttribute(this.ATTRIBUTES.TRIGGER) || 'click';
         }
 
         // Get custom debounce time from x-debounce attribute
         let elementDebounceTime = this.debounceTime; // Default to global debounce time
-        const xDebounce = element.getAttribute('x-debounce');
+        const xDebounce = element.getAttribute(this.ATTRIBUTES.DEBOUNCE);
         if (xDebounce !== null) {
             const parsedDebounce = parseInt(xDebounce, 10);
             if (!isNaN(parsedDebounce) && parsedDebounce >= 0) {
@@ -110,11 +246,13 @@ class Partial {
      * @param {HTMLElement} element
      */
     async handleAction(event, element) {
-        const method = this.getMethod(element);
-        let url = element.getAttribute(`x-${method.toLowerCase()}`);
+        const requestParams = this.extractRequestParams(element);
 
-        if (!url) {
-            const error = new Error(`No URL specified for method ${method} on element.`);
+        // Ensure 'element' is included in the request parameters
+        requestParams.element = element;
+
+        if (!requestParams.url) {
+            const error = new Error(`No URL specified for method ${requestParams.method} on element.`);
             console.error(error.message, element);
             if (typeof this.onError === 'function') {
                 this.onError(error, element);
@@ -122,15 +260,9 @@ class Partial {
             return;
         }
 
-        const headers = this.getHeaders(element);
-        let partialSelector = element.getAttribute('x-target');
-        if (!partialSelector) {
-            partialSelector = window.body;
-        }
-
-        const targetElement = document.querySelector(partialSelector);
+        const targetElement = document.querySelector(requestParams.targetSelector);
         if (!targetElement) {
-            const error = new Error(`No element found with selector '${partialSelector}' for 'x-target' targeting.`);
+            const error = new Error(`No element found with selector '${requestParams.targetSelector}' for 'x-target' targeting.`);
             console.error(error.message);
             if (typeof this.onError === 'function') {
                 this.onError(error, element);
@@ -138,8 +270,7 @@ class Partial {
             return;
         }
 
-        const partialId = targetElement.getAttribute('id');
-        if (!partialId) {
+        if (!requestParams.partialId) {
             const error = new Error(`Target element does not have an 'id' attribute.`);
             console.error(error.message, targetElement);
             if (typeof this.onError === 'function') {
@@ -149,94 +280,48 @@ class Partial {
         }
 
         // Set the X-Target header to the request
-        headers["X-Target"] = partialId;
-
-        // Handle x-params for GET requests
-        if (method === 'GET') {
-            const xParams = element.getAttribute('x-params');
-            if (xParams) {
-                try {
-                    const paramsObject = JSON.parse(xParams);
-                    const urlParams = new URLSearchParams(paramsObject).toString();
-                    url += (url.includes('?') ? '&' : '?') + urlParams;
-                } catch (e) {
-                    console.error('Invalid JSON in x-params attribute:', e);
-                    const error = new Error('Invalid JSON in x-params attribute');
-                    if (typeof this.onError === 'function') {
-                        this.onError(error, element);
-                    }
-                    return;
-                }
-            }
-        }
+        requestParams.headers["X-Target"] = requestParams.partialId;
 
         try {
             // Dispatch x-before event(s) if specified
-            const beforeEvents = element.getAttribute('x-before');
+            const beforeEvents = element.getAttribute(this.ATTRIBUTES.BEFORE);
             if (beforeEvents) {
                 await this.dispatchCustomEvents(beforeEvents, { element, event });
             }
 
             // Before request hook
             if (typeof this.beforeRequest === 'function') {
-                await this.beforeRequest({ method, url, headers, element });
+                await this.beforeRequest({ ...requestParams, element });
             }
 
-            const responseText = await this.performRequest(method, url, headers, element);
+            // Dispatch beforeSend event
+            this.dispatchEvent('beforeSend', { ...requestParams, element });
+
+            const responseText = await this.performRequest(requestParams);
 
             // After response hook
             if (typeof this.afterResponse === 'function') {
                 await this.afterResponse({ response: this.lastResponse, element });
             }
 
-            // Parse the response HTML
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(responseText, 'text/html');
+            // Dispatch afterReceive event
+            this.dispatchEvent('afterReceive', { response: this.lastResponse, element });
 
-            // Extract OOB elements
-            const oobElements = Array.from(doc.querySelectorAll('[x-swap-oob]'));
-            oobElements.forEach(el => el.parentNode.removeChild(el));
-
-            // Dispatch an event before the content is replaced
-            this.dispatchEvent('xBeforeContentReplace', { targetElement, doc });
-
-            // Replace the target's innerHTML with the main content
-            targetElement.innerHTML = doc.body.innerHTML;
-
-            // Dispatch an event after the content is replaced
-            this.dispatchEvent('xAfterContentReplace', { targetElement, doc });
+            // Process and update the DOM with the response
+            await this.processResponse(responseText, targetElement, element);
 
             // After successfully updating content
-            const shouldPushState = element.getAttribute('x-push-state') !== 'false';
+            const shouldPushState = element.getAttribute(this.ATTRIBUTES.PUSH_STATE) !== 'false';
             if (shouldPushState) {
-                const newUrl = new URL(url, window.location.origin);
+                const newUrl = new URL(requestParams.url, window.location.origin);
                 history.pushState({ xPartial: true }, '', newUrl);
             }
 
-            // Auto-focus if enabled
-            const focusEnabled = element.getAttribute('x-focus') !== 'false';
-            if (this.autoFocus && focusEnabled) {
-                if (targetElement.getAttribute('tabindex') === null) {
-                    targetElement.setAttribute('tabindex', '-1');
-                }
-                targetElement.focus();
-            }
-
-            // Re-scan the newly added content for Partial elements
-            this.scanForElements(targetElement);
-
-            // Handle OOB swapping with the extracted OOB elements
-            this.handleOobSwapping(oobElements);
-
-            // Handle any x-event-* headers from the response
-            await this.handleResponseEvents();
-
             // Dispatch x-after event(s) if specified
-            const afterEvents = element.getAttribute('x-after');
+            const afterEvents = element.getAttribute(this.ATTRIBUTES.AFTER);
             if (afterEvents) {
                 await this.dispatchCustomEvents(afterEvents, { element, event });
             }
-
         } catch (error) {
             console.error('Request failed:', error);
 
@@ -250,68 +335,43 @@ class Partial {
     }
 
     /**
-     * Dispatches custom events specified in a comma-separated string.
-     * @param {string} events - Comma-separated event names.
-     * @param {Object} detail - Detail object to pass with the event.
+     * Extracts request parameters from the element.
+     * @param {HTMLElement} element
+     * @returns {Object} Parameters including method, url, headers, body, etc.
      */
-    async dispatchCustomEvents(events, detail) {
-        const eventNames = events.split(',').map(e => e.trim());
-        for (const eventName of eventNames) {
-            const event = new CustomEvent(eventName, { detail });
-            this.eventTarget.dispatchEvent(event);
+    extractRequestParams(element) {
+        const method = this.getMethod(element);
+        let url = element.getAttribute(`x-${method.toLowerCase()}`);
+
+        const headers = this.getHeaders(element);
+
+        let targetSelector = element.getAttribute(this.ATTRIBUTES.TARGET);
+        if (!targetSelector) {
+            targetSelector = 'body';
         }
-    }
 
-    /**
-     * Handles the popstate event for browser navigation.
-     * @param {PopStateEvent} event
-     */
-    async handlePopState(event) {
-        if (event.state && event.state.xPartial) {
-            const url = window.location.href;
-            try {
-                const responseText = await this.performRequest('GET', url, {}, null);
+        const targetElement = document.querySelector(targetSelector);
+        const partialId = targetElement ? targetElement.getAttribute('id') : null;
 
-                // Parse the response HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(responseText, 'text/html');
-
-                // Replace the body content
-                document.body.innerHTML = doc.body.innerHTML;
-
-                // Re-scan the entire document
-                this.scanForElements();
-
-                // Optionally, focus the body
-                if (this.autoFocus) {
-                    document.body.focus();
-                }
-
-            } catch (error) {
-                console.error('PopState request failed:', error);
-                if (typeof this.onError === 'function') {
-                    this.onError(error, document.body);
+        // Handle x-params for GET requests
+        if (method === 'GET') {
+            const xParams = element.getAttribute(this.ATTRIBUTES.PARAMS);
+            if (xParams) {
+                try {
+                    const paramsObject = JSON.parse(xParams);
+                    const urlParams = new URLSearchParams(paramsObject).toString();
+                    url += (url.includes('?') ? '&' : '?') + urlParams;
+                } catch (e) {
+                    console.error('Invalid JSON in x-params attribute:', e);
+                    const error = new Error('Invalid JSON in x-params attribute');
+                    if (typeof this.onError === 'function') {
+                        this.onError(error, element);
+                    }
                 }
             }
         }
-    }
 
-    /**
-     * Debounce function to limit the rate at which a function can fire.
-     * @param {Function} func - The function to debounce.
-     * @param {number} wait - The number of milliseconds to wait.
-     * @returns {Function}
-     */
-    debounce(func, wait) {
-        let timeout;
-        return (...args) => {
-            const later = () => {
-                clearTimeout(timeout);
-                func.apply(this, args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
+        return { method, url, headers, targetSelector, partialId };
     }
 
     /**
@@ -320,7 +380,7 @@ class Partial {
      * @returns {string} HTTP method
      */
     getMethod(element) {
-        for (const attr of this.actionAttributes) {
+        for (const attr of Object.values(this.ATTRIBUTES.ACTIONS)) {
             if (element.hasAttribute(attr)) {
                 return attr.replace('x-', '').toUpperCase();
             }
@@ -347,7 +407,7 @@ class Partial {
         // Collect all x-* attributes that are not actionAttributes
         for (const attr of element.attributes) {
             const name = attr.name;
-            if (name.startsWith('x-') && !this.actionAttributes.includes(name)) {
+            if (name.startsWith('x-') && !Object.values(this.ATTRIBUTES.ACTIONS).includes(name)) {
                 const headerName = 'X-' + this.capitalize(name.substring(2)); // Remove 'x-' prefix and capitalize
                 headers[headerName] = attr.value;
             }
@@ -367,13 +427,11 @@ class Partial {
 
     /**
      * Performs the HTTP request using Fetch API.
-     * @param {string} method
-     * @param {string} url
-     * @param {Object} headers
-     * @param {HTMLElement|null} element
+     * @param {Object} requestParams - Parameters including method, url, headers, body, etc.
      * @returns {Promise<string>} Response text
      */
-    performRequest(method, url, headers, element) {
+    performRequest(requestParams) {
+        const { method, url, headers, element } = requestParams;
         const options = {
             method,
             headers,
@@ -385,11 +443,11 @@ class Partial {
             let body = null;
 
             // Check if the element or the closest form has x-serialize="json"
-            const serializeAsJson = element && (element.getAttribute('x-serialize') === 'json' ||
-                (element.closest('form') && element.closest('form').getAttribute('x-serialize') === 'json'));
+            const serializeAsJson = element && (element.getAttribute(this.ATTRIBUTES.SERIALIZE) === 'json' ||
+                (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE) === 'json'));
 
             // Check for x-json attribute
-            const xJson = element && element.getAttribute('x-json');
+            const xJson = element && element.getAttribute(this.ATTRIBUTES.JSON);
 
             if (xJson) {
                 // Parse x-json attribute
@@ -445,6 +503,58 @@ class Partial {
     }
 
     /**
+     * Processes the response text and updates the DOM accordingly.
+     * @param {string} responseText
+     * @param {HTMLElement} targetElement
+     * @param {HTMLElement} element
+     */
+    async processResponse(responseText, targetElement, element) {
+        // Dispatch beforeUpdate event
+        this.dispatchEvent('beforeUpdate', { targetElement, element });
+
+        // Parse the response HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(responseText, 'text/html');
+
+        // Extract OOB elements
+        const oobElements = Array.from(doc.querySelectorAll(`[${this.ATTRIBUTES.SWAP_OOB}]`));
+        oobElements.forEach(el => el.parentNode.removeChild(el));
+
+        // Replace the target's content
+        this.updateTargetElement(targetElement, doc);
+
+        // Dispatch afterUpdate event
+        this.dispatchEvent('afterUpdate', { targetElement, element });
+
+        // Re-scan the newly added content for Partial elements
+        this.scanForElements(targetElement);
+
+        // Handle OOB swapping with the extracted OOB elements
+        this.handleOobSwapping(oobElements);
+
+        // Handle any x-event-* headers from the response
+        await this.handleResponseEvents();
+
+        // Auto-focus if enabled
+        const focusEnabled = element.getAttribute(this.ATTRIBUTES.FOCUS) !== 'false';
+        if (this.autoFocus && focusEnabled) {
+            if (targetElement.getAttribute('tabindex') === null) {
+                targetElement.setAttribute('tabindex', '-1');
+            }
+            targetElement.focus();
+        }
+    }
+
+    /**
+     * Updates the target element with new content.
+     * @param {HTMLElement} targetElement
+     * @param {Document} doc
+     */
+    updateTargetElement(targetElement, doc) {
+        targetElement.innerHTML = doc.body.innerHTML;
+    }
+
+    /**
      * Handles Out-of-Band (OOB) swapping by processing an array of OOB elements.
      * Replaces existing elements in the document with the new content based on matching IDs.
      * @param {HTMLElement[]} oobElements
@@ -457,7 +567,7 @@ class Partial {
                 return;
             }
 
-            const swapOption = oobElement.getAttribute('x-swap-oob') || this.defaultSwapOption;
+            const swapOption = oobElement.getAttribute(this.ATTRIBUTES.SWAP_OOB) || this.defaultSwapOption;
             const existingElement = document.getElementById(targetId);
 
             if (!existingElement) {
@@ -502,6 +612,71 @@ class Partial {
                 this.dispatchEvent(eventName, eventData);
             }
         });
+    }
+
+    /**
+     * Dispatches custom events specified in a comma-separated string.
+     * @param {string} events - Comma-separated event names.
+     * @param {Object} detail - Detail object to pass with the event.
+     */
+    async dispatchCustomEvents(events, detail) {
+        const eventNames = events.split(',').map(e => e.trim());
+        for (const eventName of eventNames) {
+            const event = new CustomEvent(eventName, { detail });
+            this.eventTarget.dispatchEvent(event);
+        }
+    }
+
+    /**
+     * Handles the popstate event for browser navigation.
+     * @param {PopStateEvent} event
+     */
+    async handlePopState(event) {
+        if (event.state && event.state.xPartial) {
+            const url = window.location.href;
+            try {
+                const responseText = await this.performRequest({ method: 'GET', url, headers: {}, element: null });
+
+                // Parse the response HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(responseText, 'text/html');
+
+                // Replace the body content
+                document.body.innerHTML = doc.body.innerHTML;
+
+                // Re-scan the entire document
+                this.scanForElements();
+
+                // Optionally, focus the body
+                if (this.autoFocus) {
+                    document.body.focus();
+                }
+
+            } catch (error) {
+                console.error('PopState request failed:', error);
+                if (typeof this.onError === 'function') {
+                    this.onError(error, document.body);
+                }
+            }
+        }
+    }
+
+    /**
+     * Debounce function to limit the rate at which a function can fire.
+     * @param {Function} func - The function to debounce.
+     * @param {number} wait - The number of milliseconds to wait.
+     * @returns {Function}
+     */
+    debounce(func, wait) {
+        let timeout;
+        return (...args) => {
+            const later = () => {
+                clearTimeout(timeout);
+                func.apply(this, args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
     }
 
     /**
@@ -573,5 +748,18 @@ class Partial {
      */
     refresh(container = document) {
         this.scanForElements(container);
+    }
+
+    /**
+     * Clean up SSE connections when elements are removed.
+     * @param {HTMLElement} element
+     */
+    cleanupSSEElement(element) {
+        if (this.sseConnections.has(element)) {
+            const eventSource = this.sseConnections.get(element);
+            eventSource.close();
+            this.sseConnections.delete(element);
+            element.__xSSEInitialized = false;
+        }
     }
 }
