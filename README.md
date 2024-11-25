@@ -30,7 +30,7 @@ The `Service` holds global configurations and data.
 
 ```go 
 cfg := &partial.Config{
-    PartialHeader: "X-Partial",          // Optional: Header to determine which partial to render
+    PartialHeader: "X-Target",          // Optional: Header to determine which partial to render
     UseCache:      true,                 // Enable template caching
     FuncMap:       template.FuncMap{},   // Global template functions
     Logger:        myLogger,             // Implement the Logger interface or use nil
@@ -279,7 +279,7 @@ cfg := &partial.Config{
 ```
 
 ## Handling Partial Rendering via HTTP Headers
-You can render specific partials based on the X-Partial header (or your custom header).
+You can render specific partials based on the X-Target header (or your custom header).
 
 Example:
 ```go
@@ -295,7 +295,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 To request a specific partial:
 ```bash
-curl -H "X-Partial: sidebar" http://localhost:8080
+curl -H "X-Target: sidebar" http://localhost:8080
 ```
 
 ## Useless benchmark results

@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	// defaultPartialHeader is the default header used to determine which partial to render.
-	defaultPartialHeader = "X-Partial"
+	// defaultTargetHeader is the default header used to determine which partial to render.
+	defaultTargetHeader = "X-Target"
 	// defaultSelectHeader is the default header used to determine which partial to select.
 	defaultSelectHeader = "X-Select"
 	// defaultActionHeader is the default header used to determine which action to take.
@@ -63,7 +63,7 @@ func NewService(cfg *Config) *Service {
 	}
 
 	if cfg.PartialHeader == "" {
-		cfg.PartialHeader = defaultPartialHeader
+		cfg.PartialHeader = defaultTargetHeader
 	}
 
 	if cfg.SelectHeader == "" {
