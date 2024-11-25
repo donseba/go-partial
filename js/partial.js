@@ -12,7 +12,7 @@
  */
 
 /**
- * Class representing XPartial.
+ * Class representing Partial.
  */
 class Partial {
     /**
@@ -567,7 +567,7 @@ class Partial {
     }
 
     /**
-     * Allows manually re-scanning a specific container for XPartial elements.
+     * Allows manually re-scanning a specific container for Partial elements.
      * Useful when dynamically adding content to the DOM.
      * @param {HTMLElement} container
      */
