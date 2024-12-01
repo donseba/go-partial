@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/donseba/go-partial"
 	"log/slog"
 	"net/http"
 	"path/filepath"
+
+	"github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/connector"
 )
 
 type (
@@ -20,6 +22,9 @@ func main() {
 	app := &App{
 		PartialService: partial.NewService(&partial.Config{
 			Logger: logger,
+			Connector: connector.NewPartial(&connector.Config{
+				UseURLQuery: true,
+			}),
 		}),
 	}
 

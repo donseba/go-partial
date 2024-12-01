@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/donseba/go-partial/connector"
 )
 
 func TestNewRoot(t *testing.T) {
@@ -539,8 +541,8 @@ func BenchmarkWithSelectMap(b *testing.B) {
 	}
 
 	service := NewService(&Config{
-		PartialHeader: "X-Target",
-		UseCache:      false,
+		Connector: connector.NewPartial(nil),
+		UseCache:  false,
 	})
 	layout := service.NewLayout().FS(fsys)
 
@@ -572,8 +574,8 @@ func BenchmarkWithSelectMap(b *testing.B) {
 func BenchmarkRenderWithRequest(b *testing.B) {
 	// Setup configuration and service
 	cfg := &Config{
-		PartialHeader: "X-Target",
-		UseCache:      false,
+		Connector: connector.NewPartial(nil),
+		UseCache:  false,
 	}
 
 	service := NewService(cfg)

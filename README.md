@@ -20,12 +20,20 @@ go get github.com/donseba/go-partial
 ## Advanced use cases 
 Advanced usecases are documented in the [ADVANCED.md](ADVANCED.md) file
 
-## Basic Usage
+## Integrations
+Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file
+- htmx
+- Turbo
+- Stimulus
+- Unpoly
+- Alpine.js / Alpine Ajax (not great)
+- Vue.js (not great)
+- Standalone
 
+## Basic Usage
 Here's a simple example of how to use the package to render a template.
 
 ### 1. Create a Service
-
 The `Service` holds global configurations and data.
 
 ```go 
@@ -44,7 +52,6 @@ service.SetData(map[string]any{
 ```
 
 ## 2. Create a Layout
-
 The `Layout` manages the overall structure of your templates.
 ```go
 layout := service.NewLayout()
@@ -54,7 +61,6 @@ layout.SetData(map[string]any{
 ```
 
 ### 3. Define Partials
-
 Create `Partial` instances for the content and any other components.
 
 ```go 
@@ -81,7 +87,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 ```
 
 ## Template Files
-
 templates/layout.html
 ```html
 <!DOCTYPE html>
@@ -103,7 +108,6 @@ Note: In the layout template, we use {{ child "content" }} to render the content
 
 
 ### Using Global and Layout Data
-
 - **Global Data (ServiceData)**: Set on the Service, accessible via {{.Service}} in templates.
 - **Layout Data (LayoutData)**: Set on the Layout, accessible via {{.Layout}} in templates.
 - **Partial Data (Data)**: Set on individual Partial instances, accessible via {{.Data}} in templates.

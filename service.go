@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+
+	"github.com/donseba/go-partial/connector"
 )
 
 var (
@@ -25,19 +27,18 @@ type (
 	}
 
 	Config struct {
-		PartialHeader string
-		SelectHeader  string
-		ActionHeader  string
-		UseCache      bool
-		FuncMap       template.FuncMap
-		Logger        Logger
-		fs            fs.FS
+		Connector connector.Connector
+		UseCache  bool
+		FuncMap   template.FuncMap
+		Logger    Logger
+		fs        fs.FS
 	}
 
 	Service struct {
 		config            *Config
 		data              map[string]any
 		combinedFunctions template.FuncMap
+		connector         connector.Connector
 		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
 
@@ -47,11 +48,9 @@ type (
 		content           *Partial
 		wrapper           *Partial
 		data              map[string]any
-		requestedPartial  string
-		requestedAction   string
-		requestedSelect   string
 		request           *http.Request
 		combinedFunctions template.FuncMap
+		connector         connector.Connector
 		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
 )
@@ -60,18 +59,6 @@ type (
 func NewService(cfg *Config) *Service {
 	if cfg.FuncMap == nil {
 		cfg.FuncMap = DefaultTemplateFuncMap
-	}
-
-	if cfg.PartialHeader == "" {
-		cfg.PartialHeader = defaultTargetHeader
-	}
-
-	if cfg.SelectHeader == "" {
-		cfg.SelectHeader = defaultSelectHeader
-	}
-
-	if cfg.ActionHeader == "" {
-		cfg.ActionHeader = defaultActionHeader
 	}
 
 	if cfg.Logger == nil {
@@ -83,6 +70,7 @@ func NewService(cfg *Config) *Service {
 		data:              make(map[string]any),
 		funcMapLock:       sync.RWMutex{},
 		combinedFunctions: cfg.FuncMap,
+		connector:         cfg.Connector,
 	}
 }
 
@@ -92,6 +80,7 @@ func (svc *Service) NewLayout() *Layout {
 		service:           svc,
 		data:              make(map[string]any),
 		filesystem:        svc.config.fs,
+		connector:         svc.connector,
 		combinedFunctions: svc.getFuncMap(),
 	}
 }
@@ -105,6 +94,11 @@ func (svc *Service) SetData(data map[string]any) *Service {
 // AddData adds data to the Service.
 func (svc *Service) AddData(key string, value any) *Service {
 	svc.data[key] = value
+	return svc
+}
+
+func (svc *Service) SetConnector(conn connector.Connector) *Service {
+	svc.connector = conn
 	return svc
 }
 
@@ -185,9 +179,6 @@ func (l *Layout) getFuncMap() template.FuncMap {
 
 // RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	l.requestedPartial = r.Header.Get(l.service.config.PartialHeader)
-	l.requestedAction = r.Header.Get(l.service.config.ActionHeader)
-	l.requestedSelect = r.Header.Get(l.service.config.SelectHeader)
 	l.request = r
 
 	if l.wrapper != nil {
@@ -231,14 +222,11 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 
 	p.mergeFuncMapInternal(combinedFunctions)
 
+	p.connector = l.service.connector
 	p.fs = l.filesystem
 	p.logger = l.service.config.Logger
 	p.useCache = l.service.config.UseCache
 	p.globalData = l.service.data
 	p.layoutData = l.data
 	p.request = l.request
-	p.partialHeader = l.service.config.PartialHeader
-	p.selectHeader = l.service.config.SelectHeader
-	p.actionHeader = l.service.config.ActionHeader
-	p.requestedPartial = l.requestedPartial
 }

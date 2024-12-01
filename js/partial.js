@@ -58,9 +58,9 @@ class Partial {
         };
 
         this.SERIALIZE_TYPES = {
-            JSON: 'json',
+            JSON:        'json',
             NESTED_JSON: 'nested-json',
-            XML: 'xml',
+            XML:         'xml',
         };
 
         // Store options with default values
@@ -557,7 +557,6 @@ class Partial {
             }
 
             // Merge paramsObject with bodyData
-            console.log(paramsObject)
             if (paramsObject && Object.keys(paramsObject).length > 0) {
                 if (bodyData instanceof FormData) {
                     // Append params to FormData

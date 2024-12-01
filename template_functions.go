@@ -160,7 +160,7 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 			return template.HTML(fmt.Sprintf("no selection partials found in parent '%s'", p.id))
 		}
 
-		requestedSelect := p.getRequestedSelect()
+		requestedSelect := p.getConnector().GetSelectValue(p.getRequest())
 		if requestedSelect != "" {
 			selectedPartial = partials[requestedSelect]
 		} else {
@@ -173,7 +173,6 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 		}
 
 		selectedPartial.fs = p.fs
-		//selectedPartial.parent = p
 
 		html, err := selectedPartial.renderSelf(data.Ctx, p.getRequest())
 		if err != nil {
