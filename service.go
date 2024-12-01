@@ -11,15 +11,6 @@ import (
 	"github.com/donseba/go-partial/connector"
 )
 
-var (
-	// defaultTargetHeader is the default header used to determine which partial to render.
-	defaultTargetHeader = "X-Target"
-	// defaultSelectHeader is the default header used to determine which partial to select.
-	defaultSelectHeader = "X-Select"
-	// defaultActionHeader is the default header used to determine which action to take.
-	defaultActionHeader = "X-Action"
-)
-
 type (
 	Logger interface {
 		Warn(msg string, args ...any)
