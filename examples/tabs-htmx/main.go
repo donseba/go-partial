@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/donseba/go-partial"
 	"log/slog"
 	"net/http"
+
+	"github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/connector"
 )
 
 type (
@@ -18,14 +20,14 @@ func main() {
 
 	app := &App{
 		PartialService: partial.NewService(&partial.Config{
-			PartialHeader: "HX-Target",
-			Logger:        logger,
+			Logger:    logger,
+			Connector: connector.NewHTMX(nil),
 		}),
 	}
 
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /files/", http.StripPrefix("/files/", http.FileServer(http.Dir("./files"))))
+	mux.Handle("GET /js/", http.StripPrefix("/js/", http.FileServer(http.Dir("../../js"))))
 
 	mux.HandleFunc("GET /", app.home)
 

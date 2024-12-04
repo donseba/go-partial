@@ -1,34 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>Tab Example</title>
+        <title>Infinite Scroll</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css">
-        <script type="application/javascript" src="/js/partial.js"></script>
+		<script type="application/javascript" src="/js/partial.js"></script>
     </head>
 
     <body>
-        <div id="content">
-            {{ child "content" }}
-        </div>
+
 
         <div class="mt-3 container">
             <div>(rendered on load at : {{ formatDate now "15:04:05" }})</div>
         <div class="mt-3">What the handler looks like: </div>
 
         <pre class="mt-3 p-1" style="background-color: gray"><small>func (a *App) home(w http.ResponseWriter, r *http.Request) {
-	// the tabs for this page.
-	selectMap := map[string]*partial.Partial{
-		"tab1": partial.New("tab1.gohtml"),
-		"tab2": partial.New("tab2.gohtml"),
-		"tab3": partial.New("tab3.gohtml"),
-	}
-
 	// layout, footer, index could be abstracted away and shared over multiple handlers within the same module, for instance.
 	layout := a.PartialService.NewLayout()
-	footer := partial.NewID("footer", "footer.gohtml")
-	index := partial.NewID("index", "index.gohtml").WithOOB(footer)
+	footer := partial.NewID("footer", filepath.Join("templates", "footer.gohtml"))
+	index := partial.NewID("index", filepath.Join("templates", "index.gohtml")).WithOOB(footer)
 
-	content := partial.NewID("content", "content.gohtml").WithSelectMap("tab1", selectMap)
+	content := partial.NewID("content", filepath.Join("templates", "content.gohtml")).WithAction(func(ctx context.Context, p *partial.Partial, data *partial.Data) (*partial.Partial, error) {
+		switch p.GetRequestedAction() {
+		case "infinite-scroll":
+			return handleInfiniteScroll(p, data)
+		default:
+			return p, nil
+		}
+	})
 
 	// set the layout content and wrap it with the main template
 	layout.Set(content).Wrap(index)
@@ -40,15 +38,15 @@
 }</small></pre>
         </div>
 
-        {{ child "footer" }}
+		{{ child "footer" }}
+
+		<div class="mt-3 container" id="content" x-infinite-scroll="true" x-get="/" x-swap="beforeend">
+			{{ child "content" }}
+		</div>
 
     <script>
         // Initialize the handler with optional configuration
-        const partial = new Partial({
-            enableUrlParam: true,          // Enable URL parameter setting
-            urlParamName: 'x-select',      // Name of the query parameter (e.g., 'selected', 'tab')
-            replaceState: false             // Use pushState (false) or replaceState (true) when updating the URL
-        });
+        const partial = new Partial();
     </script>
     </body>
 </html>

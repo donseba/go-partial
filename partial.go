@@ -10,10 +10,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/donseba/go-partial/connector"
 )
 
 var (
@@ -51,18 +54,14 @@ type (
 		swapOOB           bool
 		fs                fs.FS
 		logger            Logger
-		partialHeader     string
-		selectHeader      string
-		actionHeader      string
-		requestedPartial  string
-		requestedAction   string
-		requestedSelect   string
+		connector         connector.Connector
 		useCache          bool
 		templates         []string
 		combinedFunctions template.FuncMap
 		data              map[string]any
 		layoutData        map[string]any
 		globalData        map[string]any
+		responseHeaders   map[string]string
 		mu                sync.RWMutex
 		children          map[string]*Partial
 		oobChildren       map[string]struct{}
@@ -107,6 +106,7 @@ func New(templates ...string) *Partial {
 		globalData:        make(map[string]any),
 		children:          make(map[string]*Partial),
 		oobChildren:       make(map[string]struct{}),
+		fs:                os.DirFS("./"),
 	}
 }
 
@@ -147,6 +147,29 @@ func (p *Partial) SetData(data map[string]any) *Partial {
 // AddData adds data to the partial.
 func (p *Partial) AddData(key string, value any) *Partial {
 	p.data[key] = value
+	return p
+}
+
+func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
+	p.responseHeaders = headers
+	return p
+}
+
+func (p *Partial) GetResponseHeaders() map[string]string {
+	if p == nil {
+		return nil
+	}
+
+	if p.responseHeaders == nil {
+		return p.parent.GetResponseHeaders()
+	}
+
+	return p.responseHeaders
+}
+
+// SetConnector sets the connector for the partial.
+func (p *Partial) SetConnector(connector connector.Connector) *Partial {
+	p.connector = connector
 	return p
 }
 
@@ -286,11 +309,15 @@ func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (templ
 	}
 
 	p.request = r
-	p.requestedPartial = r.Header.Get(p.getPartialHeader())
-	p.requestedAction = r.Header.Get(p.getActionHeader())
-	p.requestedSelect = r.Header.Get(p.getSelectHeader())
+	if p.connector == nil {
+		p.connector = connector.NewPartial(nil)
+	}
 
-	return p.renderWithTarget(ctx, r)
+	if p.connector.RenderPartial(r) {
+		return p.renderWithTarget(ctx, r)
+	}
+
+	return p.renderSelf(ctx, r)
 }
 
 // WriteWithRequest writes the partial to the http.ResponseWriter.
@@ -304,6 +331,12 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 	if err != nil {
 		p.getLogger().Error("error rendering partial", "error", err)
 		return err
+	}
+
+	// get headers
+	headers := p.GetResponseHeaders()
+	for k, v := range headers {
+		w.Header().Set(k, v)
 	}
 
 	_, err = w.Write([]byte(out))
@@ -367,16 +400,17 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	}
 
 	funcs["partialHeader"] = func() string {
-		return p.getPartialHeader()
+		return p.getConnector().GetTargetHeader()
 	}
 
 	funcs["requestedPartial"] = func() string {
-		return p.getRequestedPartial()
+		return p.getConnector().GetTargetValue(p.GetRequest())
 	}
 
 	funcs["ifRequestedPartial"] = func(out any, in ...string) any {
+		target := p.getConnector().GetTargetValue(p.GetRequest())
 		for _, v := range in {
-			if v == p.getRequestedPartial() {
+			if v == target {
 				return out
 			}
 		}
@@ -384,19 +418,22 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	}
 
 	funcs["selectHeader"] = func() string {
-		return p.getSelectHeader()
+		return p.getConnector().GetSelectHeader()
 	}
 
 	funcs["requestedSelect"] = func() string {
-		if p.getRequestedSelect() == "" {
+		requestedSelect := p.getConnector().GetSelectValue(p.GetRequest())
+
+		if requestedSelect == "" {
 			return p.selection.Default
 		}
-		return p.getRequestedSelect()
+		return requestedSelect
 	}
 
 	funcs["ifRequestedSelect"] = func(out any, in ...string) any {
+		selected := p.getConnector().GetSelectValue(p.GetRequest())
 		for _, v := range in {
-			if v == p.getRequestedSelect() {
+			if v == selected {
 				return out
 			}
 		}
@@ -404,16 +441,17 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	}
 
 	funcs["actionHeader"] = func() string {
-		return p.getActionHeader()
+		return p.getConnector().GetActionHeader()
 	}
 
 	funcs["requestedAction"] = func() string {
-		return p.GetRequestedAction()
+		return p.getConnector().GetActionValue(p.GetRequest())
 	}
 
 	funcs["ifRequestedAction"] = func(out any, in ...string) any {
+		action := p.getConnector().GetActionValue(p.GetRequest())
 		for _, v := range in {
-			if v == p.GetRequestedAction() {
+			if v == action {
 				return out
 			}
 		}
@@ -457,24 +495,14 @@ func (p *Partial) getLayoutData() map[string]any {
 	return p.layoutData
 }
 
-func (p *Partial) getPartialHeader() string {
-	if p.partialHeader != "" {
-		return p.partialHeader
+func (p *Partial) getConnector() connector.Connector {
+	if p.connector != nil {
+		return p.connector
 	}
 	if p.parent != nil {
-		return p.parent.getPartialHeader()
+		return p.parent.getConnector()
 	}
-	return defaultTargetHeader
-}
-
-func (p *Partial) getSelectHeader() string {
-	if p.selectHeader != "" {
-		return p.selectHeader
-	}
-	if p.parent != nil {
-		return p.parent.getSelectHeader()
-	}
-	return defaultSelectHeader
+	return nil
 }
 
 func (p *Partial) getSelectionPartials() map[string]*Partial {
@@ -484,22 +512,12 @@ func (p *Partial) getSelectionPartials() map[string]*Partial {
 	return nil
 }
 
-func (p *Partial) getActionHeader() string {
-	if p.actionHeader != "" {
-		return p.actionHeader
-	}
-	if p.parent != nil {
-		return p.parent.getActionHeader()
-	}
-	return defaultActionHeader
-}
-
-func (p *Partial) getRequest() *http.Request {
+func (p *Partial) GetRequest() *http.Request {
 	if p.request != nil {
 		return p.request
 	}
 	if p.parent != nil {
-		return p.parent.getRequest()
+		return p.parent.GetRequest()
 	}
 	return &http.Request{}
 }
@@ -511,7 +529,7 @@ func (p *Partial) getFS() fs.FS {
 	if p.parent != nil {
 		return p.parent.getFS()
 	}
-	return nil
+	return os.DirFS("./")
 }
 
 func (p *Partial) getLogger() Logger {
@@ -533,19 +551,21 @@ func (p *Partial) getLogger() Logger {
 	return p.logger
 }
 
-func (p *Partial) getRequestedPartial() string {
-	if p.requestedPartial != "" {
-		return p.requestedPartial
+func (p *Partial) GetRequestedPartial() string {
+	th := p.getConnector().GetTargetValue(p.GetRequest())
+	if th != "" {
+		return th
 	}
 	if p.parent != nil {
-		return p.parent.getRequestedPartial()
+		return p.parent.GetRequestedPartial()
 	}
 	return ""
 }
 
 func (p *Partial) GetRequestedAction() string {
-	if p.requestedAction != "" {
-		return p.requestedAction
+	ah := p.getConnector().GetActionValue(p.GetRequest())
+	if ah != "" {
+		return ah
 	}
 	if p.parent != nil {
 		return p.parent.GetRequestedAction()
@@ -553,18 +573,20 @@ func (p *Partial) GetRequestedAction() string {
 	return ""
 }
 
-func (p *Partial) getRequestedSelect() string {
-	if p.requestedSelect != "" {
-		return p.requestedSelect
+func (p *Partial) GetRequestedSelect() string {
+	as := p.getConnector().GetSelectValue(p.GetRequest())
+	if as != "" {
+		return as
 	}
 	if p.parent != nil {
-		return p.parent.getRequestedSelect()
+		return p.parent.GetRequestedSelect()
 	}
 	return ""
 }
 
 func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request) (template.HTML, error) {
-	if p.getRequestedPartial() == "" || p.getRequestedPartial() == p.id {
+	requestedTarget := p.getConnector().GetTargetValue(p.GetRequest())
+	if requestedTarget == "" || requestedTarget == p.id {
 		out, err := p.renderSelf(ctx, r)
 		if err != nil {
 			return "", err
@@ -581,10 +603,10 @@ func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request) (templa
 		}
 		return out, nil
 	} else {
-		c := p.recursiveChildLookup(p.getRequestedPartial(), make(map[string]bool))
+		c := p.recursiveChildLookup(requestedTarget, make(map[string]bool))
 		if c == nil {
-			p.getLogger().Error("requested partial not found in parent", "id", p.getRequestedPartial(), "parent", p.id)
-			return "", fmt.Errorf("requested partial %s not found in parent %s", p.getRequestedPartial(), p.id)
+			p.getLogger().Error("requested partial not found in parent", "id", requestedTarget, "parent", p.id)
+			return "", fmt.Errorf("requested partial %s not found in parent %s", requestedTarget, p.id)
 		}
 		return c.renderWithTarget(ctx, r)
 	}
@@ -634,7 +656,7 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[st
 	}
 
 	// Render the cloned child partial
-	return childClone.renderSelf(ctx, p.getRequest())
+	return childClone.renderSelf(ctx, p.GetRequest())
 }
 
 // renderNamed renders the partial with the given name and templates.
@@ -665,7 +687,6 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 			p.getLogger().Error("error in action function", "error", err)
 			return "", fmt.Errorf("error in action function: %w", err)
 		}
-		//return actionPartial.renderSelf(ctx, r)
 	}
 
 	functions := p.getFuncs(data)
@@ -725,15 +746,7 @@ func (p *Partial) getOrParseTemplate(cacheKey string, functions template.FuncMap
 	}
 
 	t := template.New(path.Base(p.templates[0])).Funcs(functions)
-	var tmpl *template.Template
-	var err error
-
-	if fsys := p.getFS(); fsys != nil {
-		tmpl, err = t.ParseFS(fsys, p.templates...)
-	} else {
-		tmpl, err = t.ParseFiles(p.templates...)
-	}
-
+	tmpl, err := t.ParseFS(p.getFS(), p.templates...)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing templates: %w", err)
 	}
@@ -757,10 +770,7 @@ func (p *Partial) clone() *Partial {
 		swapOOB:           p.swapOOB,
 		fs:                p.fs,
 		logger:            p.logger,
-		partialHeader:     p.partialHeader,
-		selectHeader:      p.selectHeader,
-		actionHeader:      p.actionHeader,
-		requestedPartial:  p.requestedPartial,
+		connector:         p.connector,
 		useCache:          p.useCache,
 		selection:         p.selection,
 		templates:         append([]string{}, p.templates...), // Copy the slice
