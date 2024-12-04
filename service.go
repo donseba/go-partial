@@ -184,20 +184,32 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 
 // WriteWithRequest writes the layout to the response writer.
 func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	out, err := l.RenderWithRequest(ctx, r)
-	if err != nil {
-		if l.service.config.Logger != nil {
-			l.service.config.Logger.Error("error rendering layout", "error", err)
+	l.request = r
+
+	if l.connector.RenderPartial(r) {
+		if l.wrapper != nil {
+			l.content.parent = l.wrapper
 		}
-		return err
+		err := l.content.WriteWithRequest(ctx, w, r)
+		if err != nil {
+			if l.service.config.Logger != nil {
+				l.service.config.Logger.Error("error rendering layout", "error", err)
+			}
+			return err
+		}
+		return nil
 	}
 
-	_, err = w.Write([]byte(out))
-	if err != nil {
-		if l.service.config.Logger != nil {
-			l.service.config.Logger.Error("error writing layout to response", "error", err)
+	if l.wrapper != nil {
+		l.wrapper.With(l.content)
+
+		err := l.wrapper.WriteWithRequest(ctx, w, r)
+		if err != nil {
+			if l.service.config.Logger != nil {
+				l.service.config.Logger.Error("error rendering layout", "error", err)
+			}
+			return err
 		}
-		return err
 	}
 
 	return nil

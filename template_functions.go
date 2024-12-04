@@ -160,7 +160,7 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 			return template.HTML(fmt.Sprintf("no selection partials found in parent '%s'", p.id))
 		}
 
-		requestedSelect := p.getConnector().GetSelectValue(p.getRequest())
+		requestedSelect := p.getConnector().GetSelectValue(p.GetRequest())
 		if requestedSelect != "" {
 			selectedPartial = partials[requestedSelect]
 		} else {
@@ -174,7 +174,7 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 
 		selectedPartial.fs = p.fs
 
-		html, err := selectedPartial.renderSelf(data.Ctx, p.getRequest())
+		html, err := selectedPartial.renderSelf(data.Ctx, p.GetRequest())
 		if err != nil {
 			p.getLogger().Error("error rendering selected partial", "id", requestedSelect, "parent", p.id, "error", err)
 			return template.HTML(fmt.Sprintf("error rendering selected partial '%s'", requestedSelect))
@@ -227,7 +227,7 @@ func actionFunc(p *Partial, data *Data) func() template.HTML {
 		}
 
 		// Render the selected partial instead
-		html, err := actionPartial.renderSelf(data.Ctx, p.getRequest())
+		html, err := actionPartial.renderSelf(data.Ctx, p.GetRequest())
 		if err != nil {
 			p.getLogger().Error("error rendering action partial", "error", err)
 			return template.HTML(fmt.Sprintf("error rendering action partial: %v", err))
