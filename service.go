@@ -226,8 +226,12 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	p.mergeFuncMapInternal(combinedFunctions)
 
 	p.connector = l.service.connector
-	p.fs = l.filesystem
-	p.logger = l.service.config.Logger
+	if l.filesystem != nil {
+		p.fs = l.filesystem
+	}
+	if l.service.config.Logger != nil {
+		p.logger = l.service.config.Logger
+	}
 	p.useCache = l.service.config.UseCache
 	p.globalData = l.service.data
 	p.layoutData = l.data

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"reflect"
 	"strings"
@@ -105,6 +106,7 @@ func New(templates ...string) *Partial {
 		globalData:        make(map[string]any),
 		children:          make(map[string]*Partial),
 		oobChildren:       make(map[string]struct{}),
+		fs:                os.DirFS("./"),
 	}
 }
 
@@ -527,7 +529,7 @@ func (p *Partial) getFS() fs.FS {
 	if p.parent != nil {
 		return p.parent.getFS()
 	}
-	return nil
+	return os.DirFS("./")
 }
 
 func (p *Partial) getLogger() Logger {
@@ -744,15 +746,7 @@ func (p *Partial) getOrParseTemplate(cacheKey string, functions template.FuncMap
 	}
 
 	t := template.New(path.Base(p.templates[0])).Funcs(functions)
-	var tmpl *template.Template
-	var err error
-
-	if fsys := p.getFS(); fsys != nil {
-		tmpl, err = t.ParseFS(fsys, p.templates...)
-	} else {
-		tmpl, err = t.ParseFiles(p.templates...)
-	}
-
+	tmpl, err := t.ParseFS(p.getFS(), p.templates...)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing templates: %w", err)
 	}
