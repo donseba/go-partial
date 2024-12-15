@@ -174,7 +174,7 @@ func TestRequestOOB(t *testing.T) {
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div {{ oobSwapIfEnabled \"true\"}} id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
@@ -209,7 +209,7 @@ func TestRequestOOB(t *testing.T) {
 
 		handleRequest(response, request)
 
-		expected := "<html><body><div>Welcome to the home page</div><div id='footer'>This is the footer</div></body></html>"
+		expected := "<html><body><div>Welcome to the home page</div><div  id='footer'>This is the footer</div></body></html>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -222,7 +222,7 @@ func TestRequestOOB(t *testing.T) {
 
 		handleRequest(response, request)
 
-		expected := "<div>Welcome to the home page</div><div hx-swap-oob='true' id='footer'>This is the footer</div>"
+		expected := "<div>Welcome to the home page</div><div x-swap-oob=\"true\" id='footer'>This is the footer</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -237,7 +237,7 @@ func TestRequestOOBSwap(t *testing.T) {
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div {{ oobSwapIfEnabled \"true\" }} id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
@@ -272,7 +272,7 @@ func TestRequestOOBSwap(t *testing.T) {
 
 		handleRequest(response, request)
 
-		expected := "<html><body><div>Welcome to the home page</div><div id='footer'>This is the footer</div></body></html>"
+		expected := "<html><body><div>Welcome to the home page</div><div  id='footer'>This is the footer</div></body></html>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -285,7 +285,7 @@ func TestRequestOOBSwap(t *testing.T) {
 
 		handleRequest(response, request)
 
-		expected := "<div>Welcome to the home page</div><div hx-swap-oob='true' id='footer'>This is the footer</div>"
+		expected := "<div>Welcome to the home page</div><div x-swap-oob=\"true\" id='footer'>This is the footer</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -450,15 +450,17 @@ func TestWithSelectMap(t *testing.T) {
 
 	// Set up the service and layout
 	svc := NewService(&Config{
-		fs: fsys, // Set the file system in the service config
+		FS:        fsys, // Set the file system in the service config
+		Connector: connector.NewPartial(nil),
 	})
+
 	layout := svc.NewLayout().
 		Set(contentPartial).
 		Wrap(index)
 
 	// Set up a test server
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		ctx := context.TODO()
 		err := layout.WriteWithRequest(ctx, w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

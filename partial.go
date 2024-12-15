@@ -538,7 +538,14 @@ func (p *Partial) GetRequest() *http.Request {
 }
 
 func (p *Partial) getFS() fs.FS {
+	if p == nil {
+		return os.DirFS("./")
+	}
+
 	if p.fs != nil {
+		if p.parent.getFS() != nil && p.parent.getFS() != os.DirFS("./") {
+			return p.parent.getFS()
+		}
 		return p.fs
 	}
 	if p.parent != nil {

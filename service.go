@@ -22,7 +22,7 @@ type (
 		UseCache  bool
 		FuncMap   template.FuncMap
 		Logger    Logger
-		fs        fs.FS
+		FS        fs.FS
 	}
 
 	Service struct {
@@ -70,7 +70,7 @@ func (svc *Service) NewLayout() *Layout {
 	return &Layout{
 		service:           svc,
 		data:              make(map[string]any),
-		filesystem:        svc.config.fs,
+		filesystem:        svc.config.FS,
 		connector:         svc.connector,
 		combinedFunctions: svc.getFuncMap(),
 	}
