@@ -26,22 +26,24 @@ var (
 	mutexCache = sync.Map{}
 	// protectedFunctionNames is a set of function names that are protected from being overridden
 	protectedFunctionNames = map[string]struct{}{
-		"action":             {},
-		"actionHeader":       {},
-		"child":              {},
-		"context":            {},
-		"ifRequestedAction":  {},
-		"ifRequestedPartial": {},
-		"ifRequestedSelect":  {},
-		"ifSwapOOB":          {},
-		"partialHeader":      {},
-		"requestedPartial":   {},
-		"requestedAction":    {},
-		"requestedSelect":    {},
-		"selectHeader":       {},
-		"selection":          {},
-		"swapOOB":            {},
-		"url":                {},
+		"child":                      {},
+		"context":                    {},
+		"selection":                  {},
+		"oobSwapEnabled":             {},
+		"oobSwapIfEnabled":           {},
+		"url":                        {},
+		"urlIs":                      {},
+		"urlStarts":                  {},
+		"urlContains":                {},
+		"requestTargetHeader":        {},
+		"requestTargetValue":         {},
+		"requestTargetIfSelected":    {},
+		"requestSelectionHeader":     {},
+		"requestSelectionValue":      {},
+		"requestSelectionIfSelected": {},
+		"requestActionHeader":        {},
+		"requestActionValue":         {},
+		"requestActionIfSelected":    {},
 	}
 )
 
@@ -151,6 +153,11 @@ func (p *Partial) AddData(key string, value any) *Partial {
 }
 
 func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
+	// in case we are working with nested partials, we need to set the headers on the parent
+	if p.parent != nil {
+		p.parent.SetResponseHeaders(headers)
+	}
+
 	p.responseHeaders = headers
 	return p
 }
@@ -387,7 +394,12 @@ func (p *Partial) getFuncMap() template.FuncMap {
 func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	funcs := p.getFuncMap()
 
+	funcs["context"] = func() context.Context {
+		return data.Ctx
+	}
+
 	funcs["child"] = childFunc(p, data)
+	funcs["childIf"] = childIfFunc(p, data)
 	funcs["selection"] = selectionFunc(p, data)
 	funcs["action"] = actionFunc(p, data)
 
@@ -395,79 +407,82 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return data.URL
 	}
 
-	funcs["context"] = func() context.Context {
-		return data.Ctx
+	funcs["urlIs"] = func(current string) bool {
+		return strings.Trim(data.URL.Path, "/") == strings.Trim(current, "/")
 	}
 
-	funcs["partialHeader"] = func() string {
+	funcs["urlStarts"] = func(current string) bool {
+		return strings.HasPrefix(data.URL.Path, current)
+	}
+
+	funcs["urlContains"] = func(current string) bool {
+		return strings.Contains(data.URL.Path, current)
+	}
+
+	// Target-related (prefixed with "requestTarget")
+	funcs["requestTargetHeader"] = func() string {
 		return p.getConnector().GetTargetHeader()
 	}
-
-	funcs["requestedPartial"] = func() string {
+	funcs["requestTargetValue"] = func() string {
 		return p.getConnector().GetTargetValue(p.GetRequest())
 	}
-
-	funcs["ifRequestedPartial"] = func(out any, in ...string) any {
-		target := p.getConnector().GetTargetValue(p.GetRequest())
-		for _, v := range in {
-			if v == target {
-				return out
+	funcs["requestTargetIfSelected"] = func(valueIfMatch any, candidates ...string) any {
+		current := p.getConnector().GetTargetValue(p.GetRequest())
+		for _, c := range candidates {
+			if c == current {
+				return valueIfMatch
 			}
 		}
 		return nil
 	}
 
-	funcs["selectHeader"] = func() string {
+	// Selection-related (prefixed with "requestSelection")
+	funcs["requestSelectionHeader"] = func() string {
 		return p.getConnector().GetSelectHeader()
 	}
-
-	funcs["requestedSelect"] = func() string {
-		requestedSelect := p.getConnector().GetSelectValue(p.GetRequest())
-
-		if requestedSelect == "" {
+	funcs["requestSelectionValue"] = func() string {
+		val := p.getConnector().GetSelectValue(p.GetRequest())
+		if val == "" {
 			return p.selection.Default
 		}
-		return requestedSelect
+		return val
 	}
-
-	funcs["ifRequestedSelect"] = func(out any, in ...string) any {
-		selected := p.getConnector().GetSelectValue(p.GetRequest())
-		for _, v := range in {
-			if v == selected {
-				return out
+	funcs["requestSelectionIfSelected"] = func(valueIfMatch any, candidates ...string) any {
+		current := p.getConnector().GetSelectValue(p.GetRequest())
+		for _, c := range candidates {
+			if c == current {
+				return valueIfMatch
 			}
 		}
 		return nil
 	}
 
-	funcs["actionHeader"] = func() string {
+	// Action-related (prefixed with "requestAction")
+	funcs["requestActionHeader"] = func() string {
 		return p.getConnector().GetActionHeader()
 	}
-
-	funcs["requestedAction"] = func() string {
+	funcs["requestActionValue"] = func() string {
 		return p.getConnector().GetActionValue(p.GetRequest())
 	}
-
-	funcs["ifRequestedAction"] = func(out any, in ...string) any {
-		action := p.getConnector().GetActionValue(p.GetRequest())
-		for _, v := range in {
-			if v == action {
-				return out
+	funcs["requestActionIfSelected"] = func(valueIfMatch any, candidates ...string) any {
+		current := p.getConnector().GetActionValue(p.GetRequest())
+		for _, c := range candidates {
+			if c == current {
+				return valueIfMatch
 			}
 		}
 		return nil
 	}
 
-	funcs["swapOOB"] = func() bool {
+	funcs["oobSwapEnabled"] = func() bool {
 		return p.swapOOB
 	}
 
-	funcs["ifSwapOOB"] = func(v string) template.HTML {
+	funcs["oobSwapIfEnabled"] = func(v string) template.HTMLAttr {
 		if p.swapOOB {
-			return template.HTML("x-swap-oob=\" + v + \"")
+			return template.HTMLAttr(`x-swap-oob="` + v + `"`)
 		}
-		// Return an empty trusted HTML instead of a plain empty string
-		return template.HTML("")
+		return template.HTMLAttr("")
 	}
 
 	return funcs
@@ -593,14 +608,13 @@ func (p *Partial) renderWithTarget(ctx context.Context, r *http.Request) (templa
 		}
 
 		// Render OOB children of parent if necessary
-		if p.parent != nil {
-			oobOut, oobErr := p.parent.renderOOBChildren(ctx, r, true)
-			if oobErr != nil {
-				p.getLogger().Error("error rendering OOB children of parent", "error", oobErr, "parent", p.parent.id)
-				return "", fmt.Errorf("error rendering OOB children of parent with ID '%s': %w", p.parent.id, oobErr)
-			}
-			out += oobOut
+		oobOutAll, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
+		if oobErr != nil {
+			p.getLogger().Error("error rendering OOB children from ancestors", "error", oobErr)
+			return "", fmt.Errorf("error rendering OOB children from ancestors: %w", oobErr)
 		}
+		out += oobOutAll
+
 		return out, nil
 	} else {
 		c := p.recursiveChildLookup(requestedTarget, make(map[string]bool))
@@ -722,6 +736,20 @@ func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, swapOO
 			}
 			out += childData
 		}
+	}
+	return out, nil
+}
+
+func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Request, swapOOB bool) (template.HTML, error) {
+	var out template.HTML
+	ancestor := p.parent
+	for ancestor != nil {
+		chunk, err := ancestor.renderOOBChildren(ctx, r, swapOOB)
+		if err != nil {
+			return "", fmt.Errorf("error rendering OOB children from ancestor '%s': %w", ancestor.id, err)
+		}
+		out += chunk
+		ancestor = ancestor.parent
 	}
 	return out, nil
 }

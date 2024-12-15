@@ -212,6 +212,20 @@ func childFunc(p *Partial, data *Data) func(id string, vals ...any) template.HTM
 	}
 }
 
+func childIfFunc(p *Partial, data *Data) func(id string, vals ...any) template.HTML {
+	return func(id string, vals ...any) template.HTML {
+		if len(p.children) == 0 {
+			return ""
+		}
+
+		if p.children[id] == nil {
+			return ""
+		}
+
+		return childFunc(p, data)(id, vals...)
+	}
+}
+
 func actionFunc(p *Partial, data *Data) func() template.HTML {
 	return func() template.HTML {
 		if p.templateAction == nil {

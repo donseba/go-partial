@@ -120,6 +120,10 @@ func (l *Layout) FS(fs fs.FS) *Layout {
 	return l
 }
 
+func (l *Layout) Connector() connector.Connector {
+	return l.connector
+}
+
 // Set sets the content for the layout.
 func (l *Layout) Set(p *Partial) *Layout {
 	l.content = p

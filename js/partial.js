@@ -2,13 +2,12 @@
 
 /**
  * @typedef {Object} PartialOptions
- * @property {'outerHTML'|'innerHTML'} [defaultSwapOption='outerHTML'] - Default swap method.
+ * @property {'outerHTML'|'innerHTML'} [defaultSwapOption='innerHTML'] - Default swap method.
  * @property {Function} [onError] - Callback function for handling errors.
  * @property {Function|string} [csrfToken] - CSRF token value or function returning the token.
- * @property {Function} [beforeRequest] - Hook before the request is sent.
- * @property {Function} [afterResponse] - Hook after the response is received.
  * @property {boolean} [autoFocus=false] - Whether to auto-focus the target element after content update.
  * @property {number} [debounceTime=0] - Debounce time in milliseconds for event handlers.
+ * @property {Function} [onBeforeSwap] - Callback function before swapping content.
  */
 
 /**
@@ -18,6 +17,16 @@
  * @property {string} [xFocus] - Whether to focus the target element ('true' or 'false').
  * @property {string} [xSwap] - The swap method ('outerHTML' or 'innerHTML').
  * @property {string} [xEvent] - Custom events to dispatch.
+ */
+
+/**
+ * @typedef {Object} RequestParams
+ * @property {string} method - The HTTP method.
+ * @property {string} url - The request URL.
+ * @property {Object} headers - Request headers.
+ * @property {string} targetSelector - The CSS selector for the target element.
+ * @property {string} partialId - The ID of the target element.
+ * @property {Object} paramsObject - Additional parameters.
  */
 
 /**
@@ -82,15 +91,23 @@ class Partial {
         // Store options with default values
         this.onError           = options.onError || null;
         this.csrfToken         = options.csrfToken || null;
-        this.defaultSwapOption = options.defaultSwapOption || 'outerHTML';
-        this.beforeRequest     = options.beforeRequest || null;
-        this.afterResponse     = options.afterResponse || null;
+        this.defaultSwapOption = options.defaultSwapOption || 'innerHTML';
         this.autoFocus         = options.autoFocus !== undefined ? options.autoFocus : false;
         this.debounceTime      = options.debounceTime || 0;
 
         this.eventTarget    = new EventTarget();
         this.eventListeners = {};
 
+        // Store hooks in a single object
+        this.hooks = {
+            onAction      : [],
+            beforeRequest : [],
+            afterResponse : [],
+            afterSettle   : [],
+            beforeSettle  : [],
+        };
+
+        this.middleware = [];
         // Map to store SSE connections per element
         this.sseConnections = new Map();
 
@@ -104,6 +121,16 @@ class Partial {
         this.handleOobSwapping          = this.handleOobSwapping.bind(this);
         this.handlePopState             = this.handlePopState.bind(this);
         this.handleInfiniteScrollAction = this.handleInfiniteScrollAction.bind(this);
+        this.addHook                    = this.addHook.bind(this);
+        this.runHooks                   = this.runHooks.bind(this);
+        this.use                        = this.use.bind(this);
+        this.runMiddleware              = this.runMiddleware.bind(this);
+        this.prepareRequestBody         = this.prepareRequestBody.bind(this);
+        this.prepareRequestUrl          = this.prepareRequestUrl.bind(this);
+        this.prepareRequestHeaders      = this.prepareRequestHeaders.bind(this);
+        this.performRequest             = this.performRequest.bind(this);
+        this.performRequestCore         = this.performRequestCore.bind(this);
+        this.runMiddleware              = this.runMiddleware.bind(this);
 
         // Initialize the handler on DOMContentLoaded
         document.addEventListener('DOMContentLoaded', () => this.scanForElements());
@@ -112,13 +139,76 @@ class Partial {
         window.addEventListener('popstate', this.handlePopState);
     }
 
-    // Initialization Methods
-    // ----------------------
 
     /**
-     * Scans the entire document or a specific container for elements with defined action attributes.
-     * @param {HTMLElement | Document} [container=document]
+     * Runs all hooks of the specified type, passing along a context object.
+     * @param {string} hookName - Name of the hook to run.
+     * @param {Object} context - The context object to pass to each callback.
      */
+    async runHooks(hookName, context = {}) {
+        const callbacks = this.hooks[hookName] || [];
+        for (const callback of callbacks) {
+            try {
+                await callback(context);
+            } catch (error) {
+                this.handleError(error, context.element, context.targetElement);
+            }
+        }
+    }
+
+    /**
+     * Adds a hook callback for the specified hook type.
+     * @param {string} hookName - Name of the hook (e.g., 'beforeRequest', 'afterResponse', 'afterSettle').
+     * @param {Function} callback - The callback function to register.
+     */
+    addHook(hookName, callback) {
+        if (!this.hooks[hookName]) {
+            this.hooks[hookName] = []; // Initialize if not present, to allow custom hooks
+        }
+
+        if (typeof callback === 'function') {
+            this.hooks[hookName].push(callback);
+        } else {
+            console.error(`addHook expects a function for hook '${hookName}'`);
+        }
+    }
+
+    /**
+     * Adds middleware to the chain.
+     * @param {Function} middleware
+     */
+    use(middleware) {
+        if (typeof middleware === 'function') {
+            this.middleware.push(middleware);
+        } else {
+            console.error('Middleware must be a function.');
+        }
+    }
+
+    /**
+     * Runs middleware in sequence.
+     * @param {Object} requestParams
+     * @param {Function} finalHandler
+     */
+    async runMiddleware(requestParams, finalHandler) {
+        const stack = [...this.middleware];
+
+        const runner = async () => {
+            if (stack.length === 0) {
+                // No more middleware, call the final handler and return its result
+                return finalHandler();
+            }
+
+            const currentMiddleware = stack.shift();
+            // Assume middleware is defined as `async (requestParams, next) => { ... }`
+            // Middleware can optionally return a value, but commonly it just calls `await next()`.
+            return currentMiddleware(requestParams, runner);
+        };
+
+        // runner() will either return the finalHandler's result or something middleware returns
+        return runner();
+    }
+
     scanForElements(container = document) {
         const actionSelector = Object.values(this.ATTRIBUTES.ACTIONS).map(attr => `[${attr}]`).join(',');
         const sseSelector = `[${this.ATTRIBUTES.SSE}]`;
@@ -446,9 +536,9 @@ class Partial {
 
         // Handle x-retry
         const retryValue = this.getAttributeWithInheritance(element, this.ATTRIBUTES.RETRY);
-        const maxRetries = parseInt(retryValue, 10) || 0;
+        const maxRetries = parseInt(retryValue, 10) || 1;
 
-        const requestParams = this.prepareRequestParams(element);
+        const requestParams = this.prepareRequestParams(element, { maxRetries: maxRetries });
 
         const targetElement = document.querySelector(requestParams.targetSelector);
         if (!targetElement) {
@@ -456,6 +546,9 @@ class Partial {
             this.handleError(error, element, targetElement);
             return;
         }
+
+        // Run all onAction hooks
+        await this.runHooks('onAction', { element, targetElement, partial: this });
 
         try {
             // Show the indicator before the request
@@ -474,11 +567,6 @@ class Partial {
                 await this.dispatchCustomEvents(beforeEvents, { element, event });
             }
 
-            // Before request hook
-            if (typeof this.beforeRequest === 'function') {
-                await this.beforeRequest({ ...requestParams, element });
-            }
-
             // Dispatch beforeSend event
             this.dispatchEvent('beforeSend', { ...requestParams, element });
 
@@ -489,11 +577,6 @@ class Partial {
                 maxRetries,
             });
 
-            // After response hook
-            if (typeof this.afterResponse === 'function') {
-                await this.afterResponse({ response: this.lastResponse, element });
-            }
-
             // Dispatch afterReceive event
             this.dispatchEvent('afterReceive', { response: this.lastResponse, element });
 
@@ -501,9 +584,17 @@ class Partial {
             await this.processResponse(responseText, targetElement, element);
 
             // After successfully updating content
+            const swapOption = this.getAttributeWithInheritance(element, this.ATTRIBUTES.SWAP) || this.defaultSwapOption;
+
             if (shouldPushState) {
                 const newUrl = new URL(requestParams.url, window.location.origin);
-                history.pushState({ xPartial: true }, '', newUrl);
+                history.pushState({
+                    xPartial: true,
+                    partialId: requestParams.partialId,
+                    url: newUrl.href,
+                    swapOption: swapOption,
+                    maxRetries: maxRetries,
+                }, '', newUrl);
             }
 
             // Dispatch x-after event(s) if specified
@@ -551,7 +642,7 @@ class Partial {
      * Prepares the request parameters for the Fetch API.
      * @param {HTMLElement} element
      * @param {Object} [additionalParams={}]
-     * @returns {Object} Request parameters
+     * @returns {RequestParams} Request parameters
      */
     prepareRequestParams(element, additionalParams = {}) {
         const requestParams = this.extractRequestParams(element);
@@ -582,7 +673,7 @@ class Partial {
     /**
      * Extracts request parameters from the element.
      * @param {HTMLElement} element
-     * @returns {Object} Parameters including method, url, headers, body, etc.
+     * @returns {RequestParams} Parameters including method, url, headers, body, etc.
      */
     extractRequestParams(element) {
         const method = this.getMethod(element);
@@ -733,101 +824,130 @@ class Partial {
     // -------------------------
 
     /**
-     * Performs the HTTP request using Fetch API.
-     * @param {Object} requestParams - Parameters including method, url, headers, body, etc.
-     * @returns {Promise<string>} Response text
+     * Prepares the request body based on the element's attributes.
+     * @param element
+     * @param serializeType
+     * @param paramsObject
+     * @returns {FormData|null|string}
      */
-    async performRequest(requestParams) {
-        const { method, url, headers, element, timeout, maxRetries, paramsObject } = requestParams;
-        let requestUrl = url;
-
-        const controller = new AbortController();
-        const options = {
-            method,
-            headers,
-            credentials: 'same-origin',
-            signal: controller.signal,
-        };
-
-        // Handle x-serialize attribute
-        const serializeType = element && (
-            element.getAttribute(this.ATTRIBUTES.SERIALIZE) ||
-            (element.closest('form') && element.closest('form').getAttribute(this.ATTRIBUTES.SERIALIZE))
-        );
+    prepareRequestBody(element, serializeType, paramsObject) {
+        const method = element ? this.getMethod(element) : 'GET';
+        const isWriteMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
 
         // Check for x-json attribute
         const xJson = element && element.getAttribute(this.ATTRIBUTES.JSON);
-
-        // Handle request body
-        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-            let bodyData = {};
-
-            if (xJson) {
-                // Parse x-json attribute
-                try {
-                    bodyData = JSON.parse(xJson);
-                } catch (e) {
-                    console.error('Invalid JSON in x-json attribute:', e);
-                    throw new Error('Invalid JSON in x-json attribute');
-                }
-            } else if (element && (element.tagName === 'FORM' || element.closest('form'))) {
-                const form = element.tagName === 'FORM' ? element : element.closest('form');
-                if (serializeType === this.SERIALIZE_TYPES.JSON) {
-                    // Serialize form data as flat JSON
-                    bodyData = JSON.parse(Serializer.serializeFormToJson(form));
-                } else if (serializeType === this.SERIALIZE_TYPES.NESTED_JSON) {
-                    // Serialize form data as nested JSON
-                    bodyData = JSON.parse(Serializer.serializeFormToNestedJson(form));
-                } else if (serializeType === this.SERIALIZE_TYPES.XML) {
-                    // Serialize form data as XML
-                    bodyData = Serializer.serializeFormToXml(form);
-                    headers['Content-Type'] = 'application/xml';
-                } else {
-                    // Use FormData
-                    bodyData = new FormData(form);
-                }
+        if (xJson) {
+            // If x-json is provided, we use it directly
+            let bodyData;
+            try {
+                bodyData = JSON.parse(xJson);
+            } catch (e) {
+                console.error('Invalid JSON in x-json attribute:', e);
+                throw new Error('Invalid JSON in x-json attribute');
             }
 
-            // Merge paramsObject with bodyData
             if (paramsObject && Object.keys(paramsObject).length > 0) {
-                if (bodyData instanceof FormData) {
-                    // Append params to FormData
-                    for (const key in paramsObject) {
-                        bodyData.append(key, paramsObject[key]);
-                    }
-                } else if (typeof bodyData === 'string') {
-                    // Parse existing bodyData and merge
-                    bodyData = { ...JSON.parse(bodyData), ...paramsObject };
+                bodyData = { ...bodyData, ...paramsObject };
+            }
+            return JSON.stringify(bodyData);
+        }
+
+        // If no x-json provided, we rely on form data or nothing
+        const form = element && (element.tagName === 'FORM' ? element : element.closest('form'));
+
+        if (serializeType === 'json' || serializeType === 'nested-json' || serializeType === 'xml') {
+            if (!form || !(form instanceof HTMLFormElement)) {
+                // If we need to serialize form data but no form is found:
+                if (isWriteMethod) {
+                    throw new Error(`Expected an HTMLFormElement for body serialization, but none found.`);
                 } else {
-                    // Merge objects
-                    bodyData = { ...bodyData, ...paramsObject };
+                    // For GET or similar we do not need a body
+                    return null;
                 }
             }
 
-            if (bodyData instanceof FormData) {
-                options.body = bodyData;
-            } else if (typeof bodyData === 'string') {
-                options.body = bodyData;
-                headers['Content-Type'] = headers['Content-Type'] || 'application/json';
-            } else {
-                options.body = JSON.stringify(bodyData);
-                headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+            let body;
+            if (serializeType === 'json') {
+                body = Serializer.serializeFormToJson(form);
+            } else if (serializeType === 'nested-json') {
+                body = Serializer.serializeFormToNestedJson(form);
+            } else if (serializeType === 'xml') {
+                body = Serializer.serializeFormToXml(form);
             }
+
+            if (paramsObject && Object.keys(paramsObject).length > 0) {
+                body = JSON.stringify({ ...JSON.parse(body), ...paramsObject });
+            }
+            return body;
         } else {
-            // For GET requests, append params to URL
+            // Default: FormData
+            if (!form || !(form instanceof HTMLFormElement)) {
+                if (isWriteMethod) {
+                    throw new Error(`Expected an HTMLFormElement for FormData, but none found.`);
+                } else {
+                    return null;
+                }
+            }
+
+            const bodyData = new FormData(form);
             if (paramsObject && Object.keys(paramsObject).length > 0) {
-                const urlParams = new URLSearchParams(paramsObject).toString();
-                requestUrl += (requestUrl.includes('?') ? '&' : '?') + urlParams;
+                for (const key in paramsObject) {
+                    bodyData.append(key, paramsObject[key]);
+                }
+            }
+            return bodyData;
+        }
+    }
+
+    /**
+     * Prepares the request URL with query parameters.
+     * @param url string
+     * @param paramsObject object
+     * @returns {*|string}
+     */
+    prepareRequestUrl(url, paramsObject) {
+        if (!paramsObject || Object.keys(paramsObject).length === 0) {
+            return url;
+        }
+
+        const queryString = new URLSearchParams(paramsObject).toString();
+        return url.includes('?') ? `${url}&${queryString}` : `${url}?${queryString}`;
+    }
+
+    /**
+     * Prepares the request headers with CSRF token and additional headers.
+     * @param element
+     * @param defaultHeaders
+     * @returns {{}}
+     */
+    prepareRequestHeaders(element, defaultHeaders = {}) {
+        const headers = { ...defaultHeaders };
+
+        if (this.csrfToken) {
+            headers['X-CSRF-Token'] =
+                typeof this.csrfToken === 'function' ? this.csrfToken() : this.csrfToken;
+        }
+
+        if (element) {
+            const additionalHeaders = element.getAttribute('x-headers');
+            if (additionalHeaders) {
+                Object.assign(headers, JSON.parse(additionalHeaders));
             }
         }
 
-        // Start the timeout if specified
-        let timeoutId;
-        if (!isNaN(timeout) && timeout > 0) {
-            timeoutId = setTimeout(() => {
-                controller.abort();
-            }, timeout);
-        }
+        return headers;
+    }
+
+    /**
+     * Performs the core request using Fetch API with timeout and retries.
+     * @param {RequestParams} requestParams
+     * @returns {Promise<Response>}
+     */
+    async performRequestCore(requestParams) {
+        const { method, url, headers, body, timeout, maxRetries } = requestParams;
+
+        const controller = new AbortController();
+        const options = { method, headers, body, signal: controller.signal };
 
         let attempts = 0;
         const maxAttempts = maxRetries + 1;
@@ -835,37 +955,78 @@ class Partial {
         while (attempts < maxAttempts) {
             attempts++;
             try {
-                const response = await fetch(requestUrl, options);
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
+                const timeoutId = timeout
+                    ? setTimeout(() => controller.abort(), timeout)
+                    : null;
 
-                this.lastResponse = response;
+                const response = await fetch(url, options);
+
+                if (timeoutId) clearTimeout(timeoutId);
 
                 if (!response.ok) {
+                    // Fetch succeeded but HTTP error
                     const text = await response.text();
                     throw new Error(`HTTP error ${response.status}: ${text}`);
                 }
-                return response.text();
-            } catch (error) {
-                if (timeoutId) {
-                    clearTimeout(timeoutId);
-                }
 
+                // Successfully got a response
+                return response;
+
+            } catch (error) {
                 if (error.name === 'AbortError') {
                     throw new Error('Request timed out');
                 }
 
+                // If this was the last attempt, rethrow
                 if (attempts >= maxAttempts) {
                     throw error;
                 }
-                // TODO, implement a delay before retrying
+                // Otherwise, it will loop and try again
             }
         }
+
+        // If we exit the loop here without returning or throwing, this is a logic flaw.
+        // Always throw an error or return something if we don't get a response.
+        throw new Error('No response returned from performRequestCore (all attempts failed without producing a response).');
     }
 
-    // Response Processing Methods
-    // ---------------------------
+    /**
+     * Performs the request and returns the response text.
+     * @param {RequestParams} requestParams
+     * @returns {Promise<*>}
+     */
+    async performRequest(requestParams) {
+        // Run beforeRequest hooks
+        await this.runHooks('beforeRequest', { requestParams, partial: this });
+
+        return await this.runMiddleware(requestParams, async () => {
+            const { element, paramsObject } = requestParams;
+            const serializeType = element?.getAttribute(this.ATTRIBUTES.SERIALIZE) || 'json';
+
+            const body = this.prepareRequestBody(element, serializeType, paramsObject);
+            const url = this.prepareRequestUrl(requestParams.url, paramsObject);
+            const headers = this.prepareRequestHeaders(element, requestParams.headers);
+
+            let response;
+            try {
+                response = await this.performRequestCore({ ...requestParams, url, body, headers });
+            } catch (error) {
+                console.error('performRequestCore failed:', error);
+                throw error;
+            }
+
+            if (!response) {
+                throw new Error('No response returned from performRequestCore');
+            }
+
+            this.lastResponse = response;
+
+            // Run afterResponse hooks
+            await this.runHooks('afterResponse', { requestParams, response, partial: this });
+
+            return response.text();
+        });
+    }
 
     /**
      * Processes the response text and updates the DOM accordingly.
@@ -893,10 +1054,13 @@ class Partial {
         // Determine the target element
         let finalTargetElement = targetElement;
         if (backendTargetSelector) {
-            const backendTargetElement = document.querySelector(backendTargetSelector);
+            const backendTargetElement = document.querySelector(backendTargetSelector) || document.getElementById(backendTargetSelector);
             if (backendTargetElement) {
                 finalTargetElement = backendTargetElement;
-            } else {
+            } else if(backendTargetSelector === 'root') {
+                // replace the entire body
+                finalTargetElement = window;
+            }else {
                 console.error(`No element found with selector '${backendTargetSelector}' specified in X-Target header.`);
             }
         }
@@ -925,10 +1089,14 @@ class Partial {
         // Handle any x-event-* headers from the response
         await this.handleResponseEvents();
 
+
         // Stop infinite scroll if instructed by backend
         if (infiniteScrollAction === 'stop' && element.hasAttribute(this.ATTRIBUTES.INFINITE_SCROLL)) {
             this.stopInfiniteScroll(element);
         }
+
+        // after all DOM updates
+        await this.runHooks('afterSettle', { element, targetElement, partial: this });
     }
 
     /**
@@ -971,12 +1139,25 @@ class Partial {
      * @param {string} swapOption
      */
     performSwap(targetElement, newContent, swapOption) {
+        // Create a template element to parse the HTML
+        const template = document.createElement('template');
+        template.innerHTML = newContent.trim();
+        const fragment = template.content;
+
+        // Pre-initialize elements within this fragment
+        // This runs `setupElement` and attaches event listeners off-DOM
+        this.scanForElements(fragment);
+
         switch (swapOption) {
-            case 'innerHTML':
-                targetElement.innerHTML = newContent;
-                break;
             case 'outerHTML':
-                targetElement.outerHTML = newContent;
+                // Replace the entire target element with the content of the fragment
+                targetElement.replaceWith(fragment);
+                break;
+
+            case 'innerHTML':
+                // Clear and append fragment's children inside targetElement
+                targetElement.innerHTML = '';
+                targetElement.appendChild(fragment);
                 break;
             case 'beforebegin':
             case 'afterbegin':
@@ -1036,30 +1217,55 @@ class Partial {
      */
     async handlePopState(event) {
         if (event.state && event.state.xPartial) {
-            const url = window.location.href;
+            const { partialId, url, swapOption, maxRetries } = event.state;
+            if (!partialId || !url ) {
+                console.warn('No partialId or url found in history.state, falling back to full reload.');
+                window.location.reload();
+                return;
+            }
+
+            const targetElement = document.getElementById(partialId);
+            if (!targetElement) {
+                console.warn(`No element found with ID '${partialId}'. Falling back to full reload.`);
+                window.location.reload();
+                return;
+            }
+
+
+            // Re-extract requestParams from the targetElement
+            const requestParams = this.extractRequestParams(targetElement);
+
+            requestParams.element = targetElement;
+            requestParams.url = url; // Ensure url is set to the popped state URL
+            requestParams.maxRetries = maxRetries; // Set a default retry limit
+            requestParams.headers["X-Target"] = partialId;
+
+            // Run the request again to restore the state
             try {
-                const responseText = await this.performRequest({ method: 'GET', url, headers: {}, element: null });
-
-                // Parse the response HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(responseText, 'text/html');
-
-                // Replace the body content
-                document.body.innerHTML = doc.body.innerHTML;
-
-                // Re-scan the entire document
-                this.scanForElements();
-
-                // Optionally, focus the body
-                if (this.autoFocus) {
-                    document.body.focus();
+                const responseText = await this.performRequest(requestParams);
+                const targetElement = document.querySelector(requestParams.targetSelector);
+                if (!targetElement) {
+                    console.error(`No element found with selector '${requestParams.targetSelector}' for infinite scroll.`);
+                    return;
                 }
 
+                if (swapOption) {
+                    targetElement.setAttribute('x-swap', swapOption);
+                }
+
+                await this.processResponse(responseText, targetElement, targetElement);
+                if (this.autoFocus) {
+                    targetElement.focus();
+                }
             } catch (error) {
-                this.handleError(error, document.body);
+                this.handleError(error, targetElement);
             }
+        } else {
+            // No xPartial state, fallback to full page reload or handle differently
+            window.location.reload();
         }
     }
+
 
     /**
      * Listens for a custom event and executes the callback when the event is dispatched.
@@ -1197,7 +1403,7 @@ class Serializer {
      * @param {HTMLFormElement} form
      * @returns {string} Nested JSON string
      */
-    serializeFormToNestedJson(form) {
+    static serializeFormToNestedJson(form) {
         const formData = new FormData(form);
         const serializedData = {};
 
