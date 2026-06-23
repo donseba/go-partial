@@ -1,16 +1,16 @@
-<section class="page">
-    <header class="page-heading">
-        <span class="eyebrow">Selected children</span>
-        <h1>{{ .Data.Title }}</h1>
-        <p>The shell stays the same while the selected partial is chosen by <code>{{ selectionHeader }}</code>.</p>
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Selected children</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <p class="leading-7 text-stone-600">The shell stays the same while the selected partial is chosen by <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ selectionHeader }}</code>.</p>
     </header>
 
-    <div class="example-surface">
-        <div class="tabs" role="tablist">
+    <div class="rounded-lg border border-stone-300 bg-white p-4">
+        <div class="flex items-center gap-1.5 overflow-x-auto border-b border-stone-300" role="tablist">
             <button
                 role="tab"
                 aria-selected="{{ if selectionIf true "summary" }}true{{ else }}false{{ end }}"
-                class="{{ selectionIf "active" "summary" }}"
+                class="{{ if selectionIf true "summary" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                 hx-get="/selection"
                 hx-target="#content"
                 hx-headers='{"{{ selectionHeader }}":"summary"}'>
@@ -19,7 +19,7 @@
             <button
                 role="tab"
                 aria-selected="{{ if selectionIf true "details" }}true{{ else }}false{{ end }}"
-                class="{{ selectionIf "active" "details" }}"
+                class="{{ if selectionIf true "details" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                 hx-get="/selection"
                 hx-target="#content"
                 hx-headers='{"{{ selectionHeader }}":"details"}'>
@@ -27,27 +27,27 @@
             </button>
         </div>
 
-        <div class="tab-panel" role="tabpanel">
+        <div class="rounded-b-lg rounded-tr-lg border border-stone-300 bg-white p-4" role="tabpanel">
             {{ selection }}
         </div>
     </div>
 
-    <article class="description-panel">
-        <h2>Header-driven selection</h2>
-        <p>The selected key comes from <code>{{ selectionHeader }}</code>. The server maps that key to a registered child partial and renders only that choice.</p>
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Header-driven selection</h2>
+        <p class="leading-7 text-stone-600">The selected key comes from <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ selectionHeader }}</code>. The server maps that key to a registered child partial and renders only that choice.</p>
     </article>
 
-    <article class="code-panel">
-        <h2>Server setup</h2>
-        <pre><code>content.WithSelectMap("summary", map[string]*partial.Partial{
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content.WithSelectMap("summary", map[string]*partial.Partial{
     "summary": summary,
     "details": details,
 })</code></pre>
     </article>
 
-    <article class="code-panel">
-        <h2>Template usage</h2>
-        <pre><code>&lt;button class="{{ "{{ selectionIf \"active\" \"summary\" }}" }}"
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button class="{{"{{ selectionIf \"active\" \"summary\" }}" }}"
         hx-headers='{"{{ "{{ selectionHeader }}" }}":"summary"}'&gt;
     Summary
 &lt;/button&gt;

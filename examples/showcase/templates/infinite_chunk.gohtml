@@ -6,7 +6,7 @@
     {{ child "rickroll" }}
 {{ else }}
     <div id="infinite-sentinel-{{ .Data.Next }}"
-         class="sentinel"
+         class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600"
          hx-get="/infinite/load"
          hx-target="#infinite-sentinel-{{ .Data.Next }}"
          hx-swap="outerHTML"

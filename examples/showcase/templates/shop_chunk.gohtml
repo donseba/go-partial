@@ -1,0 +1,16 @@
+{{ range .Data.Items }}
+    {{ partial "shop-item" "Item" . }}
+{{ end }}
+
+{{ if .Data.Done }}
+    <div class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600">All products loaded.</div>
+{{ else }}
+    <div class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600"
+         hx-get="/shop/load"
+         hx-trigger="revealed"
+         hx-target="this"
+         hx-swap="outerHTML"
+         hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ .Data.Next }}"}'>
+        Loading more products...
+    </div>
+{{ end }}

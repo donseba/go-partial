@@ -1,146 +1,154 @@
-<article class="docs-page">
-    <p class="eyebrow">Reference</p>
-    <h1>Template functions</h1>
-    <p class="lead">go-partial adds rendering helpers, connector helpers, URL helpers, OOB helpers, and small utility functions to normal <code>html/template</code> files.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Reference</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Template functions</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">go-partial adds rendering helpers, connector helpers, URL helpers, OOB helpers, and small utility functions to normal <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">html/template</code> files.</p>
 
-    <h2>Composition helpers</h2>
-    <p>These helpers render registered partials or choose output from the partial tree.</p>
+    <h2 class="text-xl font-bold text-slate-50">Composition helpers</h2>
+    <p class="leading-7 text-slate-400">These helpers render registered partials or choose output from the partial tree.</p>
 
-    <table>
-        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>child</code></td><td>Render a registered child by ID, optionally with scoped key/value pairs.</td><td><code>{{ "{{ child \"sidebar\" }}" }}</code></td></tr>
-            <tr><td><code>childIf</code></td><td>Render a child only when it is registered, optionally with scoped key/value pairs.</td><td><code>{{ "{{ childIf \"promo\" \"Title\" \"Sale\" }}" }}</code></td></tr>
-            <tr><td><code>partial</code></td><td>Render a registered child with scoped key/value pairs.</td><td><code>{{ "{{ partial \"row\" \"Row\" . }}" }}</code></td></tr>
-            <tr><td><code>selection</code></td><td>Render the selected child from a selection map.</td><td><code>{{ "{{ selection }}" }}</code></td></tr>
-            <tr><td><code>action</code></td><td>Render the partial returned by a template action callback.</td><td><code>{{ "{{ action }}" }}</code></td></tr>
-            <tr><td><code>scoped</code></td><td>Read the local scope passed to the current partial.</td><td><code>{{ "{{ scoped.Row.Name }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a registered child by ID, optionally with scoped key/value pairs.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ child \"sidebar\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">childIf</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a child only when it is registered, optionally with scoped key/value pairs.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ childIf \"promo\" \"Title\" \"Sale\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a registered child with scoped key/value pairs.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ partial \"row\" \"Row\" . }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render connector-aware deferred loading markup for an endpoint.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ async \"/table/row/:row\" \"row\" .ID }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">reveal</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Load an endpoint when the region enters the viewport.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ reveal \"/chart\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">poll</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Refresh an endpoint on an interval.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ poll .Interact.Notifications }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">on</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Refresh an endpoint when a named browser event is dispatched.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ on \"cart:changed\" \"/cart\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">stream</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Declare a stream-backed region.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ stream \"/events\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">prefetch</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit a prefetch hint.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ prefetch \"/users/42\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">island</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a named lazy server-rendered island.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ island .Interact.Cart }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">refresh</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a refresh control.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ refresh .Interact.CartRefresh }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selection</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render the selected child from a selection map.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">action</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render the partial returned by a template action callback.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ action }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Read the local scope passed to the current partial.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ scoped.Row.Name }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <h2>Map helper</h2>
-    <p><code>dict</code> is a general data helper, not a composition helper. Use it when a template needs to build a map. <code>child</code>, <code>childIf</code>, and <code>partial</code> accept direct key/value pairs, so most scoped-data calls do not need <code>dict</code>.</p>
+    <h2 class="text-xl font-bold text-slate-50">Map helper</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dict</code> is a general data helper, not a composition helper. Use it when a template needs to build a map. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">childIf</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> accept direct key/value pairs, so most scoped-data calls do not need <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dict</code>.</p>
 
-    <pre><code>{{ "{{ dict \"Name\" \"Ada\" \"Count\" 3 }}" }}</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ dict \"Name\" \"Ada\" \"Count\" 3 }}" }}</code></pre>
 
-    <h2>Rows with scoped data</h2>
-    <p>The parent owns the loop and passes only the row-local values into the reusable row partial.</p>
-    <pre><code>{{ "{{ range .Data.Rows }}" }}
+    <h2 class="text-xl font-bold text-slate-50">Rows with scoped data</h2>
+    <p class="leading-7 text-slate-400">The parent owns the loop and passes only the row-local values into the reusable row partial.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ range .Data.Rows }}" }}
     {{ "{{ partial \"row\" \"Row\" . \"Owner\" $.Data.Owner }}" }}
 {{ "{{ end }}" }}</code></pre>
 
-    <p>The row template reads those values through <code>scoped</code>. The same values are also available as <code>.Data</code>, but <code>scoped</code> makes the handoff explicit.</p>
-    <pre><code>&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
+    <p class="leading-7 text-slate-400">The row template reads those values through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>. The same values are also available as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code>, but <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code> makes the handoff explicit.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
     &lt;td&gt;{{ "{{ scoped.Row.Name }}" }}&lt;/td&gt;
     &lt;td&gt;{{ "{{ scoped.Owner }}" }}&lt;/td&gt;
 &lt;/tr&gt;</code></pre>
 
-    <h2>Connector helpers</h2>
-    <p>These read the configured connector. Each concept has one header helper, one value helper, and one conditional helper.</p>
+    <h2 class="text-xl font-bold text-slate-50">Connector helpers</h2>
+    <p class="leading-7 text-slate-400">These read the configured connector. Each concept has one header helper, one value helper, and one conditional helper.</p>
 
-    <table>
-        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>targetHeader</code></td><td>Return the target header name.</td><td><code>{{ "{{ targetHeader }}" }}</code></td></tr>
-            <tr><td><code>targetValue</code></td><td>Return the requested target value.</td><td><code>{{ "{{ targetValue }}" }}</code></td></tr>
-            <tr><td><code>targetIf</code></td><td>Return a value when the current target matches one of the given values.</td><td><code>{{ "{{ targetIf \"active\" \"content\" }}" }}</code></td></tr>
-            <tr><td><code>selectionHeader</code></td><td>Return the selection header name.</td><td><code>{{ "{{ selectionHeader }}" }}</code></td></tr>
-            <tr><td><code>selectionValue</code></td><td>Return the selected key or default selection.</td><td><code>{{ "{{ selectionValue }}" }}</code></td></tr>
-            <tr><td><code>selectionIf</code></td><td>Return a value when the current selection matches one of the given values.</td><td><code>{{ "{{ selectionIf \"active\" \"details\" }}" }}</code></td></tr>
-            <tr><td><code>actionHeader</code></td><td>Return the action header name.</td><td><code>{{ "{{ actionHeader }}" }}</code></td></tr>
-            <tr><td><code>actionValue</code></td><td>Return the requested action value.</td><td><code>{{ "{{ actionValue }}" }}</code></td></tr>
-            <tr><td><code>actionIf</code></td><td>Return a value when the current action matches one of the given values.</td><td><code>{{ "{{ actionIf \"active\" \"save\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">targetHeader</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the target header name.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ targetHeader }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">targetValue</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the requested target value.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ targetValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">targetIf</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return a value when the current target matches one of the given values.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ targetIf \"active\" \"content\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selectionHeader</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the selection header name.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selectionHeader }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selectionValue</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the selected key or default selection.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selectionValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selectionIf</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return a value when the current selection matches one of the given values.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selectionIf \"active\" \"details\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">actionHeader</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the action header name.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ actionHeader }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">actionValue</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the requested action value.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ actionValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">actionIf</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return a value when the current action matches one of the given values.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ actionIf \"active\" \"save\" }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <h2>URL and context helpers</h2>
-    <table>
-        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">URL and context helpers</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>url</code></td><td>Return the current request URL.</td><td><code>{{ "{{ url }}" }}</code></td></tr>
-            <tr><td><code>urlIs</code></td><td>Check whether the current path equals a path.</td><td><code>{{ "{{ if urlIs \"/docs\" }}active{{ end }}" }}</code></td></tr>
-            <tr><td><code>urlStarts</code></td><td>Check whether the current path starts with a prefix.</td><td><code>{{ "{{ urlStarts \"/docs\" }}" }}</code></td></tr>
-            <tr><td><code>urlContains</code></td><td>Check whether the current path contains text.</td><td><code>{{ "{{ urlContains \"settings\" }}" }}</code></td></tr>
-            <tr><td><code>joinPath</code></td><td>Join path parts into a clean path string.</td><td><code>{{ "{{ joinPath \"/docs\" \"api\" }}" }}</code></td></tr>
-            <tr><td><code>urlPath</code></td><td>Join path parts and return a safe template URL.</td><td><code>{{ "{{ urlPath .BasePath \"users\" \"42\" }}" }}</code></td></tr>
-            <tr><td><code>context</code></td><td>Return the current render context.</td><td><code>{{ "{{ context }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">url</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the current request URL.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ url }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlIs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Check whether the current path equals a path.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ if urlIs \"/docs\" }}active{{ end }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlStarts</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Check whether the current path starts with a prefix.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlStarts \"/docs\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlContains</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Check whether the current path contains text.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlContains \"settings\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">joinPath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Join path parts into a clean path string.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ joinPath \"/docs\" \"api\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlPath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Join path parts and return a safe template URL.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlPath .BasePath \"users\" \"42\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">context</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the current render context.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ context }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <h2>Out-of-band helpers</h2>
-    <p>Out-of-band helpers are only meaningful for partials registered with <code>WithOOB</code>. During a normal full-page render they return empty output, so the same template can live in the page shell. During an OOB render they emit the HTMX swap attribute.</p>
+    <h2 class="text-xl font-bold text-slate-50">Out-of-band helpers</h2>
+    <p class="leading-7 text-slate-400">Out-of-band helpers are only meaningful for partials registered with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithOOB</code>. During a normal full-page render they return empty output, so the same template can live in the page shell. During an OOB render they emit the HTMX swap attribute.</p>
 
-    <table>
-        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>oob</code></td><td>Return <code>true</code> while the partial is being rendered as out-of-band output.</td><td><code>{{ "{{ if oob }}OOB render{{ end }}" }}</code></td></tr>
-            <tr><td><code>oobAttr</code></td><td>Emit <code>hx-swap-oob</code> as a safe HTML attribute only during OOB rendering. Defaults to <code>true</code>.</td><td><code>&lt;aside{{ "{{ oobAttr }}" }}&gt;</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">oob</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">true</code> while the partial is being rendered as out-of-band output.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ if oob }}OOB render{{ end }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">oobAttr</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hx-swap-oob</code> as a safe HTML attribute only during OOB rendering. Defaults to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">true</code>.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside{{ "{{ oobAttr }}" }}&gt;</code></td></tr>
         </tbody>
     </table>
 
-    <p>This template renders normally inside the page, but emits <code>hx-swap-oob</code> when the same partial is rendered as an OOB child.</p>
-    <pre><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;
+    <p class="leading-7 text-slate-400">This template renders normally inside the page, but emits <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hx-swap-oob</code> when the same partial is rendered as an OOB child.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;
     Saved
 &lt;/aside&gt;</code></pre>
 
-    <table>
-        <thead><tr><th>Render mode</th><th>Template input</th><th>Rendered output</th></tr></thead>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Render mode</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Template input</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Rendered output</th></tr></thead>
         <tbody>
             <tr>
-                <td>Normal page render</td>
-                <td><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
-                <td><code>&lt;aside id="toast"&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle">Normal page render</td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast"&gt;</code></td>
             </tr>
             <tr>
-                <td>OOB render</td>
-                <td><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
-                <td><code>&lt;aside id="toast" hx-swap-oob="true"&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle">OOB render</td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast" hx-swap-oob="true"&gt;</code></td>
             </tr>
             <tr>
-                <td>OOB render with explicit swap</td>
-                <td><code>&lt;aside id="toast"{{ "{{ oobAttr \"outerHTML\" }}" }}&gt;</code></td>
-                <td><code>&lt;aside id="toast" hx-swap-oob="outerHTML"&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle">OOB render with explicit swap</td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast"{{ "{{ oobAttr \"outerHTML\" }}" }}&gt;</code></td>
+                <td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;aside id="toast" hx-swap-oob="outerHTML"&gt;</code></td>
             </tr>
         </tbody>
     </table>
 
-    <p>The attribute name is <code>hx-swap-oob</code>, which is HTMX's out-of-band swap attribute. It is not read from the request; go-partial knows whether the partial is currently being rendered as OOB output. The optional value controls the HTMX swap mode and defaults to <code>true</code>.</p>
+    <p class="leading-7 text-slate-400">The attribute name is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hx-swap-oob</code>, which is HTMX's out-of-band swap attribute. It is not read from the request; go-partial knows whether the partial is currently being rendered as OOB output. The optional value controls the HTMX swap mode and defaults to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">true</code>.</p>
 
-    <h2>Passing scoped data</h2>
-    <p><code>child</code>, <code>childIf</code>, and <code>partial</code> all use the same scoped-data rule: pass no data, direct key/value pairs, or one map from <code>dict</code>. The child receives that data as both <code>.Data</code> and <code>scoped</code>.</p>
+    <h2 class="text-xl font-bold text-slate-50">Passing scoped data</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">childIf</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> all use the same scoped-data rule: pass no data, direct key/value pairs, or one map from <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dict</code>. The child receives that data as both <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>.</p>
 
-    <p>Use direct key/value pairs for normal scoped data. Use <code>dict</code> when you specifically need to pass a prebuilt map or nested map.</p>
-    <pre><code>{{ "{{ child \"sidebar\" }}" }}
+    <p class="leading-7 text-slate-400">Use direct key/value pairs for normal scoped data. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dict</code> when you specifically need to pass a prebuilt map or nested map.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ child \"sidebar\" }}" }}
 {{ "{{ child \"sidebar\" \"User\" .Data.User }}" }}
 {{ "{{ childIf \"promo\" \"Title\" \"Sale\" }}" }}
 {{ "{{ partial \"users/row\" \"Row\" . }}" }}
 {{ "{{ partial \"users/row\" (dict \"Row\" . \"CanEdit\" true) }}" }}</code></pre>
 
-    <h2>Custom template functions</h2>
-    <p>Each scope has one registration path. Use the narrowest scope that owns the helper. go-partial protects its core helper names, so application helpers cannot replace functions such as <code>child</code>, <code>partial</code>, <code>scoped</code>, or <code>targetValue</code>.</p>
+    <h2 class="text-xl font-bold text-slate-50">Custom template functions</h2>
+    <p class="leading-7 text-slate-400">Each scope has one registration path. Use the narrowest scope that owns the helper. go-partial protects its core helper names, so application helpers cannot replace functions such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">targetValue</code>.</p>
 
-    <table>
-        <thead><tr><th>Scope</th><th>API</th><th>Use</th></tr></thead>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Scope</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">API</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td>Package default</td><td><code>partial.AddGlobalFunc</code></td><td>Helpers every later service should receive.</td></tr>
-            <tr><td>Service</td><td><code>svc.UseFuncs</code></td><td>Application-wide helpers such as translations, money, or asset URLs.</td></tr>
-            <tr><td>Layout</td><td><code>layout.UseFuncs</code></td><td>Helpers for one render pipeline or page shell.</td></tr>
-            <tr><td>Partial</td><td><code>partial.UseFuncs</code></td><td>Helpers local to one component tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Package default</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.AddGlobalFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers every later service should receive.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers for one render pipeline or page shell.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers local to one component tree.</td></tr>
         </tbody>
     </table>
 
-    <p>Package-level helpers are copied into services created after registration. This is useful for application-wide helpers in small apps, but service-level registration is usually clearer.</p>
-    <pre><code>err := partial.AddGlobalFunc("asset", func(path string) string {
+    <p class="leading-7 text-slate-400">Package-level helpers are copied into services created after registration. This is useful for application-wide helpers in small apps, but service-level registration is usually clearer.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">err := partial.AddGlobalFunc("asset", func(path string) string {
     return "/assets/" + strings.TrimPrefix(path, "/")
 })</code></pre>
 
-    <p>Create the service first, then register helpers owned by the application.</p>
-    <pre><code>svc := partial.NewService(&partial.Config{
+    <p class="leading-7 text-slate-400">Create the service first, then register helpers owned by the application.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
     FS: os.DirFS("web"),
 })</code></pre>
 
-    <p>Service helpers are available to every layout and partial rendered through that service.</p>
-    <pre><code>svc.UseFuncs(template.FuncMap{
+    <p class="leading-7 text-slate-400">Service helpers are available to every layout and partial rendered through that service.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.UseFuncs(template.FuncMap{
     "money": func(cents int) string {
         return fmt.Sprintf("EUR %.2f", float64(cents)/100)
     },
@@ -149,73 +157,73 @@
     },
 })</code></pre>
 
-    <p>Partial helpers stay local to that component tree. Use this for helpers that do not make sense globally.</p>
-    <pre><code>row := partial.NewID("row", "row.gohtml")
+    <p class="leading-7 text-slate-400">Partial helpers stay local to that component tree. Use this for helpers that do not make sense globally.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">row := partial.NewID("row", "row.gohtml")
 row.UseFuncs(template.FuncMap{
     "statusLabel": func(status string) string {
         return strings.ToUpper(status)
     },
 })</code></pre>
 
-    <p>Once registered, helpers are just normal template functions.</p>
-    <pre><code>&lt;td&gt;{{ "{{ money scoped.Row.TotalCents }}" }}&lt;/td&gt;
+    <p class="leading-7 text-slate-400">Once registered, helpers are just normal template functions.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;td&gt;{{ "{{ money scoped.Row.TotalCents }}" }}&lt;/td&gt;
 &lt;span&gt;{{ "{{ initials .Data.FirstName .Data.LastName }}" }}&lt;/span&gt;</code></pre>
 
-    <h2>String helpers</h2>
-    <table>
-        <thead><tr><th>Function</th><th>Example</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">String helpers</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>upper</code></td><td><code>{{ "{{ upper \"hello\" }}" }}</code></td></tr>
-            <tr><td><code>lower</code></td><td><code>{{ "{{ lower \"HELLO\" }}" }}</code></td></tr>
-            <tr><td><code>trimSpace</code></td><td><code>{{ "{{ trimSpace \" hello \" }}" }}</code></td></tr>
-            <tr><td><code>trim</code></td><td><code>{{ "{{ trim \"-hello-\" \"-\" }}" }}</code></td></tr>
-            <tr><td><code>trimSuffix</code></td><td><code>{{ "{{ trimSuffix \"profile.html\" \".html\" }}" }}</code></td></tr>
-            <tr><td><code>trimPrefix</code></td><td><code>{{ "{{ trimPrefix \"/docs\" \"/\" }}" }}</code></td></tr>
-            <tr><td><code>contains</code></td><td><code>{{ "{{ contains \"hello\" \"ell\" }}" }}</code></td></tr>
-            <tr><td><code>containsAny</code></td><td><code>{{ "{{ containsAny \"team\" \"xyzm\" }}" }}</code></td></tr>
-            <tr><td><code>hasPrefix</code></td><td><code>{{ "{{ hasPrefix \"/docs/api\" \"/docs\" }}" }}</code></td></tr>
-            <tr><td><code>hasSuffix</code></td><td><code>{{ "{{ hasSuffix \"index.gohtml\" \".gohtml\" }}" }}</code></td></tr>
-            <tr><td><code>repeat</code></td><td><code>{{ "{{ repeat \"-\" 3 }}" }}</code></td></tr>
-            <tr><td><code>replace</code></td><td><code>{{ "{{ replace \"a-b-c\" \"-\" \"/\" -1 }}" }}</code></td></tr>
-            <tr><td><code>split</code></td><td><code>{{ "{{ split \"a,b,c\" \",\" }}" }}</code></td></tr>
-            <tr><td><code>join</code></td><td><code>{{ "{{ join (stringSlice \"a\" \"b\") \",\" }}" }}</code></td></tr>
-            <tr><td><code>stringSlice</code></td><td><code>{{ "{{ stringSlice \"draft\" \"published\" }}" }}</code></td></tr>
-            <tr><td><code>title</code></td><td><code>{{ "{{ title \"hello world\" }}" }}</code></td></tr>
-            <tr><td><code>substr</code></td><td><code>{{ "{{ substr \"abcdef\" 1 3 }}" }}</code></td></tr>
-            <tr><td><code>upperFirst</code></td><td><code>{{ "{{ upperFirst \"hello\" }}" }}</code></td></tr>
-            <tr><td><code>compare</code></td><td><code>{{ "{{ compare \"a\" \"b\" }}" }}</code></td></tr>
-            <tr><td><code>equalFold</code></td><td><code>{{ "{{ equalFold \"Go\" \"go\" }}" }}</code></td></tr>
-            <tr><td><code>urlEncode</code></td><td><code>{{ "{{ urlEncode \"hello world\" }}" }}</code></td></tr>
-            <tr><td><code>urlDecode</code></td><td><code>{{ "{{ urlDecode \"hello+world\" }}" }}</code></td></tr>
-            <tr><td><code>safeURL</code></td><td><code>&lt;a href="{{ "{{ safeURL .Data.Path }}" }}"&gt;</code></td></tr>
-            <tr><td><code>safeHTML</code></td><td><code>{{ "{{ safeHTML \"&lt;strong&gt;ok&lt;/strong&gt;\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">upper</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ upper \"hello\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">lower</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ lower \"HELLO\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">trimSpace</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ trimSpace \" hello \" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">trim</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ trim \"-hello-\" \"-\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">trimSuffix</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ trimSuffix \"profile.html\" \".html\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">trimPrefix</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ trimPrefix \"/docs\" \"/\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">contains</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ contains \"hello\" \"ell\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">containsAny</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ containsAny \"team\" \"xyzm\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hasPrefix</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ hasPrefix \"/docs/api\" \"/docs\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hasSuffix</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ hasSuffix \"index.gohtml\" \".gohtml\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">repeat</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ repeat \"-\" 3 }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">replace</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ replace \"a-b-c\" \"-\" \"/\" -1 }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">split</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ split \"a,b,c\" \",\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">join</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ join (stringSlice \"a\" \"b\") \",\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">stringSlice</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ stringSlice \"draft\" \"published\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">title</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ title \"hello world\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">substr</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ substr \"abcdef\" 1 3 }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">upperFirst</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ upperFirst \"hello\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">compare</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ compare \"a\" \"b\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">equalFold</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ equalFold \"Go\" \"go\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlEncode</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlEncode \"hello world\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlDecode</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlDecode \"hello+world\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">safeURL</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">&lt;a href="{{ "{{ safeURL .Data.Path }}" }}"&gt;</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">safeHTML</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ safeHTML \"&lt;strong&gt;ok&lt;/strong&gt;\" }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <h2>Time, map, list, math, and debug helpers</h2>
-    <table>
-        <thead><tr><th>Function</th><th>Example</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Time, map, list, math, and debug helpers</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
         <tbody>
-            <tr><td><code>now</code></td><td><code>{{ "{{ now }}" }}</code></td></tr>
-            <tr><td><code>formatDate</code></td><td><code>{{ "{{ formatDate \"2006-01-02\" .Data.Created }}" }}</code></td></tr>
-            <tr><td><code>parseDate</code></td><td><code>{{ "{{ parseDate \"2006-01-02\" \"2026-06-23\" }}" }}</code></td></tr>
-            <tr><td><code>first</code></td><td><code>{{ "{{ first .Data.Items }}" }}</code></td></tr>
-            <tr><td><code>last</code></td><td><code>{{ "{{ last .Data.Items }}" }}</code></td></tr>
-            <tr><td><code>hasKey</code></td><td><code>{{ "{{ hasKey .Data.Flags \"beta\" }}" }}</code></td></tr>
-            <tr><td><code>keys</code></td><td><code>{{ "{{ keys .Data.Flags }}" }}</code></td></tr>
-            <tr><td><code>inc</code></td><td><code>{{ "{{ inc .Data.Page }}" }}</code></td></tr>
-            <tr><td><code>dec</code></td><td><code>{{ "{{ dec .Data.Page }}" }}</code></td></tr>
-            <tr><td><code>debug</code></td><td><code>{{ "{{ debug .Data }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">now</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ now }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">formatDate</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ formatDate \"2006-01-02\" .Data.Created }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">parseDate</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ parseDate \"2006-01-02\" \"2026-06-23\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">first</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ first .Data.Items }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">last</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ last .Data.Items }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">hasKey</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ hasKey .Data.Flags \"beta\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">keys</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ keys .Data.Flags }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">inc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ inc .Data.Page }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dec</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ dec .Data.Page }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ debug .Data }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <h2>Debug output</h2>
-    <p><code>debug</code> renders a styled diagnostic box with the default embedded debug template. Override it with <code>SetDebugRenderer</code> on a service, layout, or partial when you want diagnostics to match your application.</p>
+    <h2 class="text-xl font-bold text-slate-50">Debug output</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug</code> renders a styled diagnostic box with the default embedded debug template. Override it with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDebugRenderer</code> on a service, layout, or partial when you want diagnostics to match your application.</p>
 
-    <pre><code>svc.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
     return template.HTML("&lt;pre class=\"debug\"&gt;" + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + "&lt;/pre&gt;"), nil
 })</code></pre>
 
-    <h2>Localization functions are provider-owned</h2>
-    <p>Calls such as <code>{{ "{{ tl .Loc \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code>.Loc</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>
+    <h2 class="text-xl font-bold text-slate-50">Localization functions are provider-owned</h2>
+    <p class="leading-7 text-slate-400">Calls such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ tl .Loc \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Loc</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>
 </article>

@@ -31,15 +31,23 @@ var (
 	// protectedFunctionNames is a set of function names that are protected from being overridden
 	protectedFunctionNames = map[string]struct{}{
 		"action":          {},
+		"async":           {},
 		"child":           {},
 		"childIf":         {},
 		"context":         {},
 		"dict":            {},
 		"debug":           {},
 		"joinPath":        {},
+		"island":          {},
+		"on":              {},
 		"oob":             {},
 		"oobAttr":         {},
 		"partial":         {},
+		"poll":            {},
+		"prefetch":        {},
+		"refresh":         {},
+		"reveal":          {},
+		"stream":          {},
 		"actionHeader":    {},
 		"actionIf":        {},
 		"actionValue":     {},
@@ -64,35 +72,37 @@ type (
 
 	// Partial represents a renderable component with optional children and data.
 	Partial struct {
-		id                string
-		parent            *Partial
-		request           *http.Request
-		renderOOB         bool
-		alwaysSwapOOB     bool
-		fs                fs.FS
-		logger            Logger
-		connector         connector.Connector
-		useCache          bool
-		templates         []string
-		combinedFunctions template.FuncMap
-		basePath          string
-		data              map[string]any
-		layoutData        map[string]any
-		globalData        map[string]any
-		serviceData       map[string]any
-		responseHeaders   map[string]string
-		response          connector.Response
-		errorRenderer     ErrorRenderer
-		debugRenderer     DebugRenderer
-		errorMode         ErrorMode
-		errorModeSet      bool
-		targetResolver    TargetResolver
-		mu                sync.RWMutex
-		children          map[string]*Partial
-		oobChildren       map[string]struct{}
-		selection         *Selection
-		templateAction    func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
-		action            func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		id                  string
+		parent              *Partial
+		request             *http.Request
+		renderOOB           bool
+		alwaysSwapOOB       bool
+		fs                  fs.FS
+		logger              Logger
+		connector           connector.Connector
+		useCache            bool
+		templates           []string
+		combinedFunctions   template.FuncMap
+		basePath            string
+		data                map[string]any
+		layoutData          map[string]any
+		globalData          map[string]any
+		serviceData         map[string]any
+		interact            map[string]any
+		responseHeaders     map[string]string
+		response            connector.Response
+		errorRenderer       ErrorRenderer
+		debugRenderer       DebugRenderer
+		interactionRenderer InteractionRenderer
+		errorMode           ErrorMode
+		errorModeSet        bool
+		targetResolver      TargetResolver
+		mu                  sync.RWMutex
+		children            map[string]*Partial
+		oobChildren         map[string]struct{}
+		selection           *Selection
+		templateAction      func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		action              func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
 	}
 
 	Selection struct {
@@ -110,6 +120,8 @@ type (
 		Request *http.Request
 		// Data contains data for the current partial.
 		Data map[string]any
+		// Interact contains client interaction declarations for the current partial.
+		Interact map[string]any
 		// Service contains data configured on the Service.
 		Service map[string]any
 		// Layout contains data configured on the current Layout.
@@ -230,18 +242,20 @@ const HeaderGoPartialError = "X-Go-Partial-Error"
 // New creates a new root.
 func New(templates ...string) *Partial {
 	return &Partial{
-		id:                "root",
-		templates:         templates,
-		combinedFunctions: copyFuncMap(),
-		data:              make(map[string]any),
-		layoutData:        make(map[string]any),
-		globalData:        make(map[string]any),
-		serviceData:       make(map[string]any),
-		children:          make(map[string]*Partial),
-		oobChildren:       make(map[string]struct{}),
-		fs:                os.DirFS("./"),
-		errorRenderer:     DefaultErrorRenderer(),
-		debugRenderer:     DefaultDebugRenderer(),
+		id:                  "root",
+		templates:           templates,
+		combinedFunctions:   copyFuncMap(),
+		data:                make(map[string]any),
+		layoutData:          make(map[string]any),
+		globalData:          make(map[string]any),
+		serviceData:         make(map[string]any),
+		interact:            make(map[string]any),
+		children:            make(map[string]*Partial),
+		oobChildren:         make(map[string]struct{}),
+		fs:                  os.DirFS("./"),
+		errorRenderer:       DefaultErrorRenderer(),
+		debugRenderer:       DefaultDebugRenderer(),
+		interactionRenderer: DefaultInteractionRenderer(),
 	}
 }
 
@@ -268,7 +282,7 @@ func DefaultErrorRenderer() ErrorRenderer {
 		}
 		if p != nil {
 			errorData.PartialID = p.id
-			errorData.Templates = append([]string{}, p.templates...)
+			errorData.Templates = slices.Clone(p.templates)
 		}
 		errorData.TemplateLabel = "Templates"
 		if len(errorData.Templates) == 1 {
@@ -302,7 +316,7 @@ func DefaultDebugRenderer() DebugRenderer {
 		}
 		if p != nil {
 			debugData.PartialID = p.id
-			debugData.Templates = append([]string{}, p.templates...)
+			debugData.Templates = slices.Clone(p.templates)
 		}
 		if data != nil {
 			debugData.Request = data.Request
@@ -376,6 +390,7 @@ func (p *Partial) Reset() *Partial {
 	p.layoutData = make(map[string]any)
 	p.globalData = make(map[string]any)
 	p.serviceData = make(map[string]any)
+	p.interact = make(map[string]any)
 	p.children = make(map[string]*Partial)
 	p.oobChildren = make(map[string]struct{})
 
@@ -404,6 +419,19 @@ func (p *Partial) SetDebugRenderer(renderer DebugRenderer) *Partial {
 	defer p.mu.Unlock()
 
 	p.debugRenderer = renderer
+
+	return p
+}
+
+func (p *Partial) SetInteractionRenderer(renderer InteractionRenderer) *Partial {
+	if p == nil {
+		return nil
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.interactionRenderer = renderer
 
 	return p
 }
@@ -448,6 +476,30 @@ func (p *Partial) AddData(key string, value any) *Partial {
 	return p
 }
 
+// SetInteractions sets client interaction declarations for the partial.
+func (p *Partial) SetInteractions(interactions map[string]any) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.interact = interactions
+	if p.interact == nil {
+		p.interact = make(map[string]any)
+	}
+	return p
+}
+
+// AddInteraction adds one client interaction declaration for the partial.
+func (p *Partial) AddInteraction(name string, interaction any) *Partial {
+	if p == nil {
+		return nil
+	}
+	if p.interact == nil {
+		p.interact = make(map[string]any)
+	}
+	p.interact[name] = interaction
+	return p
+}
+
 func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
 	if p.parent != nil {
 		p.parent.SetResponseHeaders(headers)
@@ -464,12 +516,12 @@ func (p *Partial) GetResponseHeaders() map[string]string {
 
 	if p.responseHeaders == nil {
 		if p.parent != nil {
-			return p.parent.GetResponseHeaders()
+			return maps.Clone(p.parent.GetResponseHeaders())
 		}
 		return nil
 	}
 
-	return p.responseHeaders
+	return maps.Clone(p.responseHeaders)
 }
 
 func (p *Partial) Response() *connector.ResponseBuilder {
@@ -505,8 +557,15 @@ func (p *Partial) SetConnector(connector connector.Connector) *Partial {
 
 // MergeData merges the data into the partial.
 func (p *Partial) MergeData(data map[string]any, override bool) *Partial {
+	if p.data == nil {
+		p.data = make(map[string]any)
+	}
+	if override {
+		maps.Copy(p.data, data)
+		return p
+	}
 	for k, v := range data {
-		if _, ok := p.data[k]; ok && !override {
+		if _, ok := p.data[k]; ok {
 			continue
 		}
 
@@ -751,9 +810,10 @@ func (p *Partial) mergeFuncMapInternal(funcMap template.FuncMap) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	for k, v := range funcMap {
-		p.combinedFunctions[k] = v
+	if p.combinedFunctions == nil {
+		p.combinedFunctions = make(template.FuncMap, len(funcMap))
 	}
+	maps.Copy(p.combinedFunctions, funcMap)
 }
 
 // getFuncMap returns the combined function map of the partial.
@@ -762,9 +822,10 @@ func (p *Partial) getFuncMap() template.FuncMap {
 	defer p.mu.RUnlock()
 
 	if p.parent != nil {
-		for k, v := range p.parent.getFuncMap() {
-			p.combinedFunctions[k] = v
+		if p.combinedFunctions == nil {
+			p.combinedFunctions = make(template.FuncMap)
 		}
+		maps.Copy(p.combinedFunctions, p.parent.getFuncMap())
 
 		return p.combinedFunctions
 	}
@@ -779,6 +840,14 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	funcs["childIf"] = childIfFunc(p, data)
 	funcs["dict"] = dict
 	funcs["partial"] = partialFunc(p, data)
+	funcs["async"] = interactionFunc(p, data, connector.InteractionAsync)
+	funcs["reveal"] = interactionFunc(p, data, connector.InteractionReveal)
+	funcs["poll"] = interactionFunc(p, data, connector.InteractionPoll)
+	funcs["stream"] = interactionFunc(p, data, connector.InteractionStream)
+	funcs["prefetch"] = interactionFunc(p, data, connector.InteractionPrefetch)
+	funcs["refresh"] = interactionFunc(p, data, connector.InteractionRefresh)
+	funcs["on"] = onFunc(p, data)
+	funcs["island"] = islandFunc(p, data)
 	funcs["selection"] = selectionFunc(p, data)
 	funcs["action"] = actionFunc(p, data)
 	funcs["debug"] = debugFunc(p, data)
@@ -927,10 +996,9 @@ func (p *Partial) getGlobalDataMergedWithOwn() map[string]any {
 func (p *Partial) getLayoutData() map[string]any {
 	if p.parent != nil {
 		layoutData := p.parent.getLayoutData()
-		for k, v := range p.layoutData {
-			layoutData[k] = v
-		}
-		return layoutData
+		merged := maps.Clone(layoutData)
+		maps.Copy(merged, p.layoutData)
+		return merged
 	}
 	return p.layoutData
 }
@@ -1053,6 +1121,22 @@ func (p *Partial) getDebugRenderer() DebugRenderer {
 	}
 
 	return DefaultDebugRenderer()
+}
+
+func (p *Partial) getInteractionRenderer() InteractionRenderer {
+	if p == nil {
+		return DefaultInteractionRenderer()
+	}
+
+	if p.interactionRenderer != nil {
+		return p.interactionRenderer
+	}
+
+	if p.parent != nil {
+		return p.parent.getInteractionRenderer()
+	}
+
+	return DefaultInteractionRenderer()
 }
 
 func (p *Partial) getErrorMode() ErrorMode {
@@ -1272,6 +1356,7 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		Request:  r,
 		Ctx:      ctx,
 		Data:     p.data,
+		Interact: p.interact,
 		Global:   p.getGlobalData(),
 		Service:  p.getServiceData(),
 		Layout:   p.getLayoutData(),
@@ -1380,62 +1465,33 @@ func (p *Partial) clone() *Partial {
 
 	// Create a new Partial instance
 	clone := &Partial{
-		id:                p.id,
-		parent:            p.parent,
-		request:           p.request,
-		renderOOB:         p.renderOOB,
-		alwaysSwapOOB:     p.alwaysSwapOOB,
-		fs:                p.fs,
-		logger:            p.logger,
-		connector:         p.connector,
-		useCache:          p.useCache,
-		selection:         p.selection,
-		targetResolver:    p.targetResolver,
-		templates:         append([]string{}, p.templates...), // Copy the slice
-		combinedFunctions: make(template.FuncMap),
-		basePath:          p.basePath,
-		data:              make(map[string]any),
-		layoutData:        make(map[string]any),
-		globalData:        make(map[string]any),
-		serviceData:       make(map[string]any),
-		response:          p.response,
-		errorRenderer:     p.errorRenderer,
-		debugRenderer:     p.debugRenderer,
-		errorMode:         p.errorMode,
-		errorModeSet:      p.errorModeSet,
-		children:          make(map[string]*Partial),
-		oobChildren:       make(map[string]struct{}),
-	}
-
-	// Copy the maps
-	for k, v := range p.combinedFunctions {
-		clone.combinedFunctions[k] = v
-	}
-
-	for k, v := range p.data {
-		clone.data[k] = v
-	}
-
-	for k, v := range p.layoutData {
-		clone.layoutData[k] = v
-	}
-
-	for k, v := range p.globalData {
-		clone.globalData[k] = v
-	}
-
-	for k, v := range p.serviceData {
-		clone.serviceData[k] = v
-	}
-
-	// Copy the children map
-	for k, v := range p.children {
-		clone.children[k] = v
-	}
-
-	// Copy the out-of-band children set
-	for k, v := range p.oobChildren {
-		clone.oobChildren[k] = v
+		id:                  p.id,
+		parent:              p.parent,
+		request:             p.request,
+		renderOOB:           p.renderOOB,
+		alwaysSwapOOB:       p.alwaysSwapOOB,
+		fs:                  p.fs,
+		logger:              p.logger,
+		connector:           p.connector,
+		useCache:            p.useCache,
+		selection:           p.selection,
+		targetResolver:      p.targetResolver,
+		templates:           slices.Clone(p.templates),
+		combinedFunctions:   maps.Clone(p.combinedFunctions),
+		basePath:            p.basePath,
+		data:                maps.Clone(p.data),
+		layoutData:          maps.Clone(p.layoutData),
+		globalData:          maps.Clone(p.globalData),
+		serviceData:         maps.Clone(p.serviceData),
+		interact:            maps.Clone(p.interact),
+		response:            p.response,
+		errorRenderer:       p.errorRenderer,
+		debugRenderer:       p.debugRenderer,
+		interactionRenderer: p.interactionRenderer,
+		errorMode:           p.errorMode,
+		errorModeSet:        p.errorModeSet,
+		children:            maps.Clone(p.children),
+		oobChildren:         maps.Clone(p.oobChildren),
 	}
 
 	return clone
@@ -1452,7 +1508,7 @@ func (p *Partial) generateCacheKey(templates []string, funcMapPtr uintptr) strin
 	}
 
 	// Include function map pointer
-	builder.WriteString(fmt.Sprintf("funcMap:%x", funcMapPtr))
+	_, _ = fmt.Fprintf(&builder, "funcMap:%x", funcMapPtr)
 
 	return builder.String()
 }

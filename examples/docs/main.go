@@ -38,6 +38,8 @@ func main() {
 	mux.HandleFunc("/docs/rendering", app.rendering)
 	mux.HandleFunc("/docs/data-context", app.dataContext)
 	mux.HandleFunc("/docs/selection-action", app.selectionAction)
+	mux.HandleFunc("/docs/interactions", app.interactions)
+	mux.HandleFunc("/docs/deferred", app.deferred)
 	mux.HandleFunc("/docs/flow", app.flow)
 	mux.HandleFunc("/docs/localization", app.localization)
 	mux.HandleFunc("/docs/integrations", app.integrations)
@@ -79,6 +81,14 @@ func (app *App) dataContext(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) selectionAction(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "templates/docs_selection_action.gohtml")
+}
+
+func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "templates/docs_interactions.gohtml")
+}
+
+func (app *App) deferred(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "templates/docs_deferred.gohtml")
 }
 
 func (app *App) flow(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +163,8 @@ func (app *App) navItems() []NavItem {
 		{Path: "/docs/rendering", Label: "Rendering model", Group: "Guide"},
 		{Path: "/docs/data-context", Label: "Data and context", Group: "Guide"},
 		{Path: "/docs/selection-action", Label: "Selection and action", Group: "Guide"},
+		{Path: "/docs/interactions", Label: "Interaction helpers", Group: "Guide"},
+		{Path: "/docs/deferred", Label: "Deferred partials", Group: "Guide"},
 		{Path: "/docs/flow", Label: "Page flows", Group: "Guide"},
 		{Path: "/docs/target-resolver", Label: "Target resolver", Group: "Guide"},
 		{Path: "/docs/localization", Label: "Localization", Group: "Guide"},

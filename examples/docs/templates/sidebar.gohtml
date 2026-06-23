@@ -1,37 +1,37 @@
-<aside id="docs-sidebar" class="docs-sidebar"{{ oobAttr }}>
-    <section>
-        <h2>Guide</h2>
+<aside id="docs-sidebar" class="sticky top-16 grid h-[calc(100vh-4rem)] content-start gap-6 overflow-auto border-r border-slate-800 bg-slate-950/80 px-4 py-7"{{ oobAttr }}>
+    <section class="grid gap-1.5">
+        <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Guide</h2>
         {{ range .Data.Nav }}
             {{ if eq .Group "Guide" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"
                    hx-target="#content"
                    hx-push-url="true"
-                   class="{{ if urlIs .Path }}active{{ end }}">{{ .Label }}</a>
+                   class="block rounded-md border border-transparent px-3 py-2 text-sm text-slate-400 hover:border-sky-400/40 hover:bg-sky-400/10 hover:text-slate-50 {{ if urlIs .Path }}border-sky-400/40 bg-sky-400/10 font-bold text-slate-50 shadow-[inset_3px_0_0_#4fb3ff]{{ end }}">{{ .Label }}</a>
             {{ end }}
         {{ end }}
     </section>
-    <section>
-        <h2>Integration</h2>
+    <section class="grid gap-1.5">
+        <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Integration</h2>
         {{ range .Data.Nav }}
             {{ if eq .Group "Integration" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"
                    hx-target="#content"
                    hx-push-url="true"
-                   class="{{ if urlIs .Path }}active{{ end }}">{{ .Label }}</a>
+                   class="block rounded-md border border-transparent px-3 py-2 text-sm text-slate-400 hover:border-sky-400/40 hover:bg-sky-400/10 hover:text-slate-50 {{ if urlIs .Path }}border-sky-400/40 bg-sky-400/10 font-bold text-slate-50 shadow-[inset_3px_0_0_#4fb3ff]{{ end }}">{{ .Label }}</a>
             {{ end }}
         {{ end }}
     </section>
-    <section>
-        <h2>Reference</h2>
+    <section class="grid gap-1.5">
+        <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Reference</h2>
         {{ range .Data.Nav }}
             {{ if eq .Group "Reference" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"
                    hx-target="#content"
                    hx-push-url="true"
-                   class="{{ if urlIs .Path }}active{{ end }}">{{ .Label }}</a>
+                   class="block rounded-md border border-transparent px-3 py-2 text-sm text-slate-400 hover:border-sky-400/40 hover:bg-sky-400/10 hover:text-slate-50 {{ if urlIs .Path }}border-sky-400/40 bg-sky-400/10 font-bold text-slate-50 shadow-[inset_3px_0_0_#4fb3ff]{{ end }}">{{ .Label }}</a>
             {{ end }}
         {{ end }}
     </section>

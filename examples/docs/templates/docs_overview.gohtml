@@ -1,50 +1,50 @@
-<article class="docs-page">
-    <p class="eyebrow">Documentation</p>
-    <h1>Server-rendered partials that stay useful with HTMX</h1>
-    <p class="lead">go-partial is a small rendering layer for Go applications that want reusable template regions, targeted updates, out-of-band swaps, and predictable server-side behavior.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Documentation</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Server-rendered partials that stay useful with HTMX</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">go-partial is a small rendering layer for Go applications that want reusable template regions, targeted updates, out-of-band swaps, and predictable server-side behavior.</p>
 
-    <div class="hero-actions">
-        <a class="primary-action" href="/docs/installation" hx-get="/docs/installation" hx-target="#content" hx-push-url="true">Get started</a>
-        <a class="secondary-action" href="/docs/api" hx-get="/docs/api" hx-target="#content" hx-push-url="true">Read the API</a>
+    <div class="flex flex-wrap gap-2.5">
+        <a class="inline-flex min-h-9 items-center rounded-md bg-sky-400 px-3 py-2 font-extrabold text-slate-950" href="/docs/installation" hx-get="/docs/installation" hx-target="#content" hx-push-url="true">Get started</a>
+        <a class="inline-flex min-h-9 items-center rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100" href="/docs/api" hx-get="/docs/api" hx-target="#content" hx-push-url="true">Read the API</a>
     </div>
 
-    <div class="doc-grid">
-        <a class="doc-card" href="/docs/rendering" hx-get="/docs/rendering" hx-target="#content" hx-push-url="true">
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3.5">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/rendering" hx-get="/docs/rendering" hx-target="#content" hx-push-url="true">
             <strong>Rendering model</strong>
             <span>Layouts, content partials, children, and targeted requests.</span>
         </a>
-        <a class="doc-card" href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">
             <strong>Target resolver</strong>
             <span>Replace one dynamic row or card with fresh request-scoped data.</span>
         </a>
-        <a class="doc-card" href="/docs/data-context" hx-get="/docs/data-context" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/data-context" hx-get="/docs/data-context" hx-target="#content" hx-push-url="true">
             <strong>Data and context</strong>
             <span>Understand .Data, .Parent, .Service, .Layout, .Loc, and request scope.</span>
         </a>
-        <a class="doc-card" href="/docs/localization" hx-get="/docs/localization" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/localization" hx-get="/docs/localization" hx-target="#content" hx-push-url="true">
             <strong>Localization</strong>
             <span>Use request context to expose your app's localizer to templates.</span>
         </a>
-        <a class="doc-card" href="/docs/template-functions" hx-get="/docs/template-functions" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/template-functions" hx-get="/docs/template-functions" hx-target="#content" hx-push-url="true">
             <strong>Template functions</strong>
-            <span><code>child</code>, <code>partial</code>, <code>scoped</code>, <code>selection</code>, and friends.</span>
+            <span><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selection</code>, and friends.</span>
         </a>
-        <a class="doc-card" href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">
             <strong>Selection and action</strong>
             <span>Use request intent to choose a child partial or let Go decide the next render.</span>
         </a>
-        <a class="doc-card" href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">
             <strong>Integrations</strong>
             <span>HTMX, SSE streams, and custom fetch clients built around server-rendered partials.</span>
         </a>
-        <a class="doc-card" href="/docs/error-boundaries" hx-get="/docs/error-boundaries" hx-target="#content" hx-push-url="true">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/error-boundaries" hx-get="/docs/error-boundaries" hx-target="#content" hx-push-url="true">
             <strong>Error boundaries</strong>
             <span>Keep the page alive when one section template fails.</span>
         </a>
     </div>
 
-    <h2>A small root</h2>
-    <pre><code>svc := partial.NewService(&partial.Config{
+    <h2 class="text-xl font-bold text-slate-50">A small root</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
     Connector: connector.NewHTMX(nil),
     FS:        os.DirFS("templates"),
 })
@@ -55,16 +55,16 @@ layout := svc.NewLayout().
 
 _ = layout.WriteWithRequest(r.Context(), w, r)</code></pre>
 
-    <p>The rest of this site is rendered by that same pattern. The navigation, sidebar, examples, and error sections are all partials.</p>
+    <p class="leading-7 text-slate-400">The rest of this site is rendered by that same pattern. The navigation, sidebar, examples, and error sections are all partials.</p>
 
-    <h2>What go-partial is optimizing for</h2>
-    <ul>
-        <li>Keep templates as normal <code>html/template</code> files.</li>
+    <h2 class="text-xl font-bold text-slate-50">What go-partial is optimizing for</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
+        <li>Keep templates as normal <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">html/template</code> files.</li>
         <li>Let the server decide what a target, action, or selected partial means.</li>
         <li>Make repeated fragments explicit without requiring a new component language.</li>
         <li>Return useful HTML even when one section fails during development.</li>
     </ul>
 
-    <h2>Integrates with</h2>
-    <p>go-partial is designed to sit beside packages such as <code>go-translator</code>, <code>go-form</code>, <code>go-importmap</code>, and <code>go-router</code>. The renderer stays focused on partial trees and response behavior while the application stack handles routing, assets, translation, and forms.</p>
+    <h2 class="text-xl font-bold text-slate-50">Integrates with</h2>
+    <p class="leading-7 text-slate-400">go-partial is designed to sit beside packages such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-translator</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-form</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-importmap</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-router</code>. The renderer stays focused on partial trees and response behavior while the application stack handles routing, assets, translation, and forms.</p>
 </article>

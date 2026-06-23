@@ -3,10 +3,13 @@ package partial
 import (
 	"fmt"
 	"html/template"
+	"maps"
 	"net/url"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/donseba/go-partial/connector"
 )
 
 var DefaultTemplateFuncMap = template.FuncMap{
@@ -66,11 +69,7 @@ func AddGlobalFunc(name string, f any) error {
 }
 
 func copyFuncMap() template.FuncMap {
-	funcMap := make(template.FuncMap, len(DefaultTemplateFuncMap))
-	for k, v := range DefaultTemplateFuncMap {
-		funcMap[k] = v
-	}
-	return funcMap
+	return maps.Clone(DefaultTemplateFuncMap)
 }
 
 func safeHTML(s string) template.HTML {
@@ -353,6 +352,244 @@ func partialFunc(p *Partial, data *Data) func(id string, args ...any) template.H
 
 		return html
 	}
+}
+
+func interactionFunc(p *Partial, data *Data, kind connector.InteractionKind) func(value any, args ...any) template.HTML {
+	return func(value any, args ...any) template.HTML {
+		interaction, err := interactionFromValue(kind, "", value, args...)
+		if err != nil {
+			p.getLogger().Warn("invalid interaction arguments", "kind", kind, "error", err)
+			return template.HTML(template.HTMLEscapeString(err.Error()))
+		}
+
+		return renderInteraction(p, data, interaction)
+	}
+}
+
+func islandFunc(p *Partial, data *Data) func(value any, args ...any) template.HTML {
+	return func(value any, args ...any) template.HTML {
+		interaction, err := islandInteractionFromValue(value, args...)
+		if err != nil {
+			p.getLogger().Warn("invalid island arguments", "error", err)
+			return template.HTML(template.HTMLEscapeString(err.Error()))
+		}
+		return renderInteraction(p, data, interaction)
+	}
+}
+
+func onFunc(p *Partial, data *Data) func(value any, args ...any) template.HTML {
+	return func(value any, args ...any) template.HTML {
+		interaction, err := onInteractionFromValue(value, args...)
+		if err != nil {
+			p.getLogger().Warn("invalid on arguments", "error", err)
+			return template.HTML(template.HTMLEscapeString(err.Error()))
+		}
+		return renderInteraction(p, data, interaction)
+	}
+}
+
+func interactionFromValue(kind connector.InteractionKind, name string, value any, args ...any) (connector.Interaction, error) {
+	switch v := value.(type) {
+	case string:
+		if kind == connector.InteractionPoll && len(args) == 1 {
+			args = []any{"every", args[0]}
+		}
+		return buildInteraction(kind, name, v, args...)
+	case Interaction:
+		return normalizeInteraction(v.Interaction()), nil
+	case *Interaction:
+		if v == nil {
+			return connector.Interaction{}, fmt.Errorf("interaction is nil")
+		}
+		return normalizeInteraction(v.Interaction()), nil
+	case connector.Interaction:
+		return normalizeInteraction(v), nil
+	case InteractionConfig:
+		return normalizeInteraction(v.Interaction()), nil
+	default:
+		return connector.Interaction{}, fmt.Errorf("interaction helper expects an endpoint string or interaction config, got %T", value)
+	}
+}
+
+func onInteractionFromValue(value any, args ...any) (connector.Interaction, error) {
+	event, ok := value.(string)
+	if !ok {
+		return interactionFromValue(connector.InteractionOn, "", value, args...)
+	}
+	if len(args) == 0 {
+		return connector.Interaction{}, fmt.Errorf("on expects an endpoint when the first argument is an event")
+	}
+	endpoint, ok := args[0].(string)
+	if !ok {
+		return connector.Interaction{}, fmt.Errorf("on endpoint must be string, got %T", args[0])
+	}
+
+	interaction, err := buildInteraction(connector.InteractionOn, event, endpoint, args[1:]...)
+	if err != nil {
+		return connector.Interaction{}, err
+	}
+	interaction.Trigger = event
+	if interaction.Options == nil {
+		interaction.Options = make(map[string]string)
+	}
+	if _, ok := interaction.Options["from"]; !ok {
+		interaction.Options["from"] = "body"
+	}
+	if _, ok := interaction.Options["placeholder"]; !ok {
+		interaction.Placeholder = ""
+	}
+	return normalizeInteraction(interaction), nil
+}
+
+func islandInteractionFromValue(value any, args ...any) (connector.Interaction, error) {
+	if _, ok := value.(string); !ok {
+		return interactionFromValue(connector.InteractionIsland, "", value, args...)
+	}
+	name := value.(string)
+	if len(args) == 0 {
+		return connector.Interaction{}, fmt.Errorf("island expects an endpoint when the first argument is a name")
+	}
+	endpoint, ok := args[0].(string)
+	if !ok {
+		return connector.Interaction{}, fmt.Errorf("island endpoint must be string, got %T", args[0])
+	}
+	return buildInteraction(connector.InteractionIsland, name, endpoint, args[1:]...)
+}
+
+func renderInteraction(p *Partial, data *Data, interaction connector.Interaction) template.HTML {
+	conn := p.getConnector()
+	if conn == nil {
+		conn = connector.NewPartial(nil)
+	}
+
+	attrs := conn.InteractionAttrs(interaction)
+	renderer := p.getInteractionRenderer()
+	out, err := renderer(data.Ctx, p, data, interaction, attrs)
+	if err != nil {
+		p.getLogger().Error("error rendering interaction", "kind", interaction.Kind, "id", interaction.ID, "error", err)
+		return template.HTML(template.HTMLEscapeString(err.Error()))
+	}
+	return out
+}
+
+func buildInteraction(kind connector.InteractionKind, name string, endpoint string, args ...any) (connector.Interaction, error) {
+	values, err := interactionValues(args...)
+	if err != nil {
+		return connector.Interaction{}, err
+	}
+
+	resolvedURL := resolveInteractionURL(endpoint, values)
+	if name == "" {
+		name = values["name"]
+	}
+
+	return normalizeInteraction(connector.Interaction{
+		Kind:        kind,
+		ID:          values["id"],
+		URL:         resolvedURL,
+		Target:      values["target"],
+		Swap:        values["swap"],
+		Trigger:     values["trigger"],
+		Interval:    values["every"],
+		Placeholder: values["placeholder"],
+		Name:        name,
+		Params:      values,
+		Options:     values,
+	}), nil
+}
+
+func normalizeInteraction(interaction connector.Interaction) connector.Interaction {
+	if interaction.Options == nil {
+		interaction.Options = make(map[string]string)
+	}
+	if interaction.Kind == connector.InteractionOn {
+		if interaction.Trigger == "" {
+			interaction.Trigger = interaction.Name
+		}
+		if _, ok := interaction.Options["from"]; !ok {
+			interaction.Options["from"] = "body"
+		}
+	}
+	if interaction.ID == "" {
+		idBase := interaction.URL
+		if interaction.Name != "" {
+			idBase = interaction.Name
+		}
+		interaction.ID = string(interaction.Kind) + "-" + sanitizeInteractionID(idBase)
+	}
+	if interaction.Target == "" {
+		interaction.Target = "#" + interaction.ID
+	}
+	if _, placeholderSet := interaction.Options["placeholder"]; interaction.Placeholder == "" && !placeholderSet {
+		if interaction.Kind == connector.InteractionOn {
+			interaction.Placeholder = ""
+		} else {
+			interaction.Placeholder = "Loading..."
+		}
+	}
+	return interaction
+}
+
+func interactionValues(args ...any) (map[string]string, error) {
+	if len(args) == 0 {
+		return nil, nil
+	}
+	if len(args)%2 != 0 {
+		return nil, fmt.Errorf("interaction helpers expect key/value pairs")
+	}
+
+	values := make(map[string]string, len(args)/2)
+	for i := 0; i < len(args); i += 2 {
+		key, ok := args[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("interaction option key must be string, got %T", args[i])
+		}
+		values[key] = fmt.Sprint(args[i+1])
+	}
+	return values, nil
+}
+
+func resolveInteractionURL(endpoint string, values map[string]string) string {
+	resolved := strings.TrimSpace(endpoint)
+	if resolved == "" {
+		resolved = "/"
+	}
+	if !strings.HasPrefix(resolved, "/") && !strings.HasPrefix(resolved, "http://") && !strings.HasPrefix(resolved, "https://") {
+		resolved = "/" + resolved
+	}
+
+	for key, value := range values {
+		resolved = strings.ReplaceAll(resolved, ":"+key, url.PathEscape(value))
+	}
+
+	return resolved
+}
+
+func sanitizeInteractionID(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "content"
+	}
+
+	var b strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(unicode.ToLower(r))
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteRune('-')
+			lastDash = true
+		}
+	}
+
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "content"
+	}
+	return out
 }
 
 func childIfFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {

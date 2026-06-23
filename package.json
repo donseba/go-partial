@@ -1,0 +1,33 @@
+{
+  "name": "go-partial",
+  "version": "1.0.0",
+  "description": "Server-side partial rendering for Go.",
+  "private": true,
+  "directories": {
+    "doc": "docs",
+    "example": "examples"
+  },
+  "scripts": {
+    "build:css": "npm run build:css:showcase && npm run build:css:docs",
+    "build:css:showcase": "tailwindcss -i ./examples/showcase/static/site.tailwind.css -o ./examples/showcase/static/site.css --minify",
+    "build:css:docs": "tailwindcss -i ./examples/docs/static/site.tailwind.css -o ./examples/docs/static/site.css --minify",
+    "watch:css:showcase": "tailwindcss -i ./examples/showcase/static/site.tailwind.css -o ./examples/showcase/static/site.css --watch",
+    "watch:css:docs": "tailwindcss -i ./examples/docs/static/site.tailwind.css -o ./examples/docs/static/site.css --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/donseba/go-partial.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/donseba/go-partial/issues"
+  },
+  "homepage": "https://github.com/donseba/go-partial#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.1",
+    "tailwindcss": "^4.3.1"
+  }
+}

@@ -14,11 +14,28 @@ type (
 		GetTargetHeader() string
 		GetSelectHeader() string
 		GetActionHeader() string
+		InteractionAttrs(interaction Interaction) map[string]string
 		ResponseHeaders(response Response) map[string]string
 	}
 
 	Config struct {
 		UseURLQuery bool
+	}
+
+	InteractionKind string
+
+	Interaction struct {
+		Kind        InteractionKind
+		ID          string
+		URL         string
+		Target      string
+		Swap        string
+		Trigger     string
+		Interval    string
+		Placeholder string
+		Name        string
+		Params      map[string]string
+		Options     map[string]string
 	}
 
 	base struct {
@@ -30,6 +47,15 @@ type (
 )
 
 const (
+	InteractionAsync    InteractionKind = "async"
+	InteractionReveal   InteractionKind = "reveal"
+	InteractionPoll     InteractionKind = "poll"
+	InteractionStream   InteractionKind = "stream"
+	InteractionPrefetch InteractionKind = "prefetch"
+	InteractionIsland   InteractionKind = "island"
+	InteractionRefresh  InteractionKind = "refresh"
+	InteractionOn       InteractionKind = "on"
+
 	HeaderTarget HeaderKey = "X-Target"
 	HeaderSelect HeaderKey = "X-Select"
 	HeaderAction HeaderKey = "X-Action"
@@ -65,6 +91,23 @@ func (x *base) GetSelectHeader() string {
 
 func (x *base) GetActionHeader() string {
 	return x.actionHeader
+}
+
+func (x *base) InteractionAttrs(interaction Interaction) map[string]string {
+	attrs := map[string]string{
+		"data-partial-interaction": string(interaction.Kind),
+		"data-url":                 interaction.URL,
+	}
+	if interaction.Target != "" {
+		attrs["data-target"] = interaction.Target
+	}
+	if interaction.Interval != "" {
+		attrs["data-interval"] = interaction.Interval
+	}
+	if interaction.Trigger != "" {
+		attrs["data-trigger"] = interaction.Trigger
+	}
+	return attrs
 }
 
 func (x *base) GetTargetValue(r *http.Request) string {

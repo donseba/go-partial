@@ -1,16 +1,16 @@
-<section class="page">
-    <header class="page-heading">
-        <span class="eyebrow">Localization</span>
-        <h1>{{ tl .Loc "title" }}</h1>
-        <p>{{ tl .Loc "intro" }}</p>
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Localization</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ tl .Loc "title" }}</h1>
+        <p class="leading-7 text-stone-600">{{ tl .Loc "intro" }}</p>
     </header>
 
-    <div class="example-surface stack">
-        <div class="toolbar locale-switcher" aria-label="Locale switcher">
+    <div class="rounded-lg border border-stone-300 bg-white p-4 grid gap-3.5">
+        <div class="flex flex-wrap gap-2" aria-label="Locale switcher">
             {{ range .Data.Locales }}
                 <button
                     type="button"
-                    class="{{ if eq $.Data.Locale . }}active{{ end }}"
+                    class="{{ if eq $.Data.Locale . }}inline-flex min-h-9 cursor-pointer items-center rounded-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                     hx-get="/localization?locale={{ . }}"
                     hx-target="#content"
                     hx-push-url="true">
@@ -19,10 +19,10 @@
             {{ end }}
         </div>
 
-        <article class="localized-card">
-            <span class="pill">{{ tl .Loc "active" }}: {{ .Loc.GetLocale }}</span>
-            <h2>{{ tl .Loc "checkout" }}</h2>
-            <dl class="facts">
+        <article class="grid gap-3.5">
+            <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ tl .Loc "active" }}: {{ .Loc.GetLocale }}</span>
+            <h2 class="text-lg font-bold text-stone-950">{{ tl .Loc "checkout" }}</h2>
+            <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-lg border border-stone-300 bg-white p-4">
                 <dt>{{ tl .Loc "total" }}</dt>
                 <dd>EUR 42.75</dd>
                 <dt>{{ tl .Loc "delivery" }}</dt>
@@ -32,24 +32,24 @@
                 <dt>ctl</dt>
                 <dd>{{ ctl .Loc "button" "save" }}</dd>
             </dl>
-            <p>{{ tl .Loc "explanation" }}</p>
+            <p class="leading-7 text-stone-600">{{ tl .Loc "explanation" }}</p>
         </article>
     </div>
 
-    <article class="description-panel">
-        <h2>Bring your own translator</h2>
-        <p>The package only requires <code>GetLocale()</code>. Translation behavior is linked through template functions, so the localizer can stay focused on the active locale.</p>
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Bring your own translator</h2>
+        <p class="leading-7 text-stone-600">The package only requires <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">GetLocale()</code>. Translation behavior is linked through template functions, so the localizer can stay focused on the active locale.</p>
     </article>
 
-    <article class="code-panel">
-        <h2>Server setup</h2>
-        <pre><code>ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
 content.WriteWithRequest(ctx, w, r)</code></pre>
     </article>
 
-    <article class="code-panel">
-        <h2>Template usage</h2>
-        <pre><code>&lt;h1&gt;{{ "{{ tl .Loc \"title\" }}" }}&lt;/h1&gt;
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;h1&gt;{{ "{{ tl .Loc \"title\" }}" }}&lt;/h1&gt;
 &lt;p&gt;{{ "{{ tn .Loc \"oneMessage\" \"manyMessage\" .Data.Count .Data.Count }}" }}&lt;/p&gt;
 &lt;button&gt;{{ "{{ ctl .Loc \"button\" \"save\" }}" }}&lt;/button&gt;</code></pre>
     </article>

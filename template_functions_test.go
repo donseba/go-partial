@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/donseba/go-partial/connector"
 )
 
 // Tests
@@ -328,5 +330,168 @@ func TestChildDebugRendererSurvivesClone(t *testing.T) {
 
 	if string(out) != `<aside class="child-debug">Ada</aside>` {
 		t.Fatalf("expected child debug renderer to survive clone, got %q", out)
+	}
+}
+
+func TestBuildInteractionReplacesRouteParams(t *testing.T) {
+	interaction, err := buildInteraction(connector.InteractionAsync, "", "table/:row", "row", 42)
+	if err != nil {
+		t.Fatalf("buildInteraction() error = %v", err)
+	}
+
+	if interaction.URL != "/table/42" {
+		t.Fatalf("URL = %q; want %q", interaction.URL, "/table/42")
+	}
+	if interaction.ID != "async-table-42" {
+		t.Fatalf("ID = %q; want %q", interaction.ID, "async-table-42")
+	}
+}
+
+func TestAsyncRendersHTMXDeferredMarkup(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("async.gohtml", `{{ async "/table/:row" "row" .Data.ID }}`)
+
+	p := NewID("async", "async.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys).
+		SetData(map[string]any{"ID": 7})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	for _, expected := range []string{
+		`id="async-table-7"`,
+		`hx-get="/table/7"`,
+		`hx-trigger="load"`,
+		`hx-target="#async-table-7"`,
+		`hx-swap="innerHTML"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %q in %q", expected, body)
+		}
+	}
+}
+
+func TestAsyncAcceptsInteractionConfig(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("async.gohtml", `{{ async .Interact.Stats }}`)
+
+	p := NewID("async", "async.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys).
+		SetInteractions(map[string]any{
+			"Stats": Async("/stats").
+				ID("stats-loader").
+				Target("#stats").
+				Swap(SwapOuterHTML).
+				Placeholder(""),
+		})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	for _, expected := range []string{
+		`id="stats-loader"`,
+		`hx-get="/stats"`,
+		`hx-target="#stats"`,
+		`hx-swap="outerHTML"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %q in %q", expected, body)
+		}
+	}
+	if strings.Contains(body, "Loading...") {
+		t.Fatalf("expected empty placeholder, got %q", body)
+	}
+}
+
+func TestPollRendersHTMXIntervalMarkup(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("poll.gohtml", `{{ poll "/notifications" "every" "10s" }}`)
+
+	p := NewID("poll", "poll.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys)
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	for _, expected := range []string{
+		`id="poll-notifications"`,
+		`hx-get="/notifications"`,
+		`hx-swap="innerHTML"`,
+		`hx-trigger="every 10s"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %q in %q", expected, body)
+		}
+	}
+}
+
+func TestOnRendersHTMXEventMarkup(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("on.gohtml", `{{ on "cart:changed" "/cart/summary" }}`)
+
+	p := NewID("on", "on.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys)
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	for _, expected := range []string{
+		`id="on-cart-changed"`,
+		`hx-get="/cart/summary"`,
+		`hx-target="#on-cart-changed"`,
+		`hx-swap="innerHTML"`,
+		`hx-trigger="cart:changed from:body"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %q in %q", expected, body)
+		}
+	}
+}
+
+func TestOnAcceptsInteractionConfig(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("on.gohtml", `{{ on .Interact.CartChanged }}`)
+
+	p := NewID("on", "on.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys).
+		SetInteractions(map[string]any{
+			"CartChanged": On("cart:changed", "/cart/summary").
+				ID("cart-listener").
+				Target("#cart").
+				From("window"),
+		})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	for _, expected := range []string{
+		`id="cart-listener"`,
+		`hx-get="/cart/summary"`,
+		`hx-target="#cart"`,
+		`hx-trigger="cart:changed from:window"`,
+	} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %q in %q", expected, body)
+		}
 	}
 }

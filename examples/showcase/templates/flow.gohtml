@@ -1,32 +1,32 @@
-<section class="page">
-    <header class="page-heading">
-        <span class="eyebrow">Multi-step pages</span>
-        <h1>{{ .Data.Title }}</h1>
-        <p>PageFlow coordinates the current step, validation state, and accumulated step data while your app keeps ownership of session storage.</p>
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Multi-step pages</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <p class="leading-7 text-stone-600">PageFlow coordinates the current step, validation state, and accumulated step data while your app keeps ownership of session storage.</p>
     </header>
 
-    <div class="flow-shell example-surface">
-        <aside class="flow-steps" aria-label="Flow steps">
+    <div class="grid grid-cols-[220px_minmax(0,1fr)] gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <aside class="grid content-start gap-2 border-r border-stone-300 pr-4" aria-label="Flow steps">
             {{ range .Data.Steps }}
-                <div class="flow-step {{ if eq $.Data.CurrentStep .Name }}active{{ end }} {{ if index $.Data.Validated .Name }}done{{ end }}">
+                <div class="{{ if eq $.Data.CurrentStep .Name }}grid gap-0.5 rounded-md border border-teal-700 bg-teal-50 p-3 text-teal-900{{ else if index $.Data.Validated .Name }}grid gap-0.5 rounded-md border border-stone-300 bg-white p-3 text-teal-900{{ else }}grid gap-0.5 rounded-md border border-stone-300 bg-white p-3 text-stone-950{{ end }}">
                     <span>{{ upperFirst .Name }}</span>
                     {{ if index $.Data.Validated .Name }}<small>Validated</small>{{ else }}<small>Pending</small>{{ end }}
                 </div>
             {{ end }}
         </aside>
-        <section class="flow-panel">
+        <section class="min-w-0">
             {{ child .Data.CurrentStep }}
         </section>
     </div>
 
-    <article class="description-panel">
-        <h2>Application-owned state</h2>
-        <p>The flow object knows the ordered steps and validation rules. The example stores <code>FlowSessionData</code> behind a browser cookie, but a real app can use encrypted cookies, database state, or a server session package.</p>
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Application-owned state</h2>
+        <p class="leading-7 text-stone-600">The flow object knows the ordered steps and validation rules. The example stores <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">FlowSessionData</code> behind a browser cookie, but a real app can use encrypted cookies, database state, or a server session package.</p>
     </article>
 
-    <article class="code-panel">
-        <h2>Server setup</h2>
-        <pre><code>steps := []partial.FlowStep{
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">steps := []partial.FlowStep{
     {Name: "account", Partial: account, Validate: validateAccount},
     {Name: "details", Partial: details, Validate: validateDetails},
     {Name: "confirm", Partial: confirm},
@@ -38,10 +38,10 @@ session.SetStepValidated(step.Name, true)
 flow.Next(session)</code></pre>
     </article>
 
-    <article class="code-panel">
-        <h2>Template usage</h2>
-        <pre><code>{{ "{{ range .Data.Steps }}" }}
-    &lt;div class="{{ "{{ if eq $.Data.CurrentStep .Name }}active{{ end }}" }}"&gt;
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ range .Data.Steps }}" }}
+    &lt;div class="{{"{{ if eq $.Data.CurrentStep .Name }}border-teal-700 bg-teal-50 text-teal-900{{ end }}" }}"&gt;
         {{ "{{ upperFirst .Name }}" }}
     &lt;/div&gt;
 {{ "{{ end }}" }}

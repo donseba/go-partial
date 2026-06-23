@@ -1,17 +1,17 @@
-<section class="page">
-    <header class="page-heading">
-        <span class="eyebrow">Selected children</span>
-        <h1>{{ .Data.Title }}</h1>
-        <p>Tabs are just selected partials. Each tab click sends <code>{{ selectionHeader }}</code>, and the server renders the selected child into the same panel.</p>
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Selected children</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <p class="leading-7 text-stone-600">Tabs are just selected partials. Each tab click sends <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ selectionHeader }}</code>, and the server renders the selected child into the same panel.</p>
     </header>
 
-    <div class="example-surface">
-        <div class="tabs" role="tablist">
+    <div class="rounded-lg border border-stone-300 bg-white p-4">
+        <div class="flex items-center gap-1.5 overflow-x-auto border-b border-stone-300" role="tablist">
             {{ range .Data.Tabs }}
                 <button
                     role="tab"
                     aria-selected="{{ if selectionIf true .Key }}true{{ else }}false{{ end }}"
-                    class="{{ selectionIf "active" .Key }}"
+                    class="{{ if selectionIf true .Key }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                     hx-get="/tabs"
                     hx-target="#content"
                     hx-headers='{"{{ selectionHeader }}":"{{ .Key }}"}'>
@@ -20,19 +20,19 @@
             {{ end }}
         </div>
 
-        <div class="tab-panel" role="tabpanel">
+        <div class="rounded-b-lg rounded-tr-lg border border-stone-300 bg-white p-4" role="tabpanel">
             {{ selection }}
         </div>
     </div>
 
-    <article class="description-panel">
-        <h2>Same primitive, different UI</h2>
-        <p>The tabs use the same selection mechanism as the selection page. The active state is derived from the current request header.</p>
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Same primitive, different UI</h2>
+        <p class="leading-7 text-stone-600">The tabs use the same selection mechanism as the selection page. The active state is derived from the current request header.</p>
     </article>
 
-    <article class="code-panel">
-        <h2>Server setup</h2>
-        <pre><code>content.WithSelectMap("overview", map[string]*partial.Partial{
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content.WithSelectMap("overview", map[string]*partial.Partial{
     "overview": overview,
     "activity": activity,
     "settings": settings,
@@ -40,9 +40,9 @@
 })</code></pre>
     </article>
 
-    <article class="code-panel">
-        <h2>Template usage</h2>
-        <pre><code>&lt;button hx-get="/tabs"
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button hx-get="/tabs"
         hx-target="#content"
         hx-headers='{"{{ selectionHeader }}":"overview"}'&gt;
     Overview

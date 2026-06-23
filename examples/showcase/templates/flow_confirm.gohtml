@@ -1,9 +1,9 @@
-<form class="flow-form" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
+<form class="grid gap-4" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
     <div>
-        <h2>Confirm</h2>
-        <p>The confirmation step receives the merged data from the previous steps.</p>
+        <h2 class="text-lg font-bold text-stone-950">Confirm</h2>
+        <p class="leading-7 text-stone-600">The confirmation step receives the merged data from the previous steps.</p>
     </div>
-    <dl class="facts">
+    <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-lg border border-stone-300 bg-white p-4">
         <dt>Email</dt>
         <dd>{{ index .Data.AllData "email" }}</dd>
         <dt>Project</dt>
@@ -11,8 +11,8 @@
         <dt>Plan</dt>
         <dd>{{ index .Data.AllData "plan" }}</dd>
     </dl>
-    <div class="toolbar">
-        <button type="submit" name="direction" value="back">Back</button>
-        <button type="submit" name="direction" value="reset">Start over</button>
+    <div class="flex flex-wrap gap-2">
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit" name="direction" value="back">Back</button>
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit" name="direction" value="reset">Start over</button>
     </div>
 </form>

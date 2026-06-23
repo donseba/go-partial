@@ -1,133 +1,154 @@
-<article class="docs-page">
-    <p class="eyebrow">Reference</p>
-    <h1>Core API</h1>
-    <p class="lead">The public surface is small: build partials, register relationships, choose a connector, then render through request-aware writer APIs.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Reference</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Core API</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">The public surface is small: build partials, register relationships, choose a connector, then render through request-aware writer APIs.</p>
 
-    <h2>Construction</h2>
-    <table>
-        <thead><tr><th>Call</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Construction</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Call</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>partial.New(templates...)</code></td><td>Create a partial with the default ID <code>root</code>.</td></tr>
-            <tr><td><code>partial.NewID(id, templates...)</code></td><td>Create a partial with a stable ID. IDs are used for child lookup, target matching, and diagnostics.</td></tr>
-            <tr><td><code>partial.NewService(config)</code></td><td>Create a renderer service with shared filesystem, connector, functions, cache, logger, and error renderer.</td></tr>
-            <tr><td><code>svc.NewLayout()</code></td><td>Create a request render pipeline that applies service config to content and wrapper partials.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.New(templates...)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a partial with the default ID <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">root</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.NewID(id, templates...)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a partial with a stable ID. IDs are used for child lookup, target matching, and diagnostics.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.NewService(config)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a renderer service with shared filesystem, connector, functions, cache, logger, and error renderer.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.NewLayout()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a request render pipeline that applies service config to content and wrapper partials.</td></tr>
         </tbody>
     </table>
 
-    <h2>Partial methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Partial methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>ID(id)</code></td><td>Set the partial ID.</td></tr>
-            <tr><td><code>Templates(...)</code>, <code>AddTemplate(...)</code></td><td>Replace or append template files.</td></tr>
-            <tr><td><code>SetFileSystem(fs)</code></td><td>Read templates from an <code>fs.FS</code>, usually <code>os.DirFS</code> or <code>embed.FS</code>.</td></tr>
-            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code>, <code>MergeData(map, override)</code></td><td>Set data for the current partial. Data should be request-scoped when it can change.</td></tr>
-            <tr><td><code>SetGlobalData(map)</code>, <code>SetLayoutData(map)</code></td><td>Expose shared ancestor or layout data to templates.</td></tr>
-            <tr><td><code>With(child)</code></td><td>Register a child partial by its ID.</td></tr>
-            <tr><td><code>WithOOB(child)</code></td><td>Register a child that can render out-of-band during partial requests.</td></tr>
-            <tr><td><code>WithSelectMap(defaultKey, map)</code></td><td>Register selectable child partials for <code>{{ "{{ selection }}" }}</code>. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
-            <tr><td><code>WithTargetResolver(fn)</code></td><td>Resolve dynamic target IDs, such as <code>row-42</code>, to a partial and fresh scoped data.</td></tr>
-            <tr><td><code>WithAction(fn)</code>, <code>WithTemplateAction(fn)</code></td><td>Render alternate partials from server-side actions. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
-            <tr><td><code>UseFuncs(map)</code></td><td>Add template helpers for this partial. Protected helpers such as <code>child</code>, <code>partial</code>, and <code>scoped</code> cannot be overwritten.</td></tr>
-            <tr><td><code>SetConnector(conn)</code></td><td>Override the connector for one partial tree.</td></tr>
-            <tr><td><code>Response()</code>, <code>SetResponse(response)</code></td><td>Attach protocol response instructions, such as HTMX retargeting or triggers.</td></tr>
-            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Override the embedded error page or fragment.</td></tr>
-            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Override the embedded debug helper output for this partial tree.</td></tr>
-            <tr><td><code>UseTemplateCache(bool)</code></td><td>Enable or disable parsed template caching for this partial.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ID(id)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the partial ID.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Templates(...)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddTemplate(...)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Replace or append template files.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetFileSystem(fs)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Read templates from an <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">fs.FS</code>, usually <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">os.DirFS</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">embed.FS</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetData(map)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddData(key, value)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">MergeData(map, override)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set data for the current partial. Data should be request-scoped when it can change.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetInteractions(map)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddInteraction(name, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Expose client interaction declarations as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Interact</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetGlobalData(map)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetLayoutData(map)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Expose shared ancestor or layout data to templates.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">With(child)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Register a child partial by its ID.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithOOB(child)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Register a child that can render out-of-band during partial requests.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithSelectMap(defaultKey, map)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Register selectable child partials for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code>. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Resolve dynamic target IDs, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>, to a partial and fresh scoped data.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithAction(fn)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTemplateAction(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render alternate partials from server-side actions. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseFuncs(map)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Add template helpers for this partial. Protected helpers such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code> cannot be overwritten.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetConnector(conn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override the connector for one partial tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Response()</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetResponse(response)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Attach protocol response instructions, such as HTMX retargeting or triggers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetErrorRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override the embedded error page or fragment.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDebugRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override the embedded debug helper output for this partial tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseTemplateCache(bool)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Enable or disable parsed template caching for this partial.</td></tr>
         </tbody>
     </table>
 
-    <h2>Service config</h2>
-    <table>
-        <thead><tr><th>Field</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Service config</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Field</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>Connector</code></td><td>Default connector for layouts and partial trees. Defaults to <code>connector.NewPartial(nil)</code>.</td></tr>
-            <tr><td><code>FS</code></td><td>Template filesystem shared by layouts and partials.</td></tr>
-            <tr><td><code>UseTemplateCache</code></td><td>Enable parsed template caching. This does not cache rendered HTML.</td></tr>
-            <tr><td><code>Logger</code></td><td>Logger used for render, child, target, and fallback errors.</td></tr>
-            <tr><td><code>ErrorRenderer</code></td><td>Default embedded error renderer override.</td></tr>
-            <tr><td><code>DebugRenderer</code></td><td>Default embedded debug renderer override.</td></tr>
-            <tr><td><code>ErrorMode</code></td><td><code>ErrorModeSafe</code> hides details. <code>ErrorModeDetailed</code> shows template location and the original render error.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Connector</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Default connector for layouts and partial trees. Defaults to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewPartial(nil)</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FS</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Template filesystem shared by layouts and partials.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseTemplateCache</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Enable parsed template caching. This does not cache rendered HTML.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Logger</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Logger used for render, child, target, and fallback errors.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorRenderer</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Default embedded error renderer override.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">DebugRenderer</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Default embedded debug renderer override.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorMode</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorModeSafe</code> hides details. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorModeDetailed</code> shows template location and the original render error.</td></tr>
         </tbody>
     </table>
 
-    <h2>Service methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Service methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>NewLayout()</code></td><td>Create a render pipeline with service configuration applied.</td></tr>
-            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code></td><td>Expose service-level data as <code>.Service</code>.</td></tr>
-            <tr><td><code>SetConnector(conn)</code></td><td>Change the default connector after service creation.</td></tr>
-            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Change the default error renderer after service creation.</td></tr>
-            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Change the default debug renderer after service creation.</td></tr>
-            <tr><td><code>SetErrorMode(mode)</code></td><td>Change safe or detailed embedded error output after service creation.</td></tr>
-            <tr><td><code>UseFuncs(map)</code></td><td>Add service-level template functions without overwriting protected helpers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">NewLayout()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a render pipeline with service configuration applied.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetData(map)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddData(key, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Expose service-level data as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Service</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetConnector(conn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Change the default connector after service creation.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetErrorRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Change the default error renderer after service creation.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDebugRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Change the default debug renderer after service creation.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetErrorMode(mode)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Change safe or detailed embedded error output after service creation.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseFuncs(map)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Add service-level template functions without overwriting protected helpers.</td></tr>
         </tbody>
     </table>
 
-    <h2>Package functions</h2>
-    <table>
-        <thead><tr><th>Function</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Package functions</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Function</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>AddGlobalFunc(name, fn)</code></td><td>Add a helper to the package-level default function map. Services created after this call receive it.</td></tr>
-            <tr><td><code>NewPageFlow(steps)</code></td><td>Create a storage-agnostic multi-step page flow. See the <a href="/docs/api/pageflow" hx-get="/docs/api/pageflow" hx-target="#content" hx-push-url="true">PageFlow API</a>.</td></tr>
-            <tr><td><code>NewSSEWriter(w)</code></td><td>Create a writer for server-sent HTML patches and signals.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddGlobalFunc(name, fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Add a helper to the package-level default function map. Services created after this call receive it.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Async(endpoint)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Reveal(endpoint)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Poll(endpoint)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create client-side loading interactions for template helpers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">On(event, endpoint)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create an event-driven refresh interaction. Defaults to body-dispatched custom events.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Stream(endpoint)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Prefetch(endpoint)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Island(name, endpoint)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Refresh(endpoint)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create stream, hint, island, and explicit refresh interactions.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">NewPageFlow(steps)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a storage-agnostic multi-step page flow. See the <a href="/docs/api/pageflow" hx-get="/docs/api/pageflow" hx-target="#content" hx-push-url="true">PageFlow API</a>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">NewSSEWriter(w)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a writer for server-sent HTML patches and signals.</td></tr>
         </tbody>
     </table>
 
-    <h2>Layout methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Interaction methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>FS(fs)</code></td><td>Override the template filesystem for this layout.</td></tr>
-            <tr><td><code>Set(content)</code></td><td>Set the main content partial.</td></tr>
-            <tr><td><code>Wrap(wrapper)</code></td><td>Set the page wrapper partial.</td></tr>
-            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code></td><td>Expose layout-level data as <code>.Layout</code>.</td></tr>
-            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Override error rendering for this layout tree.</td></tr>
-            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Override debug rendering for this layout tree.</td></tr>
-            <tr><td><code>SetErrorMode(mode)</code></td><td>Override safe or detailed embedded error output for this layout tree.</td></tr>
-            <tr><td><code>UseFuncs(map)</code></td><td>Add template functions for this layout tree.</td></tr>
-            <tr><td><code>RenderWithRequest(ctx, r)</code></td><td>Render through the request-aware layout pipeline and return HTML.</td></tr>
-            <tr><td><code>WriteWithRequest(ctx, w, r)</code></td><td>Render through the request-aware layout pipeline and write the HTTP response.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ID(id)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the generated wrapper/listener element ID.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Target(selector)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the DOM target that receives the response.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Swap(value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set connector swap behavior, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.SwapInnerHTML</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.SwapOuterHTML</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Trigger(value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override the connector trigger expression.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">From(source)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the event source used by <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">On</code>, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">body</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">window</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Every(duration)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EveryString(value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set polling interval.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Placeholder(text)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the generated helper's placeholder text. Pass an empty string for no visible placeholder.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Param(key, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Replace <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">:key</code> placeholders in the endpoint path.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Option(key, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Attach a connector/renderer-specific option.</td></tr>
         </tbody>
     </table>
 
-    <h2>Rendering methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Layout methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>Render(ctx)</code></td><td>Render without a request. Useful for tests or offline rendering.</td></tr>
-            <tr><td><code>RenderWithRequest(ctx, r)</code></td><td>Render with connector request context. Returns HTML or an error; it does not write fallback error pages.</td></tr>
-            <tr><td><code>WriteWithRequest(ctx, w, r)</code></td><td>Render and write the response. This is the preferred HTTP path because it can apply response headers and embedded error output.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FS(fs)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override the template filesystem for this layout.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Set(content)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the main content partial.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Wrap(wrapper)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set the page wrapper partial.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetData(map)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AddData(key, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Expose layout-level data as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Layout</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetErrorRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override error rendering for this layout tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDebugRenderer(fn)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override debug rendering for this layout tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetErrorMode(mode)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Override safe or detailed embedded error output for this layout tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseFuncs(map)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Add template functions for this layout tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest(ctx, r)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render through the request-aware layout pipeline and return HTML.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest(ctx, w, r)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render through the request-aware layout pipeline and write the HTTP response.</td></tr>
         </tbody>
     </table>
 
-    <h2>SSE writer</h2>
-    <table>
-        <thead><tr><th>Call</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Rendering methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>partial.NewSSEWriter(w)</code></td><td>Create a neutral server-sent event writer and apply the expected SSE response headers.</td></tr>
-            <tr><td><code>PatchHTML(target, html)</code></td><td>Emit a <code>partial:patch</code> event with a target selector and HTML fragment.</td></tr>
-            <tr><td><code>PatchPartial(ctx, r, target, p)</code></td><td>Render a partial and emit it as a <code>partial:patch</code> event.</td></tr>
-            <tr><td><code>Signal(name, value)</code></td><td>Emit a <code>partial:signal</code> event with JSON data.</td></tr>
-            <tr><td><code>Error(err)</code></td><td>Emit a <code>partial:error</code> event.</td></tr>
-            <tr><td><code>Comment(text)</code>, <code>Retry(duration)</code>, <code>Flush()</code></td><td>Write standard SSE comments, retry timing, and flush the stream.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Render(ctx)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render without a request. Useful for tests or offline rendering.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest(ctx, r)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render with connector request context. Returns HTML or an error; it does not write fallback error pages.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest(ctx, w, r)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render and write the response. This is the preferred HTTP path because it can apply response headers and embedded error output.</td></tr>
         </tbody>
     </table>
 
-    <p>SSE header and event names are constants, such as <code>SSEHeaderContentType</code>, <code>SSEContentTypeEventStream</code>, <code>SSEEventPatch</code>, <code>SSEEventSignal</code>, and <code>SSEEventError</code>.</p>
-
-    <h2>Template context</h2>
-    <table>
-        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">SSE writer</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Call</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>.Data</code></td><td>The current partial's data.</td></tr>
-            <tr><td><code>.Parent</code></td><td>The immediate parent's data when rendered as a child.</td></tr>
-            <tr><td><code>.Global</code></td><td>Merged global data from ancestors.</td></tr>
-            <tr><td><code>.Service</code></td><td>Service-level data from <code>svc.SetData</code>.</td></tr>
-            <tr><td><code>.Layout</code></td><td>Layout-level data from <code>layout.SetData</code>.</td></tr>
-            <tr><td><code>.Request</code>, <code>.URL</code>, <code>.Ctx</code></td><td>Request, URL, and context for request-aware rendering.</td></tr>
-            <tr><td><code>.Loc</code>, <code>.Csrf</code>, <code>.BasePath</code></td><td>Localization, CSRF, and base-path helpers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.NewSSEWriter(w)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a neutral server-sent event writer and apply the expected SSE response headers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">PatchHTML(target, html)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:patch</code> event with a target selector and HTML fragment.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">PatchPartial(ctx, r, target, p)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a partial and emit it as a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:patch</code> event.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Signal(name, value)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:signal</code> event with JSON data.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Error(err)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:error</code> event.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Comment(text)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Retry(duration)</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Flush()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Write standard SSE comments, retry timing, and flush the stream.</td></tr>
+        </tbody>
+    </table>
+
+    <p class="leading-7 text-slate-400">SSE header and event names are constants, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SSEHeaderContentType</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SSEContentTypeEventStream</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SSEEventPatch</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SSEEventSignal</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SSEEventError</code>.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Template context</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Field</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Meaning</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The current partial's content data.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Interact</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The current partial's client interaction declarations.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Parent</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The immediate parent's data when rendered as a child.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Global</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Merged global data from ancestors.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Service</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service-level data from <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.SetData</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Layout</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout-level data from <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.SetData</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.URL</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Ctx</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request, URL, and context for request-aware rendering.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Loc</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Csrf</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.BasePath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Localization, CSRF, and base-path helpers.</td></tr>
         </tbody>
     </table>
 </article>

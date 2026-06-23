@@ -1,0 +1,9 @@
+<button id="shop-cart-button"
+        class="inline-flex w-fit items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-bold text-stone-950 hover:border-teal-700 hover:text-teal-900"
+        type="button"
+        hx-get="/shop/cart/open"
+        hx-target="#cart-popup"
+        hx-swap="outerHTML"
+        {{ oobAttr }}>
+    Cart <span class="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-teal-700 px-1.5 text-xs font-extrabold text-white">{{ .Data.Cart.Count }}</span>
+</button>

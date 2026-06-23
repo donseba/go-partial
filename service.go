@@ -18,14 +18,15 @@ type (
 	}
 
 	Config struct {
-		Connector        connector.Connector
-		UseTemplateCache bool
-		Logger           Logger
-		FS               fs.FS
-		ErrorRenderer    ErrorRenderer
-		DebugRenderer    DebugRenderer
-		ErrorMode        ErrorMode
-		fs               fs.FS
+		Connector           connector.Connector
+		UseTemplateCache    bool
+		Logger              Logger
+		FS                  fs.FS
+		ErrorRenderer       ErrorRenderer
+		DebugRenderer       DebugRenderer
+		InteractionRenderer InteractionRenderer
+		ErrorMode           ErrorMode
+		fs                  fs.FS
 	}
 
 	Service struct {
@@ -114,6 +115,11 @@ func (svc *Service) SetDebugRenderer(renderer DebugRenderer) *Service {
 	return svc
 }
 
+func (svc *Service) SetInteractionRenderer(renderer InteractionRenderer) *Service {
+	svc.config.InteractionRenderer = renderer
+	return svc
+}
+
 func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
 	svc.config.ErrorMode = mode
 	return svc
@@ -173,6 +179,17 @@ func (l *Layout) SetDebugRenderer(renderer DebugRenderer) *Layout {
 	}
 	if l.wrapper != nil {
 		l.wrapper.SetDebugRenderer(renderer)
+	}
+	return l
+}
+
+func (l *Layout) SetInteractionRenderer(renderer InteractionRenderer) *Layout {
+	l.service.config.InteractionRenderer = renderer
+	if l.content != nil {
+		l.content.SetInteractionRenderer(renderer)
+	}
+	if l.wrapper != nil {
+		l.wrapper.SetInteractionRenderer(renderer)
 	}
 	return l
 }
@@ -305,6 +322,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	}
 	if l.service.config.DebugRenderer != nil {
 		p.debugRenderer = l.service.config.DebugRenderer
+	}
+	if l.service.config.InteractionRenderer != nil {
+		p.interactionRenderer = l.service.config.InteractionRenderer
 	}
 	p.errorMode = l.service.config.ErrorMode
 	p.errorModeSet = true

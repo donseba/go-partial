@@ -1,25 +1,25 @@
-<section class="page">
-    <header class="page-heading">
-        <span class="eyebrow">Streaming partials</span>
-        <h1>{{ .Data.Title }}</h1>
-        <p>This page opens an <code>EventSource</code> stream. The server renders normal go-partial templates and sends them as <code>partial:patch</code> events.</p>
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Streaming partials</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <p class="leading-7 text-stone-600">This page opens an <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">EventSource</code> stream. The server renders normal go-partial templates and sends them as <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">partial:patch</code> events.</p>
     </header>
 
-    <div class="sse-demo">
-        <section class="sse-stage">
-            <article id="sse-status" class="sse-status">
-                <div class="status-meta">
-                    <span class="pill">Idle</span>
+    <div class="grid grid-cols-[minmax(0,1fr)_320px] items-stretch gap-4">
+        <section class="min-h-64 rounded-lg border border-stone-300 bg-gradient-to-br from-teal-50/40 to-white p-4">
+            <article id="sse-status" class="grid min-h-56 content-center gap-4 bg-transparent p-0">
+                <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-stone-600">
+                    <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">Idle</span>
                     <span>Waiting for EventSource</span>
                 </div>
-                <h2>Ready to stream</h2>
-                <p>Start the stream to receive server-rendered patches.</p>
+                <h2 class="text-lg font-bold text-stone-950">Ready to stream</h2>
+                <p class="leading-7 text-stone-600">Start the stream to receive server-rendered patches.</p>
             </article>
         </section>
 
-        <aside class="sse-controls" aria-label="SSE client state">
-            <h2>Client state</h2>
-            <dl class="state-list">
+        <aside class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4" aria-label="SSE client state">
+            <h2 class="text-lg font-bold text-stone-950">Client state</h2>
+            <dl class="grid">
                 <div>
                     <dt>Progress</dt>
                     <dd><span id="sse-progress">0</span> / 5</dd>
@@ -29,29 +29,29 @@
                     <dd id="sse-connection">Closed</dd>
                 </div>
             </dl>
-            <div class="toolbar">
-                <button type="button" id="sse-start">Start stream</button>
-                <button type="button" id="sse-stop">Stop stream</button>
+            <div class="flex flex-wrap gap-2">
+                <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button" id="sse-start">Start stream</button>
+                <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button" id="sse-stop">Stop stream</button>
             </div>
         </aside>
     </div>
 
-    <article class="description-panel">
-        <h2>Streamed HTML patches</h2>
-        <p>SSE is a writer layer. The server can render an ordinary partial and send it as a named event while the client decides how to apply that patch.</p>
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Streamed HTML patches</h2>
+        <p class="leading-7 text-stone-600">SSE is a writer layer. The server can render an ordinary partial and send it as a named event while the client decides how to apply that patch.</p>
     </article>
 
-    <article class="code-panel">
-        <h2>Server setup</h2>
-        <pre><code>events := partial.NewSSEWriter(w)
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">events := partial.NewSSEWriter(w)
 _ = events.PatchPartial(ctx, r, "#sse-status", statusPartial)
 _ = events.Signal("progress", map[string]any{"step": step})
 events.Flush()</code></pre>
     </article>
 
-    <article class="code-panel">
-        <h2>Template usage</h2>
-        <pre><code>source.addEventListener("partial:patch", (event) =&gt; {
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">source.addEventListener("partial:patch", (event) =&gt; {
     const patch = JSON.parse(event.data);
     document.querySelector(patch.target).outerHTML = patch.html;
 });</code></pre>

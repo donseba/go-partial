@@ -1,18 +1,18 @@
-<article class="docs-page">
-    <p class="eyebrow">Guide</p>
-    <h1>Target resolver</h1>
-    <p class="lead"><code>WithTargetResolver</code> handles DOM targets that are not fixed partial IDs. It is the tool for tables, feeds, cards, and repeated rows.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Target resolver</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> handles DOM targets that are not fixed partial IDs. It is the tool for tables, feeds, cards, and repeated rows.</p>
 
-    <h2>The problem</h2>
-    <p>A table may render one row template many times. Every row needs its own DOM ID so HTMX can replace exactly that row, but the Go partial is still one reusable <code>row</code> partial.</p>
+    <h2 class="text-xl font-bold text-slate-50">The problem</h2>
+    <p class="leading-7 text-slate-400">A table may render one row template many times. Every row needs its own DOM ID so HTMX can replace exactly that row, but the Go partial is still one reusable <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row</code> partial.</p>
 
-    <pre><code>&lt;table&gt;
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;table&gt;
 {{ "{{ range .Data.Rows }}" }}
     {{ "{{ partial \"users/row\" \"Row\" . }}" }}
 {{ "{{ end }}" }}
 &lt;/table&gt;</code></pre>
 
-    <pre><code>&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
     &lt;td&gt;{{ "{{ scoped.Row.Name }}" }}&lt;/td&gt;
     &lt;td&gt;
         &lt;button hx-post="/users/{{ "{{ scoped.Row.ID }}" }}/refresh"
@@ -21,10 +21,10 @@
     &lt;/td&gt;
 &lt;/tr&gt;</code></pre>
 
-    <h2>Wire the resolver</h2>
-    <p>The connector reads the requested target from the request. For HTMX this is <code>HX-Target</code>. If the target is not a registered child ID, go-partial asks the resolver whether it can map that target to a partial and scoped data.</p>
+    <h2 class="text-xl font-bold text-slate-50">Wire the resolver</h2>
+    <p class="leading-7 text-slate-400">The connector reads the requested target from the request. For HTMX this is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target</code>. If the target is not a registered child ID, go-partial asks the resolver whether it can map that target to a partial and scoped data.</p>
 
-    <pre><code>rowPartial := partial.NewID("users/row", "templates/users/row.gohtml")
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">rowPartial := partial.NewID("users/row", "templates/users/row.gohtml")
 
 table := partial.NewID("content", "templates/users/table.gohtml").
     SetData(map[string]any{"Rows": rows}).
@@ -48,21 +48,21 @@ table.WithTargetResolver(func(ctx context.Context, r *http.Request, target strin
     return rowPartial, map[string]any{"Row": row}, true
 })</code></pre>
 
-    <h2>Request flow</h2>
+    <h2 class="text-xl font-bold text-slate-50">Request flow</h2>
     <ol>
-        <li>The browser sends an HTMX request with <code>HX-Target: row-42</code>.</li>
+        <li>The browser sends an HTMX request with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target: row-42</code>.</li>
         <li>The connector marks it as a partial request and exposes the target value.</li>
-        <li>go-partial first checks for a child with ID <code>row-42</code>.</li>
-        <li>If no child exists, <code>WithTargetResolver</code> receives <code>row-42</code>.</li>
+        <li>go-partial first checks for a child with ID <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
+        <li>If no child exists, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> receives <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
         <li>The resolver returns the reusable row partial plus fresh scoped data for row 42.</li>
-        <li>Only that row template is rendered and swapped into <code>#row-42</code>.</li>
+        <li>Only that row template is rendered and swapped into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">#row-42</code>.</li>
     </ol>
 
-    <h2>Rules of thumb</h2>
-    <ul>
-        <li>Keep DOM IDs stable and unique, such as <code>row-{{ "{" }}id{{ "}" }}</code>.</li>
+    <h2 class="text-xl font-bold text-slate-50">Rules of thumb</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
+        <li>Keep DOM IDs stable and unique, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-{{ "{" }}id{{ "}" }}</code>.</li>
         <li>Do not cache row HTML when row data can change. Resolve fresh data per request.</li>
-        <li>Return <code>false</code> for unknown target shapes so normal child lookup and errors stay predictable.</li>
-        <li>Use <code>partial</code> plus <code>dict</code> for repeated rendering, and <code>WithTargetResolver</code> for targeted replacement of one repeated item.</li>
+        <li>Return <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">false</code> for unknown target shapes so normal child lookup and errors stay predictable.</li>
+        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> plus <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">dict</code> for repeated rendering, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> for targeted replacement of one repeated item.</li>
     </ul>
 </article>

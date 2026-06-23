@@ -2,6 +2,7 @@ package connector
 
 import (
 	"net/http"
+	"strings"
 )
 
 type HTMX struct {
@@ -33,6 +34,14 @@ const (
 	HTMXHeaderTrigger            HeaderKey = "HX-Trigger"
 	HTMXHeaderTriggerAfterSettle HeaderKey = "HX-Trigger-After-Settle"
 	HTMXHeaderTriggerAfterSwap   HeaderKey = "HX-Trigger-After-Swap"
+
+	HTMXAttrGet        = "hx-get"
+	HTMXAttrExt        = "hx-ext"
+	HTMXAttrTrigger    = "hx-trigger"
+	HTMXAttrTarget     = "hx-target"
+	HTMXAttrSwap       = "hx-swap"
+	HTMXAttrSSEConnect = "sse-connect"
+	HTMXAttrSSESwap    = "sse-swap"
 )
 
 func NewHTMX(c *Config) Connector {
@@ -73,4 +82,71 @@ func (h *HTMX) ResponseHeaders(response Response) map[string]string {
 	setResponseHeader(headers, HTMXHeaderTriggerAfterSettle, response.TriggerAfterSettle)
 	setResponseHeader(headers, HTMXHeaderTriggerAfterSwap, response.TriggerAfterSwap)
 	return headers
+}
+
+func (h *HTMX) InteractionAttrs(interaction Interaction) map[string]string {
+	attrs := map[string]string{}
+	target := "#" + interaction.ID
+	if interaction.Target != "" {
+		target = interaction.Target
+	}
+	swap := interaction.Swap
+	if swap == "" {
+		swap = string(SwapInnerHTML)
+	}
+
+	switch interaction.Kind {
+	case InteractionReveal:
+		attrs[HTMXAttrGet] = interaction.URL
+		attrs[HTMXAttrTrigger] = "revealed"
+		attrs[HTMXAttrTarget] = target
+		attrs[HTMXAttrSwap] = swap
+	case InteractionPoll:
+		interval := interaction.Interval
+		if interval == "" {
+			interval = "5s"
+		}
+		if interaction.Swap == "" {
+			swap = "innerHTML"
+		}
+		attrs[HTMXAttrGet] = interaction.URL
+		attrs[HTMXAttrTrigger] = "every " + interval
+		attrs[HTMXAttrTarget] = target
+		attrs[HTMXAttrSwap] = swap
+	case InteractionStream:
+		attrs[HTMXAttrExt] = "sse"
+		attrs[HTMXAttrSSEConnect] = interaction.URL
+		attrs[HTMXAttrSSESwap] = "message"
+	case InteractionPrefetch:
+		attrs["rel"] = "prefetch"
+		attrs["href"] = interaction.URL
+	case InteractionRefresh:
+		trigger := interaction.Trigger
+		if trigger == "" {
+			trigger = "click"
+		}
+		attrs[HTMXAttrGet] = interaction.URL
+		attrs[HTMXAttrTrigger] = trigger
+		attrs[HTMXAttrTarget] = target
+		attrs[HTMXAttrSwap] = swap
+	case InteractionOn:
+		trigger := interaction.Trigger
+		if trigger == "" {
+			trigger = interaction.Name
+		}
+		if from := interaction.Options["from"]; from != "" && !strings.Contains(trigger, " from:") {
+			trigger += " from:" + from
+		}
+		attrs[HTMXAttrGet] = interaction.URL
+		attrs[HTMXAttrTrigger] = trigger
+		attrs[HTMXAttrTarget] = target
+		attrs[HTMXAttrSwap] = swap
+	default:
+		attrs[HTMXAttrGet] = interaction.URL
+		attrs[HTMXAttrTrigger] = "load"
+		attrs[HTMXAttrTarget] = target
+		attrs[HTMXAttrSwap] = swap
+	}
+
+	return attrs
 }

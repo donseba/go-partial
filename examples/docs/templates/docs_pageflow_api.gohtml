@@ -1,55 +1,55 @@
-<article class="docs-page">
-    <p class="eyebrow">Reference</p>
-    <h1>PageFlow API</h1>
-    <p class="lead">PageFlow defines the flow. FlowSessionData carries per-user state. That split lets a single flow definition be reused safely across requests, tabs, and users.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Reference</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">PageFlow API</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">PageFlow defines the flow. FlowSessionData carries per-user state. That split lets a single flow definition be reused safely across requests, tabs, and users.</p>
 
-    <h2>Types</h2>
-    <table>
-        <thead><tr><th>Type</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Types</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Type</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>FlowStep</code></td><td>One named step with an optional partial and validation callback.</td></tr>
-            <tr><td><code>PageFlow</code></td><td>The ordered step definition. It does not store current user progress.</td></tr>
-            <tr><td><code>FlowSessionData</code></td><td>Per-user flow state: current step, collected step data, and validation results.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowStep</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">One named step with an optional partial and validation callback.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">PageFlow</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The ordered step definition. It does not store current user progress.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Per-user flow state: current step, collected step data, and validation results.</td></tr>
         </tbody>
     </table>
 
-    <h2>FlowStep</h2>
-    <pre><code>type FlowStep struct {
+    <h2 class="text-xl font-bold text-slate-50">FlowStep</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type FlowStep struct {
     Name     string
     Partial  *partial.Partial
     Validate func(r *http.Request, data map[string]any) error
 }</code></pre>
 
-    <p><code>Name</code> should be stable because it is stored in <code>FlowSessionData.Current</code>, used as the child partial ID in templates, and used as the key for step data and validation state.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Name</code> should be stable because it is stored in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData.Current</code>, used as the child partial ID in templates, and used as the key for step data and validation state.</p>
 
-    <h2>PageFlow methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">PageFlow methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>NewPageFlow(steps)</code></td><td>Create a flow definition from ordered steps.</td></tr>
-            <tr><td><code>FirstStep()</code></td><td>Return the first step, or nil when there are no steps.</td></tr>
-            <tr><td><code>CurrentStep(session)</code></td><td>Return the step named by <code>session.Current</code>, falling back to the first step.</td></tr>
-            <tr><td><code>SetCurrentStep(session, name)</code></td><td>Set <code>session.Current</code> only when the named step exists.</td></tr>
-            <tr><td><code>Next(session)</code></td><td>Advance <code>session.Current</code> to the next step when possible.</td></tr>
-            <tr><td><code>Prev(session)</code></td><td>Move <code>session.Current</code> to the previous step when possible.</td></tr>
-            <tr><td><code>FindStep(name)</code></td><td>Return a step index, or <code>-1</code> when no step exists.</td></tr>
-            <tr><td><code>AllPreviousValidated(session)</code></td><td>Check that every step before the current step is marked valid.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">NewPageFlow(steps)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a flow definition from ordered steps.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FirstStep()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the first step, or nil when there are no steps.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">CurrentStep(session)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the step named by <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code>, falling back to the first step.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetCurrentStep(session, name)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code> only when the named step exists.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Next(session)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Advance <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code> to the next step when possible.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Prev(session)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Move <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code> to the previous step when possible.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FindStep(name)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return a step index, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">-1</code> when no step exists.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">AllPreviousValidated(session)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Check that every step before the current step is marked valid.</td></tr>
         </tbody>
     </table>
 
-    <h2>Session methods</h2>
-    <table>
-        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Session methods</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>SetStepValidated(name, valid)</code></td><td>Record validation state for one step.</td></tr>
-            <tr><td><code>SetStepData(name, data)</code></td><td>Store data collected by one step.</td></tr>
-            <tr><td><code>GetStepData(name)</code></td><td>Read data for one step.</td></tr>
-            <tr><td><code>GetAllData()</code></td><td>Merge all step data into one map for confirmation pages or final handlers.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetStepValidated(name, valid)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Record validation state for one step.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetStepData(name, data)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Store data collected by one step.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">GetStepData(name)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Read data for one step.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">GetAllData()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Merge all step data into one map for confirmation pages or final handlers.</td></tr>
         </tbody>
     </table>
 
-    <h2>Request handler shape</h2>
-    <pre><code>session := loadFlowSession(r)
+    <h2 class="text-xl font-bold text-slate-50">Request handler shape</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">session := loadFlowSession(r)
 flow := partial.NewPageFlow(steps)
 
 step := flow.CurrentStep(session)
@@ -69,8 +69,8 @@ session.SetStepValidated(step.Name, true)
 flow.Next(session)
 saveFlowSession(w, session)</code></pre>
 
-    <h2>Rendering shape</h2>
-    <pre><code>current := flow.CurrentStep(session)
+    <h2 class="text-xl font-bold text-slate-50">Rendering shape</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">current := flow.CurrentStep(session)
 
 content := partial.NewID("content", "flow.gohtml").SetData(map[string]any{
     "Steps":       flow.Steps,
@@ -82,6 +82,6 @@ for _, step := range flow.Steps {
     content.With(step.Partial)
 }</code></pre>
 
-    <h2>Why session owns current</h2>
-    <p>A flow definition is usually stable enough to create once and reuse. Current step is not stable; it belongs to a browser session, user, request, or persisted draft. Keeping it in <code>FlowSessionData</code> prevents one user's progress from mutating another user's flow.</p>
+    <h2 class="text-xl font-bold text-slate-50">Why session owns current</h2>
+    <p class="leading-7 text-slate-400">A flow definition is usually stable enough to create once and reuse. Current step is not stable; it belongs to a browser session, user, request, or persisted draft. Keeping it in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData</code> prevents one user's progress from mutating another user's flow.</p>
 </article>

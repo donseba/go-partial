@@ -1,0 +1,48 @@
+package main
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	partial "github.com/donseba/go-partial"
+)
+
+func (app *App) scoped(w http.ResponseWriter, r *http.Request) {
+	content := app.tablePartial()
+	app.renderPartial(w, r, content)
+}
+
+func (app *App) tablePartial() *partial.Partial {
+	rowPartial := partial.NewID("row", "templates/row.gohtml")
+	content := partial.NewID("content", "templates/scoped.gohtml").SetData(map[string]any{
+		"Title": "Scoped rows",
+		"Owner": "Ada",
+		"Rows":  app.rows,
+	})
+	content.With(rowPartial)
+	content.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+		if !strings.HasPrefix(target, "row-") {
+			return nil, nil, false
+		}
+		id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
+		if err != nil {
+			return nil, nil, false
+		}
+		for _, row := range app.rows {
+			if row.ID == id {
+				row.Status = "Updated " + time.Now().Format("15:04:05")
+				return rowPartial, map[string]any{"Row": row, "Owner": "Ada"}, true
+			}
+		}
+		return nil, nil, false
+	})
+	return content
+}
+
+func (app *App) refreshRow(w http.ResponseWriter, r *http.Request) {
+	_ = r.URL.Query().Get("id")
+	app.writeContent(w, r, app.tablePartial())
+}

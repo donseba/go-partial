@@ -7,11 +7,11 @@
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link rel="stylesheet" href="/static/site.css">
 </head>
-<body>
+<body class="m-0 bg-slate-950 font-sans text-slate-50 [background:linear-gradient(180deg,rgba(27,38,53,.58),transparent_360px),#0d1117]">
     {{ child "header" }}
-    <div class="docs-shell">
+    <div class="mx-auto grid max-w-[1480px] grid-cols-[292px_minmax(0,1fr)]">
         {{ child "sidebar" }}
-        <main id="content" class="docs-content">
+        <main id="content" class="min-w-0 px-11 py-12 pb-28">
             {{ child "content" }}
         </main>
     </div>

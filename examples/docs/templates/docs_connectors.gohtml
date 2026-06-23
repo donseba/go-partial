@@ -1,65 +1,65 @@
-<article class="docs-page">
-    <p class="eyebrow">Reference</p>
-    <h1>Connectors</h1>
-    <p class="lead">Connectors let go-partial understand request headers from a frontend library or a custom fetch client.</p>
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Reference</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Connectors</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Connectors let go-partial understand request headers from a frontend library or a custom fetch client.</p>
 
-    <h2>Choose a connector</h2>
-    <pre><code>svc := partial.NewService(&partial.Config{
+    <h2 class="text-xl font-bold text-slate-50">Choose a connector</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
     Connector: connector.NewHTMX(nil),
     FS:        os.DirFS("web"),
 })</code></pre>
 
-    <p>The connector is applied to layouts, content partials, children, selected partials, and out-of-band partials rendered through the service.</p>
+    <p class="leading-7 text-slate-400">The connector is applied to layouts, content partials, children, selected partials, and out-of-band partials rendered through the service.</p>
 
-    <h2>Included connectors</h2>
-    <table>
-        <thead><tr><th>Connector</th><th>Target header</th><th>Use</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Included connectors</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Connector</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Target header</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td><code>connector.NewPartial</code></td><td><code>X-Target</code></td><td>Framework-neutral requests from fetch, tests, or custom clients.</td></tr>
-            <tr><td><code>connector.NewHTMX</code></td><td><code>HX-Target</code></td><td>HTMX requests, boosted navigation, response headers, and OOB updates.</td></tr>
-            <tr><td><code>connector.NewUnpoly</code></td><td><code>X-Up-Target</code></td><td>Unpoly fragment requests.</td></tr>
-            <tr><td><code>connector.NewTurbo</code></td><td><code>Turbo-Frame</code></td><td>Turbo Frame requests.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewPartial</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Framework-neutral requests from fetch, tests, or custom clients.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewHTMX</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">HTMX requests, boosted navigation, response headers, and OOB updates.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewUnpoly</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Up-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Unpoly fragment requests.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewTurbo</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Turbo-Frame</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Turbo Frame requests.</td></tr>
         </tbody>
     </table>
 
-    <p>Alpine, Stimulus, Vue, and similar frontend libraries do not need built-in connectors unless they define a stable fragment-request protocol. Use <code>connector.NewPartial</code> or a custom connector when your own fetch layer sends project-specific headers.</p>
+    <p class="leading-7 text-slate-400">Alpine, Stimulus, Vue, and similar frontend libraries do not need built-in connectors unless they define a stable fragment-request protocol. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewPartial</code> or a custom connector when your own fetch layer sends project-specific headers.</p>
 
-    <h2>Shared connector values</h2>
-    <p>Every connector exposes the same concepts to go-partial:</p>
-    <table>
-        <thead><tr><th>Concept</th><th>Generic header</th><th>Template helper</th></tr></thead>
+    <h2 class="text-xl font-bold text-slate-50">Shared connector values</h2>
+    <p class="leading-7 text-slate-400">Every connector exposes the same concepts to go-partial:</p>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Concept</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Generic header</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Template helper</th></tr></thead>
         <tbody>
-            <tr><td>Target</td><td><code>X-Target</code></td><td><code>{{ "{{ targetValue }}" }}</code></td></tr>
-            <tr><td>Selection</td><td><code>X-Select</code></td><td><code>{{ "{{ selectionValue }}" }}</code></td></tr>
-            <tr><td>Action</td><td><code>X-Action</code></td><td><code>{{ "{{ actionValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Target</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ targetValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Selection</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Select</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selectionValue }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Action</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Action</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ actionValue }}" }}</code></td></tr>
         </tbody>
     </table>
 
-    <p>Framework-specific connectors may use a different target header, such as <code>HX-Target</code> or <code>X-Up-Target</code>. Selection and action headers stay generic unless the connector defines otherwise.</p>
+    <p class="leading-7 text-slate-400">Framework-specific connectors may use a different target header, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Up-Target</code>. Selection and action headers stay generic unless the connector defines otherwise.</p>
 
-    <h2>URL query fallback</h2>
-    <p>Set <code>UseURLQuery</code> when a client cannot send custom headers. go-partial will read <code>target</code>, <code>select</code>, and <code>action</code> from the query string after checking headers.</p>
+    <h2 class="text-xl font-bold text-slate-50">URL query fallback</h2>
+    <p class="leading-7 text-slate-400">Set <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseURLQuery</code> when a client cannot send custom headers. go-partial will read <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">select</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">action</code> from the query string after checking headers.</p>
 
-    <pre><code>svc := partial.NewService(&partial.Config{
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
     Connector: connector.NewPartial(&connector.Config{
         UseURLQuery: true,
     }),
 })</code></pre>
 
-    <h2>Response instructions</h2>
-    <p>Partials can set protocol-neutral response instructions. The connector turns them into response headers when supported.</p>
+    <h2 class="text-xl font-bold text-slate-50">Response instructions</h2>
+    <p class="leading-7 text-slate-400">Partials can set protocol-neutral response instructions. The connector turns them into response headers when supported.</p>
 
-    <pre><code>content.Response().
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.Response().
     Retarget("#notice").
     ReswapWith(connector.NewSwap().Style(connector.SwapOuterHTML)).
     TriggerWith(connector.NewTrigger().AddEvent("saved"))</code></pre>
 
-    <p>With the HTMX connector, this writes headers such as <code>HX-Retarget</code>, <code>HX-Reswap</code>, and <code>HX-Trigger</code>.</p>
+    <p class="leading-7 text-slate-400">With the HTMX connector, this writes headers such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Retarget</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Reswap</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Trigger</code>.</p>
 
-    <h2>Custom connector</h2>
-    <p>If your frontend sends different headers, implement the connector interface in your application.</p>
+    <h2 class="text-xl font-bold text-slate-50">Custom connector</h2>
+    <p class="leading-7 text-slate-400">If your frontend sends different headers, implement the connector interface in your application.</p>
 
-    <pre><code>type Connector interface {
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Connector interface {
     RenderPartial(r *http.Request) bool
     GetTargetValue(r *http.Request) string
     GetSelectValue(r *http.Request) string
@@ -71,13 +71,13 @@
     ResponseHeaders(response connector.Response) map[string]string
 }</code></pre>
 
-    <h2>External references</h2>
-    <ul>
+    <h2 class="text-xl font-bold text-slate-50">External references</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
         <li><a href="https://htmx.org/reference/">HTMX reference</a></li>
         <li><a href="https://turbo.hotwired.dev/handbook/frames">Turbo Frames handbook</a></li>
         <li><a href="https://unpoly.com/X-Up-Target">Unpoly X-Up-Target</a></li>
     </ul>
 
-    <h2>Related integration docs</h2>
-    <p>For practical usage, see the <a href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">integration overview</a>, <a href="/docs/integrations/htmx" hx-get="/docs/integrations/htmx" hx-target="#content" hx-push-url="true">HTMX integration</a>, and <a href="/docs/integrations/sse" hx-get="/docs/integrations/sse" hx-target="#content" hx-push-url="true">SSE integration</a>.</p>
+    <h2 class="text-xl font-bold text-slate-50">Related integration docs</h2>
+    <p class="leading-7 text-slate-400">For practical usage, see the <a href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">integration overview</a>, <a href="/docs/integrations/htmx" hx-get="/docs/integrations/htmx" hx-target="#content" hx-push-url="true">HTMX integration</a>, and <a href="/docs/integrations/sse" hx-get="/docs/integrations/sse" hx-target="#content" hx-push-url="true">SSE integration</a>.</p>
 </article>

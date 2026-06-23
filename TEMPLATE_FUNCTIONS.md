@@ -10,6 +10,7 @@ Template names are split into two groups:
 
 - Reserved underscore accessors: generated accessors for typed struct params, such as `_user` or `_can`.
 - Regular helpers: renderer helpers such as `scoped`, `child`, `partial`, `selection`, and `action`. `dict` is a data/map helper, not a composition helper.
+- Interaction declarations live on `.Interact`, not `.Data`, when they are configured in Go.
 
 Underscore names are reserved for generated struct/param accessors. User-defined template functions should not start with `_`.
 
@@ -22,6 +23,14 @@ Underscore names are reserved for generated struct/param accessors. User-defined
 | `child` | Helper | Render a registered child partial by ID. |
 | `childIf` | Helper | Render a child only when it has been registered. |
 | `partial` | Built-in helper | Render a registered partial from another template using scoped data. |
+| `async` | Built-in helper | Render connector-aware deferred loading markup for an endpoint. |
+| `reveal` | Built-in helper | Load an endpoint when the region enters the viewport. |
+| `poll` | Built-in helper | Refresh an endpoint on an interval. |
+| `on` | Built-in helper | Refresh an endpoint when a named browser event is dispatched. |
+| `stream` | Built-in helper | Declare a stream-backed region for clients that support it. |
+| `prefetch` | Built-in helper | Emit a prefetch hint. |
+| `island` | Built-in helper | Create a named lazy server-rendered island. |
+| `refresh` | Built-in helper | Render a refresh control for an endpoint or target. |
 | `dict` | Built-in data helper | Build a map when a template needs map-style values. |
 | `selection` | Helper | Render the selected partial from a `WithSelectMap` selection. |
 | `action` | Helper | Render the requested action partial. |
@@ -194,6 +203,82 @@ This remains the best fit for named page regions where the partial ID and DOM ta
 ```text
 HX-Target: navbar -> render child "navbar"
 ```
+
+## Interaction Helpers
+
+Interaction helpers render connector-aware loading or request markup for endpoints. The helper creates an interaction model, the active connector supplies protocol attributes, and the interaction renderer owns the final HTML wrapper.
+
+```gotemplate
+{{ async "/stats" }}
+{{ reveal "/charts/monthly" }}
+{{ on "cart:changed" "/cart/summary" }}
+{{ stream "/activity/events" }}
+{{ prefetch "/users/42" }}
+```
+
+For configured interactions, build the value in Go and pass it through the partial's interaction context. This keeps client behavior declarations separate from content data.
+
+```go
+content.SetInteractions(map[string]any{
+    "Stats": partial.Async("/stats").
+        ID("stats-loader").
+        Target("#stats").
+        Placeholder(""),
+
+    "Notifications": partial.Poll("/notifications").
+        Every(10 * time.Second),
+
+    "CartChanged": partial.On("cart:changed", "/cart/summary").
+        Target("#cart"),
+
+    "Cart": partial.Island("cart", "/cart/summary"),
+
+    "CartRefresh": partial.Refresh("/cart/summary").
+        Target("#cart").
+        Swap(partial.SwapOuterHTML).
+        Placeholder("Refresh cart"),
+})
+```
+
+```gotemplate
+{{ async .Interact.Stats }}
+{{ poll .Interact.Notifications }}
+{{ on .Interact.CartChanged }}
+{{ island .Interact.Cart }}
+{{ refresh .Interact.CartRefresh }}
+```
+
+With the HTMX connector, the first call renders markup shaped like:
+
+```html
+<div id="async-stats"
+     hx-get="/stats"
+     hx-trigger="load"
+     hx-target="#async-stats"
+     hx-swap="innerHTML">
+  Loading...
+</div>
+```
+
+Route parameters use `:name` placeholders. Prefer `Param` in Go for configured interactions:
+
+```go
+row := partial.Async("/table/row/:row").Param("row", row.ID)
+```
+
+The simple template form still accepts direct key/value pairs for route placeholders when that reads better in a loop:
+
+```gotemplate
+{{ async "/table/row/:row" "row" .Data.Row.ID }}
+```
+
+The default renderer emits simple unstyled HTML. Applications can replace it with `SetInteractionRenderer` on a service, layout, or partial.
+
+`on` listens for a browser event and refreshes its target when that event is dispatched. With HTMX, custom events default to `from:body`, so application code can dispatch `document.body.dispatchEvent(new CustomEvent("cart:changed"))`.
+
+`stream` only declares the stream region and connector attributes. The client still needs a compatible SSE integration, and the endpoint must emit events that integration understands. `prefetch` is intentionally non-visual; the default renderer emits a `<link rel="prefetch">` hint.
+
+Interaction helpers are deferred client-side loading, not blocking server-side execution. Use `partial` or `child` when the current render should include the child immediately.
 
 ## `selection`
 

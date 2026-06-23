@@ -1,0 +1,42 @@
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Deferred loading</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <p class="leading-7 text-stone-600">The <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">async</code> helper renders connector-aware loading markup. HTMX fetches each endpoint after the page shell is already visible.</p>
+    </header>
+
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">Endpoint partial</h2>
+            {{ async "/async/stats" }}
+        </article>
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">Route parameter</h2>
+            {{ range .Data.Rows }}
+                {{ async "/async/row/:row" "row" .ID }}
+            {{ end }}
+        </article>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Deferred, not blocking</h2>
+        <p class="leading-7 text-stone-600">This is not server-side await. The initial template renders immediately, then the connector turns each deferred region into client-side loading markup.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">mux.HandleFunc("/async", app.asyncPage)
+mux.HandleFunc("/async/stats", app.asyncStats)
+
+func (app *App) asyncStats(w http.ResponseWriter, r *http.Request) {
+    content := partial.NewID("async-stats", "templates/async_stats.gohtml")
+    app.writeStandalone(w, r, content)
+}</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async \"/async/stats\" }}" }}
+{{ "{{ async \"/async/row/:row\" \"row\" .ID }}" }}</code></pre>
+    </article>
+</section>

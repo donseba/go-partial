@@ -512,7 +512,11 @@ func TestWithSelectMap(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to send request: %v", err)
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err := resp.Body.Close(); err != nil {
+					t.Fatalf("Failed to close response body: %v", err)
+				}
+			}()
 
 			// Read response body
 			bodyBytes, err := io.ReadAll(resp.Body)
