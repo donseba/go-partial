@@ -1,0 +1,27 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Error fallback</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>This page keeps the layout alive while one child partial intentionally fails during rendering.</p>
+    </header>
+
+    <div class="example-surface stack">
+        {{ child "broken-section" }}
+    </div>
+
+    <article class="description-panel">
+        <h2>Section-level failure</h2>
+        <p>The broken child is rendered through the normal partial tree. When it fails, the default error renderer replaces only that section.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content := partial.NewID("content", "templates/error.gohtml")
+content.With(partial.NewID("broken-section", "templates/broken.gohtml"))</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>{{ "{{ child \"broken-section\" }}" }}</code></pre>
+    </article>
+</section>

@@ -1,0 +1,56 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Localization</span>
+        <h1>{{ tl .Loc "title" }}</h1>
+        <p>{{ tl .Loc "intro" }}</p>
+    </header>
+
+    <div class="example-surface stack">
+        <div class="toolbar locale-switcher" aria-label="Locale switcher">
+            {{ range .Data.Locales }}
+                <button
+                    type="button"
+                    class="{{ if eq $.Data.Locale . }}active{{ end }}"
+                    hx-get="/localization?locale={{ . }}"
+                    hx-target="#content"
+                    hx-push-url="true">
+                    {{ . }}
+                </button>
+            {{ end }}
+        </div>
+
+        <article class="localized-card">
+            <span class="pill">{{ tl .Loc "active" }}: {{ .Loc.GetLocale }}</span>
+            <h2>{{ tl .Loc "checkout" }}</h2>
+            <dl class="facts">
+                <dt>{{ tl .Loc "total" }}</dt>
+                <dd>EUR 42.75</dd>
+                <dt>{{ tl .Loc "delivery" }}</dt>
+                <dd>{{ tl .Loc "status" }}</dd>
+                <dt>tn</dt>
+                <dd>{{ tn .Loc "oneMessage" "manyMessage" .Data.Count .Data.Count }}</dd>
+                <dt>ctl</dt>
+                <dd>{{ ctl .Loc "button" "save" }}</dd>
+            </dl>
+            <p>{{ tl .Loc "explanation" }}</p>
+        </article>
+    </div>
+
+    <article class="description-panel">
+        <h2>Bring your own translator</h2>
+        <p>The package only requires <code>GetLocale()</code>. Translation behavior is linked through template functions, so the localizer can stay focused on the active locale.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+content.WriteWithRequest(ctx, w, r)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;h1&gt;{{ "{{ tl .Loc \"title\" }}" }}&lt;/h1&gt;
+&lt;p&gt;{{ "{{ tn .Loc \"oneMessage\" \"manyMessage\" .Data.Count .Data.Count }}" }}&lt;/p&gt;
+&lt;button&gt;{{ "{{ ctl .Loc \"button\" \"save\" }}" }}&lt;/button&gt;</code></pre>
+    </article>
+</section>

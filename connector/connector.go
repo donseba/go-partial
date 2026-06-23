@@ -3,6 +3,8 @@ package connector
 import "net/http"
 
 type (
+	HeaderKey string
+
 	Connector interface {
 		RenderPartial(r *http.Request) bool
 		GetTargetValue(r *http.Request) string
@@ -12,6 +14,7 @@ type (
 		GetTargetHeader() string
 		GetSelectHeader() string
 		GetActionHeader() string
+		ResponseHeaders(response Response) map[string]string
 	}
 
 	Config struct {
@@ -25,6 +28,28 @@ type (
 		actionHeader string
 	}
 )
+
+const (
+	HeaderTarget HeaderKey = "X-Target"
+	HeaderSelect HeaderKey = "X-Select"
+	HeaderAction HeaderKey = "X-Action"
+
+	HeaderLocation           HeaderKey = "X-Location"
+	HeaderPushURL            HeaderKey = "X-Push-Url"
+	HeaderRedirect           HeaderKey = "X-Redirect"
+	HeaderRefresh            HeaderKey = "X-Refresh"
+	HeaderReplaceURL         HeaderKey = "X-Replace-Url"
+	HeaderReswap             HeaderKey = "X-Reswap"
+	HeaderRetarget           HeaderKey = "X-Retarget"
+	HeaderReselect           HeaderKey = "X-Reselect"
+	HeaderTrigger            HeaderKey = "X-Trigger"
+	HeaderTriggerAfterSettle HeaderKey = "X-Trigger-After-Settle"
+	HeaderTriggerAfterSwap   HeaderKey = "X-Trigger-After-Swap"
+)
+
+func (h HeaderKey) String() string {
+	return string(h)
+}
 
 func (x *base) RenderPartial(r *http.Request) bool {
 	return r.Header.Get(x.targetHeader) != ""

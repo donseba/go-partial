@@ -1,0 +1,46 @@
+<article class="docs-page">
+    <p class="eyebrow">Integration</p>
+    <h1>Custom clients</h1>
+    <p class="lead">Use the neutral connector when your frontend is plain fetch, a small controller, tests, or another client that can send predictable headers.</p>
+
+    <h2>Neutral request headers</h2>
+    <p>The partial connector uses generic names for the same concepts as framework-specific connectors.</p>
+
+    <table>
+        <thead><tr><th>Header</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>X-Target</code></td><td>DOM target or partial target ID.</td></tr>
+            <tr><td><code>X-Select</code></td><td>Selected child key for <code>{{ "{{ selection }}" }}</code>.</td></tr>
+            <tr><td><code>X-Action</code></td><td>Server action name or cursor value.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Fetch example</h2>
+    <pre><code>const response = await fetch("/settings/profile", {
+    headers: {
+        "X-Target": "profile-card",
+        "X-Action": "refresh"
+    }
+})
+
+document.querySelector("#profile-card").outerHTML = await response.text()</code></pre>
+
+    <h2>Server setup</h2>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewPartial(&connector.Config{
+        UseURLQuery: true,
+    }),
+    FS: os.DirFS("web"),
+})</code></pre>
+
+    <h2>When to write your own connector</h2>
+    <p>If your client already has established headers, implement the connector interface and keep the rest of your rendering code unchanged.</p>
+
+    <pre><code>type Connector interface {
+    RenderPartial(r *http.Request) bool
+    GetTargetValue(r *http.Request) string
+    GetSelectValue(r *http.Request) string
+    GetActionValue(r *http.Request) string
+    ResponseHeaders(response connector.Response) map[string]string
+}</code></pre>
+</article>

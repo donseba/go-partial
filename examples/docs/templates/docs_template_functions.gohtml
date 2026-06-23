@@ -1,0 +1,221 @@
+<article class="docs-page">
+    <p class="eyebrow">Reference</p>
+    <h1>Template functions</h1>
+    <p class="lead">go-partial adds rendering helpers, connector helpers, URL helpers, OOB helpers, and small utility functions to normal <code>html/template</code> files.</p>
+
+    <h2>Composition helpers</h2>
+    <p>These helpers render registered partials or choose output from the partial tree.</p>
+
+    <table>
+        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>child</code></td><td>Render a registered child by ID, optionally with scoped key/value pairs.</td><td><code>{{ "{{ child \"sidebar\" }}" }}</code></td></tr>
+            <tr><td><code>childIf</code></td><td>Render a child only when it is registered, optionally with scoped key/value pairs.</td><td><code>{{ "{{ childIf \"promo\" \"Title\" \"Sale\" }}" }}</code></td></tr>
+            <tr><td><code>partial</code></td><td>Render a registered child with scoped key/value pairs.</td><td><code>{{ "{{ partial \"row\" \"Row\" . }}" }}</code></td></tr>
+            <tr><td><code>selection</code></td><td>Render the selected child from a selection map.</td><td><code>{{ "{{ selection }}" }}</code></td></tr>
+            <tr><td><code>action</code></td><td>Render the partial returned by a template action callback.</td><td><code>{{ "{{ action }}" }}</code></td></tr>
+            <tr><td><code>scoped</code></td><td>Read the local scope passed to the current partial.</td><td><code>{{ "{{ scoped.Row.Name }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Map helper</h2>
+    <p><code>dict</code> is a general data helper, not a composition helper. Use it when a template needs to build a map. <code>child</code>, <code>childIf</code>, and <code>partial</code> accept direct key/value pairs, so most scoped-data calls do not need <code>dict</code>.</p>
+
+    <pre><code>{{ "{{ dict \"Name\" \"Ada\" \"Count\" 3 }}" }}</code></pre>
+
+    <h2>Rows with scoped data</h2>
+    <p>The parent owns the loop and passes only the row-local values into the reusable row partial.</p>
+    <pre><code>{{ "{{ range .Data.Rows }}" }}
+    {{ "{{ partial \"row\" \"Row\" . \"Owner\" $.Data.Owner }}" }}
+{{ "{{ end }}" }}</code></pre>
+
+    <p>The row template reads those values through <code>scoped</code>. The same values are also available as <code>.Data</code>, but <code>scoped</code> makes the handoff explicit.</p>
+    <pre><code>&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
+    &lt;td&gt;{{ "{{ scoped.Row.Name }}" }}&lt;/td&gt;
+    &lt;td&gt;{{ "{{ scoped.Owner }}" }}&lt;/td&gt;
+&lt;/tr&gt;</code></pre>
+
+    <h2>Connector helpers</h2>
+    <p>These read the configured connector. Each concept has one header helper, one value helper, and one conditional helper.</p>
+
+    <table>
+        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>targetHeader</code></td><td>Return the target header name.</td><td><code>{{ "{{ targetHeader }}" }}</code></td></tr>
+            <tr><td><code>targetValue</code></td><td>Return the requested target value.</td><td><code>{{ "{{ targetValue }}" }}</code></td></tr>
+            <tr><td><code>targetIf</code></td><td>Return a value when the current target matches one of the given values.</td><td><code>{{ "{{ targetIf \"active\" \"content\" }}" }}</code></td></tr>
+            <tr><td><code>selectionHeader</code></td><td>Return the selection header name.</td><td><code>{{ "{{ selectionHeader }}" }}</code></td></tr>
+            <tr><td><code>selectionValue</code></td><td>Return the selected key or default selection.</td><td><code>{{ "{{ selectionValue }}" }}</code></td></tr>
+            <tr><td><code>selectionIf</code></td><td>Return a value when the current selection matches one of the given values.</td><td><code>{{ "{{ selectionIf \"active\" \"details\" }}" }}</code></td></tr>
+            <tr><td><code>actionHeader</code></td><td>Return the action header name.</td><td><code>{{ "{{ actionHeader }}" }}</code></td></tr>
+            <tr><td><code>actionValue</code></td><td>Return the requested action value.</td><td><code>{{ "{{ actionValue }}" }}</code></td></tr>
+            <tr><td><code>actionIf</code></td><td>Return a value when the current action matches one of the given values.</td><td><code>{{ "{{ actionIf \"active\" \"save\" }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>URL and context helpers</h2>
+    <table>
+        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>url</code></td><td>Return the current request URL.</td><td><code>{{ "{{ url }}" }}</code></td></tr>
+            <tr><td><code>urlIs</code></td><td>Check whether the current path equals a path.</td><td><code>{{ "{{ if urlIs \"/docs\" }}active{{ end }}" }}</code></td></tr>
+            <tr><td><code>urlStarts</code></td><td>Check whether the current path starts with a prefix.</td><td><code>{{ "{{ urlStarts \"/docs\" }}" }}</code></td></tr>
+            <tr><td><code>urlContains</code></td><td>Check whether the current path contains text.</td><td><code>{{ "{{ urlContains \"settings\" }}" }}</code></td></tr>
+            <tr><td><code>joinPath</code></td><td>Join path parts into a clean path string.</td><td><code>{{ "{{ joinPath \"/docs\" \"api\" }}" }}</code></td></tr>
+            <tr><td><code>urlPath</code></td><td>Join path parts and return a safe template URL.</td><td><code>{{ "{{ urlPath .BasePath \"users\" \"42\" }}" }}</code></td></tr>
+            <tr><td><code>context</code></td><td>Return the current render context.</td><td><code>{{ "{{ context }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Out-of-band helpers</h2>
+    <p>Out-of-band helpers are only meaningful for partials registered with <code>WithOOB</code>. During a normal full-page render they return empty output, so the same template can live in the page shell. During an OOB render they emit the HTMX swap attribute.</p>
+
+    <table>
+        <thead><tr><th>Function</th><th>Use</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>oob</code></td><td>Return <code>true</code> while the partial is being rendered as out-of-band output.</td><td><code>{{ "{{ if oob }}OOB render{{ end }}" }}</code></td></tr>
+            <tr><td><code>oobAttr</code></td><td>Emit <code>hx-swap-oob</code> as a safe HTML attribute only during OOB rendering. Defaults to <code>true</code>.</td><td><code>&lt;aside{{ "{{ oobAttr }}" }}&gt;</code></td></tr>
+        </tbody>
+    </table>
+
+    <p>This template renders normally inside the page, but emits <code>hx-swap-oob</code> when the same partial is rendered as an OOB child.</p>
+    <pre><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;
+    Saved
+&lt;/aside&gt;</code></pre>
+
+    <table>
+        <thead><tr><th>Render mode</th><th>Template input</th><th>Rendered output</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Normal page render</td>
+                <td><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
+                <td><code>&lt;aside id="toast"&gt;</code></td>
+            </tr>
+            <tr>
+                <td>OOB render</td>
+                <td><code>&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;</code></td>
+                <td><code>&lt;aside id="toast" hx-swap-oob="true"&gt;</code></td>
+            </tr>
+            <tr>
+                <td>OOB render with explicit swap</td>
+                <td><code>&lt;aside id="toast"{{ "{{ oobAttr \"outerHTML\" }}" }}&gt;</code></td>
+                <td><code>&lt;aside id="toast" hx-swap-oob="outerHTML"&gt;</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>The attribute name is <code>hx-swap-oob</code>, which is HTMX's out-of-band swap attribute. It is not read from the request; go-partial knows whether the partial is currently being rendered as OOB output. The optional value controls the HTMX swap mode and defaults to <code>true</code>.</p>
+
+    <h2>Passing scoped data</h2>
+    <p><code>child</code>, <code>childIf</code>, and <code>partial</code> all use the same scoped-data rule: pass no data, direct key/value pairs, or one map from <code>dict</code>. The child receives that data as both <code>.Data</code> and <code>scoped</code>.</p>
+
+    <p>Use direct key/value pairs for normal scoped data. Use <code>dict</code> when you specifically need to pass a prebuilt map or nested map.</p>
+    <pre><code>{{ "{{ child \"sidebar\" }}" }}
+{{ "{{ child \"sidebar\" \"User\" .Data.User }}" }}
+{{ "{{ childIf \"promo\" \"Title\" \"Sale\" }}" }}
+{{ "{{ partial \"users/row\" \"Row\" . }}" }}
+{{ "{{ partial \"users/row\" (dict \"Row\" . \"CanEdit\" true) }}" }}</code></pre>
+
+    <h2>Custom template functions</h2>
+    <p>Each scope has one registration path. Use the narrowest scope that owns the helper. go-partial protects its core helper names, so application helpers cannot replace functions such as <code>child</code>, <code>partial</code>, <code>scoped</code>, or <code>targetValue</code>.</p>
+
+    <table>
+        <thead><tr><th>Scope</th><th>API</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td>Package default</td><td><code>partial.AddGlobalFunc</code></td><td>Helpers every later service should receive.</td></tr>
+            <tr><td>Service</td><td><code>svc.UseFuncs</code></td><td>Application-wide helpers such as translations, money, or asset URLs.</td></tr>
+            <tr><td>Layout</td><td><code>layout.UseFuncs</code></td><td>Helpers for one render pipeline or page shell.</td></tr>
+            <tr><td>Partial</td><td><code>partial.UseFuncs</code></td><td>Helpers local to one component tree.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Package-level helpers are copied into services created after registration. This is useful for application-wide helpers in small apps, but service-level registration is usually clearer.</p>
+    <pre><code>err := partial.AddGlobalFunc("asset", func(path string) string {
+    return "/assets/" + strings.TrimPrefix(path, "/")
+})</code></pre>
+
+    <p>Create the service first, then register helpers owned by the application.</p>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    FS: os.DirFS("web"),
+})</code></pre>
+
+    <p>Service helpers are available to every layout and partial rendered through that service.</p>
+    <pre><code>svc.UseFuncs(template.FuncMap{
+    "money": func(cents int) string {
+        return fmt.Sprintf("EUR %.2f", float64(cents)/100)
+    },
+    "initials": func(first, last string) string {
+        return strings.ToUpper(first[:1] + last[:1])
+    },
+})</code></pre>
+
+    <p>Partial helpers stay local to that component tree. Use this for helpers that do not make sense globally.</p>
+    <pre><code>row := partial.NewID("row", "row.gohtml")
+row.UseFuncs(template.FuncMap{
+    "statusLabel": func(status string) string {
+        return strings.ToUpper(status)
+    },
+})</code></pre>
+
+    <p>Once registered, helpers are just normal template functions.</p>
+    <pre><code>&lt;td&gt;{{ "{{ money scoped.Row.TotalCents }}" }}&lt;/td&gt;
+&lt;span&gt;{{ "{{ initials .Data.FirstName .Data.LastName }}" }}&lt;/span&gt;</code></pre>
+
+    <h2>String helpers</h2>
+    <table>
+        <thead><tr><th>Function</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>upper</code></td><td><code>{{ "{{ upper \"hello\" }}" }}</code></td></tr>
+            <tr><td><code>lower</code></td><td><code>{{ "{{ lower \"HELLO\" }}" }}</code></td></tr>
+            <tr><td><code>trimSpace</code></td><td><code>{{ "{{ trimSpace \" hello \" }}" }}</code></td></tr>
+            <tr><td><code>trim</code></td><td><code>{{ "{{ trim \"-hello-\" \"-\" }}" }}</code></td></tr>
+            <tr><td><code>trimSuffix</code></td><td><code>{{ "{{ trimSuffix \"profile.html\" \".html\" }}" }}</code></td></tr>
+            <tr><td><code>trimPrefix</code></td><td><code>{{ "{{ trimPrefix \"/docs\" \"/\" }}" }}</code></td></tr>
+            <tr><td><code>contains</code></td><td><code>{{ "{{ contains \"hello\" \"ell\" }}" }}</code></td></tr>
+            <tr><td><code>containsAny</code></td><td><code>{{ "{{ containsAny \"team\" \"xyzm\" }}" }}</code></td></tr>
+            <tr><td><code>hasPrefix</code></td><td><code>{{ "{{ hasPrefix \"/docs/api\" \"/docs\" }}" }}</code></td></tr>
+            <tr><td><code>hasSuffix</code></td><td><code>{{ "{{ hasSuffix \"index.gohtml\" \".gohtml\" }}" }}</code></td></tr>
+            <tr><td><code>repeat</code></td><td><code>{{ "{{ repeat \"-\" 3 }}" }}</code></td></tr>
+            <tr><td><code>replace</code></td><td><code>{{ "{{ replace \"a-b-c\" \"-\" \"/\" -1 }}" }}</code></td></tr>
+            <tr><td><code>split</code></td><td><code>{{ "{{ split \"a,b,c\" \",\" }}" }}</code></td></tr>
+            <tr><td><code>join</code></td><td><code>{{ "{{ join (stringSlice \"a\" \"b\") \",\" }}" }}</code></td></tr>
+            <tr><td><code>stringSlice</code></td><td><code>{{ "{{ stringSlice \"draft\" \"published\" }}" }}</code></td></tr>
+            <tr><td><code>title</code></td><td><code>{{ "{{ title \"hello world\" }}" }}</code></td></tr>
+            <tr><td><code>substr</code></td><td><code>{{ "{{ substr \"abcdef\" 1 3 }}" }}</code></td></tr>
+            <tr><td><code>upperFirst</code></td><td><code>{{ "{{ upperFirst \"hello\" }}" }}</code></td></tr>
+            <tr><td><code>compare</code></td><td><code>{{ "{{ compare \"a\" \"b\" }}" }}</code></td></tr>
+            <tr><td><code>equalFold</code></td><td><code>{{ "{{ equalFold \"Go\" \"go\" }}" }}</code></td></tr>
+            <tr><td><code>urlEncode</code></td><td><code>{{ "{{ urlEncode \"hello world\" }}" }}</code></td></tr>
+            <tr><td><code>urlDecode</code></td><td><code>{{ "{{ urlDecode \"hello+world\" }}" }}</code></td></tr>
+            <tr><td><code>safeURL</code></td><td><code>&lt;a href="{{ "{{ safeURL .Data.Path }}" }}"&gt;</code></td></tr>
+            <tr><td><code>safeHTML</code></td><td><code>{{ "{{ safeHTML \"&lt;strong&gt;ok&lt;/strong&gt;\" }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Time, map, list, math, and debug helpers</h2>
+    <table>
+        <thead><tr><th>Function</th><th>Example</th></tr></thead>
+        <tbody>
+            <tr><td><code>now</code></td><td><code>{{ "{{ now }}" }}</code></td></tr>
+            <tr><td><code>formatDate</code></td><td><code>{{ "{{ formatDate \"2006-01-02\" .Data.Created }}" }}</code></td></tr>
+            <tr><td><code>parseDate</code></td><td><code>{{ "{{ parseDate \"2006-01-02\" \"2026-06-23\" }}" }}</code></td></tr>
+            <tr><td><code>first</code></td><td><code>{{ "{{ first .Data.Items }}" }}</code></td></tr>
+            <tr><td><code>last</code></td><td><code>{{ "{{ last .Data.Items }}" }}</code></td></tr>
+            <tr><td><code>hasKey</code></td><td><code>{{ "{{ hasKey .Data.Flags \"beta\" }}" }}</code></td></tr>
+            <tr><td><code>keys</code></td><td><code>{{ "{{ keys .Data.Flags }}" }}</code></td></tr>
+            <tr><td><code>inc</code></td><td><code>{{ "{{ inc .Data.Page }}" }}</code></td></tr>
+            <tr><td><code>dec</code></td><td><code>{{ "{{ dec .Data.Page }}" }}</code></td></tr>
+            <tr><td><code>debug</code></td><td><code>{{ "{{ debug .Data }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Debug output</h2>
+    <p><code>debug</code> renders a styled diagnostic box with the default embedded debug template. Override it with <code>SetDebugRenderer</code> on a service, layout, or partial when you want diagnostics to match your application.</p>
+
+    <pre><code>svc.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
+    return template.HTML("&lt;pre class=\"debug\"&gt;" + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + "&lt;/pre&gt;"), nil
+})</code></pre>
+
+    <h2>Localization functions are provider-owned</h2>
+    <p>Calls such as <code>{{ "{{ tl .Loc \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code>.Loc</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>
+</article>

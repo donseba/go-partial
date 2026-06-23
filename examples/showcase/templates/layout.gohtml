@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .Service.AppName }}</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+    <div class="app-shell">
+        {{ child "header" }}
+
+        <main id="content">
+            {{ child "content" }}
+        </main>
+    </div>
+
+    <aside id="toast" class="toast" aria-live="polite">No out-of-band updates yet.</aside>
+</body>
+</html>

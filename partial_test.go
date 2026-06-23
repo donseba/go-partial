@@ -61,7 +61,7 @@ func TestRequestBasic(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
@@ -100,7 +100,7 @@ func TestRequestBasic(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Target", "content")
+		request.Header.Set(connector.HeaderTarget.String(), "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -116,7 +116,7 @@ func TestRequestWrap(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
@@ -154,7 +154,7 @@ func TestRequestWrap(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Target", "content")
+		request.Header.Set(connector.HeaderTarget.String(), "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -170,11 +170,11 @@ func TestRequestOOB(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
@@ -217,12 +217,12 @@ func TestRequestOOB(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Target", "content")
+		request.Header.Set(connector.HeaderTarget.String(), "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
 
-		expected := "<div>Welcome to the home page</div><div hx-swap-oob='true' id='footer'>This is the footer</div>"
+		expected := "<div>Welcome to the home page</div><div hx-swap-oob=\"true\" id='footer'>This is the footer</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -233,11 +233,11 @@ func TestRequestOOBSwap(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/footer.html":  "<div {{ if swapOOB }}hx-swap-oob='true' {{ end }}id='footer'>{{.Data.Text}}</div>",
+				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Data.Text}}</div>",
 			},
 		}
 
@@ -280,12 +280,12 @@ func TestRequestOOBSwap(t *testing.T) {
 
 	t.Run("partial", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Target", "content")
+		request.Header.Set(connector.HeaderTarget.String(), "content")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
 
-		expected := "<div>Welcome to the home page</div><div hx-swap-oob='true' id='footer'>This is the footer</div>"
+		expected := "<div>Welcome to the home page</div><div hx-swap-oob=\"true\" id='footer'>This is the footer</div>"
 		if response.Body.String() != expected {
 			t.Errorf("expected %s, got %s", expected, response.Body.String())
 		}
@@ -296,7 +296,7 @@ func TestDeepNested(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
@@ -331,7 +331,7 @@ func TestDeepNested(t *testing.T) {
 
 	t.Run("find nested item and return it", func(t *testing.T) {
 		request, _ := http.NewRequest(http.MethodGet, "/", nil)
-		request.Header.Set("X-Target", "nested")
+		request.Header.Set(connector.HeaderTarget.String(), "nested")
 		response := httptest.NewRecorder()
 
 		handleRequest(response, request)
@@ -347,7 +347,7 @@ func TestMissingPartial(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html": `<html><body>{{ child "content" }}</body></html>`,
 			},
@@ -364,7 +364,7 @@ func TestMissingPartial(t *testing.T) {
 	}
 
 	request, _ := http.NewRequest(http.MethodGet, "/", nil)
-	request.Header.Set("X-Target", "nonexistent")
+	request.Header.Set(connector.HeaderTarget.String(), "nonexistent")
 	response := httptest.NewRecorder()
 
 	handleRequest(response, request)
@@ -388,7 +388,7 @@ func TestDataInTemplates(t *testing.T) {
 			"User":      "John Doe",
 		})
 
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
 				"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
@@ -423,7 +423,7 @@ func TestDataInTemplates(t *testing.T) {
 }
 
 func TestWithSelectMap(t *testing.T) {
-	fsys := &InMemoryFS{
+	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
 			"content.gohtml": `<div class="content">{{selection}}</div>`,
@@ -505,7 +505,7 @@ func TestWithSelectMap(t *testing.T) {
 			}
 
 			if tc.selectHeader != "" {
-				req.Header.Set("X-Select", tc.selectHeader)
+				req.Header.Set(connector.HeaderSelect.String(), tc.selectHeader)
 			}
 
 			resp, err := http.DefaultClient.Do(req)
@@ -529,8 +529,119 @@ func TestWithSelectMap(t *testing.T) {
 	}
 }
 
+func TestSelectionPartialInheritsParentConnectorContext(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("content.gohtml", `{{ selection }}`)
+	fsys.AddFile("settings.gohtml", `<div>{{ selectionValue }}</div>`)
+
+	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
+	content.WithSelectMap("settings", map[string]*Partial{
+		"settings": NewID("settings", "settings.gohtml").SetFileSystem(fsys),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
+	req.Header.Set(connector.HeaderSelect.String(), "settings")
+
+	out, err := content.RenderWithRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("render selection: %v", err)
+	}
+
+	if string(out) != `<div>settings</div>` {
+		t.Fatalf("expected selected partial to read parent connector selection, got %q", out)
+	}
+}
+
+func TestSelectionIfUsesDefaultSelection(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("content.gohtml", `<button class="{{ selectionIf "active" "summary" }}">Summary</button>`)
+
+	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
+	content.WithSelectMap("summary", map[string]*Partial{
+		"summary": NewID("summary", "summary.gohtml").SetFileSystem(fsys),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
+	out, err := content.RenderWithRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("render content: %v", err)
+	}
+
+	if string(out) != `<button class="active">Summary</button>` {
+		t.Fatalf("expected selectionIf to use default selection, got %q", out)
+	}
+}
+
+func TestSelectionPartialUsesErrorFragmentOnRenderError(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("content.gohtml", `{{ selection }}`)
+	fsys.AddFile("broken.gohtml", `<div>{{ if .Data.Missing }}broken</div>`)
+
+	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
+	content.WithSelectMap("broken", map[string]*Partial{
+		"broken": NewID("broken", "broken.gohtml").SetFileSystem(fsys),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
+	req.Header.Set(connector.HeaderSelect.String(), "broken")
+
+	out, err := content.RenderWithRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("render selection: %v", err)
+	}
+
+	if !strings.Contains(string(out), `class="go-partial-error"`) {
+		t.Fatalf("expected selected partial fallback, got %q", out)
+	}
+	if !strings.Contains(string(out), `broken`) {
+		t.Fatalf("expected fallback to name the broken selected partial, got %q", out)
+	}
+}
+
+type testLocalizer struct {
+	locale string
+}
+
+func (l testLocalizer) GetLocale() string {
+	return l.locale
+}
+
+func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("content.gohtml", `{{ tl .Loc "hello" }}`)
+
+	svc := NewService(&Config{
+		FS: fsys,
+	})
+	svc.UseFuncs(template.FuncMap{
+		"tl": func(loc Localizer, key string) string {
+			return loc.GetLocale() + ":" + key
+		},
+		"child": func() string {
+			return "should not overwrite protected helper"
+		},
+	})
+
+	content := NewID("content", "content.gohtml")
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := context.WithValue(context.Background(), LocalizerContextKey, testLocalizer{locale: "nl_NL"})
+
+	out, err := svc.NewLayout().Set(content).RenderWithRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	if string(out) != "nl_NL:hello" {
+		t.Fatalf("expected translation function output, got %q", out)
+	}
+
+	if _, ok := svc.getFuncMap()["child"]; ok {
+		t.Fatal("translation functions should not overwrite protected child helper")
+	}
+}
+
 func BenchmarkWithSelectMap(b *testing.B) {
-	fsys := &InMemoryFS{
+	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
 			"content.gohtml": `<div class="content">{{selection}}</div>`,
@@ -541,8 +652,8 @@ func BenchmarkWithSelectMap(b *testing.B) {
 	}
 
 	service := NewService(&Config{
-		Connector: connector.NewPartial(nil),
-		UseCache:  false,
+		Connector:        connector.NewPartial(nil),
+		UseTemplateCache: false,
 	})
 	layout := service.NewLayout().FS(fsys)
 
@@ -574,13 +685,13 @@ func BenchmarkWithSelectMap(b *testing.B) {
 func BenchmarkRenderWithRequest(b *testing.B) {
 	// Setup configuration and service
 	cfg := &Config{
-		Connector: connector.NewPartial(nil),
-		UseCache:  false,
+		Connector:        connector.NewPartial(nil),
+		UseTemplateCache: false,
 	}
 
 	service := NewService(cfg)
 
-	fsys := &InMemoryFS{
+	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
 			"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
@@ -622,9 +733,9 @@ func TestRenderTable(t *testing.T) {
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		// Define in-memory templates for the table and the row
-		fsys := &InMemoryFS{
+		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" "RowNumber" $i }}{{ end }}</table>`,
+				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
 				"templates/row.html":   `<tr><td>Row {{ .Data.RowNumber }}</td></tr>`,
 			},
 		}
@@ -660,27 +771,188 @@ func TestRenderTable(t *testing.T) {
 	}
 }
 
-func TestMergeFuncMap(t *testing.T) {
-	svc := NewService(&Config{
-		FuncMap: template.FuncMap{
-			"existingFunc": func() string { return "existing" },
+func TestScopedReturnsCurrentPartialData(t *testing.T) {
+	svc := NewService(&Config{})
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
+			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td></tr>`,
 		},
+	}
+
+	rowPartial := New("templates/row.html").ID("row").SetFileSystem(fsys)
+
+	tablePartial := New("templates/table.html").ID("table")
+	tablePartial.SetData(map[string]any{
+		"Rows": []int{1, 2, 3},
+	})
+	tablePartial.With(rowPartial)
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(context.Background(), request)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	expected := `<table><tr><td>Row 1</td></tr><tr><td>Row 2</td></tr><tr><td>Row 3</td></tr></table>`
+	if strings.TrimSpace(string(out)) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
+func TestChildAcceptsScopedKeyValuePairs(t *testing.T) {
+	svc := NewService(&Config{})
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" "RowNumber" $i "Owner" $.Data.Owner }}{{ end }}</table>`,
+			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td><td>{{ scoped.Owner }}</td></tr>`,
+		},
+	}
+
+	rowPartial := New("templates/row.html").ID("row").SetFileSystem(fsys)
+	tablePartial := New("templates/table.html").ID("table").SetData(map[string]any{
+		"Rows":  []int{1, 2},
+		"Owner": "Ada",
+	})
+	tablePartial.With(rowPartial)
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	expected := `<table><tr><td>Row 1</td><td>Ada</td></tr><tr><td>Row 2</td><td>Ada</td></tr></table>`
+	if strings.TrimSpace(string(out)) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
+func TestPartialFunctionRendersNamedPartialWithScopedData(t *testing.T) {
+	svc := NewService(&Config{})
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "users/row" (dict "RowNumber" $i) }}{{ end }}</table>`,
+			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td></tr>`,
+		},
+	}
+
+	rowPartial := New("templates/row.html").ID("users/row").SetFileSystem(fsys)
+
+	tablePartial := New("templates/table.html").ID("table")
+	tablePartial.SetData(map[string]any{
+		"Rows": []int{1, 2, 3},
+	})
+	tablePartial.With(rowPartial)
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	expected := `<table><tr><td>Row 1</td></tr><tr><td>Row 2</td></tr><tr><td>Row 3</td></tr></table>`
+	if strings.TrimSpace(string(out)) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
+func TestPartialFunctionAcceptsScopedKeyValuePairs(t *testing.T) {
+	svc := NewService(&Config{})
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "users/row" "RowNumber" $i }}{{ end }}</table>`,
+			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td></tr>`,
+		},
+	}
+
+	rowPartial := New("templates/row.html").ID("users/row").SetFileSystem(fsys)
+	tablePartial := New("templates/table.html").ID("table").SetData(map[string]any{
+		"Rows": []int{1, 2, 3},
+	})
+	tablePartial.With(rowPartial)
+
+	request, _ := http.NewRequest(http.MethodGet, "/", nil)
+	out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(context.Background(), request)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	expected := `<table><tr><td>Row 1</td></tr><tr><td>Row 2</td></tr><tr><td>Row 3</td></tr></table>`
+	if strings.TrimSpace(string(out)) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
+func TestScopedReturnsCopyOfCurrentPartialData(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/view.html": `<div>{{ mutate scoped }}{{ .Data.Name }}</div>`,
+		},
+	}
+
+	p := New("templates/view.html").ID("view").SetFileSystem(fsys)
+	p.SetData(map[string]any{
+		"Name": "Ada",
+	})
+	p.UseFuncs(template.FuncMap{"mutate": func(values map[string]any) string {
+		values["Name"] = "Grace"
+		return ""
+	}})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	expected := `<div>Ada</div>`
+	if strings.TrimSpace(string(out)) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
+	}
+}
+
+func TestUseFuncs(t *testing.T) {
+	svc := NewService(nil)
+
+	svc.UseFuncs(template.FuncMap{
+		"existingFunc": func() string { return "existing" },
+		"newFunc":      func() string { return "new" },
+		"child":        func() string { return "should not overwrite" },
+		"dict":         func() string { return "should not overwrite" },
+		"partial":      func() string { return "should not overwrite" },
+		"scoped":       func() string { return "should not overwrite" },
 	})
 
-	svc.MergeFuncMap(template.FuncMap{
-		"newFunc": func() string { return "new" },
-		"child":   func() string { return "should not overwrite" },
-	})
-
-	if _, ok := svc.config.FuncMap["newFunc"]; !ok {
+	funcs := svc.getFuncMap()
+	if _, ok := funcs["newFunc"]; !ok {
 		t.Error("newFunc should be added to FuncMap")
 	}
 
-	if svc.config.FuncMap["newFunc"].(func() string)() != "new" {
+	if funcs["newFunc"].(func() string)() != "new" {
 		t.Error("newFunc should return 'new'")
 	}
 
-	if _, ok := svc.config.FuncMap["child"]; ok {
+	if funcs["existingFunc"].(func() string)() != "existing" {
+		t.Error("existingFunc should return 'existing'")
+	}
+
+	if _, ok := funcs["child"]; ok {
 		t.Error("child should not be overwritten in FuncMap")
+	}
+
+	if _, ok := funcs["dict"].(func() string); ok {
+		t.Error("dict should not be overwritten in FuncMap")
+	}
+
+	if _, ok := funcs["partial"]; ok {
+		t.Error("partial should not be overwritten in FuncMap")
+	}
+
+	if _, ok := funcs["scoped"]; ok {
+		t.Error("scoped should not be overwritten in FuncMap")
 	}
 }

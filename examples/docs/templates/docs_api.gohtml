@@ -1,0 +1,133 @@
+<article class="docs-page">
+    <p class="eyebrow">Reference</p>
+    <h1>Core API</h1>
+    <p class="lead">The public surface is small: build partials, register relationships, choose a connector, then render through request-aware writer APIs.</p>
+
+    <h2>Construction</h2>
+    <table>
+        <thead><tr><th>Call</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>partial.New(templates...)</code></td><td>Create a partial with the default ID <code>root</code>.</td></tr>
+            <tr><td><code>partial.NewID(id, templates...)</code></td><td>Create a partial with a stable ID. IDs are used for child lookup, target matching, and diagnostics.</td></tr>
+            <tr><td><code>partial.NewService(config)</code></td><td>Create a renderer service with shared filesystem, connector, functions, cache, logger, and error renderer.</td></tr>
+            <tr><td><code>svc.NewLayout()</code></td><td>Create a request render pipeline that applies service config to content and wrapper partials.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Partial methods</h2>
+    <table>
+        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>ID(id)</code></td><td>Set the partial ID.</td></tr>
+            <tr><td><code>Templates(...)</code>, <code>AddTemplate(...)</code></td><td>Replace or append template files.</td></tr>
+            <tr><td><code>SetFileSystem(fs)</code></td><td>Read templates from an <code>fs.FS</code>, usually <code>os.DirFS</code> or <code>embed.FS</code>.</td></tr>
+            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code>, <code>MergeData(map, override)</code></td><td>Set data for the current partial. Data should be request-scoped when it can change.</td></tr>
+            <tr><td><code>SetGlobalData(map)</code>, <code>SetLayoutData(map)</code></td><td>Expose shared ancestor or layout data to templates.</td></tr>
+            <tr><td><code>With(child)</code></td><td>Register a child partial by its ID.</td></tr>
+            <tr><td><code>WithOOB(child)</code></td><td>Register a child that can render out-of-band during partial requests.</td></tr>
+            <tr><td><code>WithSelectMap(defaultKey, map)</code></td><td>Register selectable child partials for <code>{{ "{{ selection }}" }}</code>. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
+            <tr><td><code>WithTargetResolver(fn)</code></td><td>Resolve dynamic target IDs, such as <code>row-42</code>, to a partial and fresh scoped data.</td></tr>
+            <tr><td><code>WithAction(fn)</code>, <code>WithTemplateAction(fn)</code></td><td>Render alternate partials from server-side actions. See <a href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">Selection and action</a>.</td></tr>
+            <tr><td><code>UseFuncs(map)</code></td><td>Add template helpers for this partial. Protected helpers such as <code>child</code>, <code>partial</code>, and <code>scoped</code> cannot be overwritten.</td></tr>
+            <tr><td><code>SetConnector(conn)</code></td><td>Override the connector for one partial tree.</td></tr>
+            <tr><td><code>Response()</code>, <code>SetResponse(response)</code></td><td>Attach protocol response instructions, such as HTMX retargeting or triggers.</td></tr>
+            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Override the embedded error page or fragment.</td></tr>
+            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Override the embedded debug helper output for this partial tree.</td></tr>
+            <tr><td><code>UseTemplateCache(bool)</code></td><td>Enable or disable parsed template caching for this partial.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Service config</h2>
+    <table>
+        <thead><tr><th>Field</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>Connector</code></td><td>Default connector for layouts and partial trees. Defaults to <code>connector.NewPartial(nil)</code>.</td></tr>
+            <tr><td><code>FS</code></td><td>Template filesystem shared by layouts and partials.</td></tr>
+            <tr><td><code>UseTemplateCache</code></td><td>Enable parsed template caching. This does not cache rendered HTML.</td></tr>
+            <tr><td><code>Logger</code></td><td>Logger used for render, child, target, and fallback errors.</td></tr>
+            <tr><td><code>ErrorRenderer</code></td><td>Default embedded error renderer override.</td></tr>
+            <tr><td><code>DebugRenderer</code></td><td>Default embedded debug renderer override.</td></tr>
+            <tr><td><code>ErrorMode</code></td><td><code>ErrorModeSafe</code> hides details. <code>ErrorModeDetailed</code> shows template location and the original render error.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Service methods</h2>
+    <table>
+        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>NewLayout()</code></td><td>Create a render pipeline with service configuration applied.</td></tr>
+            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code></td><td>Expose service-level data as <code>.Service</code>.</td></tr>
+            <tr><td><code>SetConnector(conn)</code></td><td>Change the default connector after service creation.</td></tr>
+            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Change the default error renderer after service creation.</td></tr>
+            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Change the default debug renderer after service creation.</td></tr>
+            <tr><td><code>SetErrorMode(mode)</code></td><td>Change safe or detailed embedded error output after service creation.</td></tr>
+            <tr><td><code>UseFuncs(map)</code></td><td>Add service-level template functions without overwriting protected helpers.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Package functions</h2>
+    <table>
+        <thead><tr><th>Function</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>AddGlobalFunc(name, fn)</code></td><td>Add a helper to the package-level default function map. Services created after this call receive it.</td></tr>
+            <tr><td><code>NewPageFlow(steps)</code></td><td>Create a storage-agnostic multi-step page flow. See the <a href="/docs/api/pageflow" hx-get="/docs/api/pageflow" hx-target="#content" hx-push-url="true">PageFlow API</a>.</td></tr>
+            <tr><td><code>NewSSEWriter(w)</code></td><td>Create a writer for server-sent HTML patches and signals.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Layout methods</h2>
+    <table>
+        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>FS(fs)</code></td><td>Override the template filesystem for this layout.</td></tr>
+            <tr><td><code>Set(content)</code></td><td>Set the main content partial.</td></tr>
+            <tr><td><code>Wrap(wrapper)</code></td><td>Set the page wrapper partial.</td></tr>
+            <tr><td><code>SetData(map)</code>, <code>AddData(key, value)</code></td><td>Expose layout-level data as <code>.Layout</code>.</td></tr>
+            <tr><td><code>SetErrorRenderer(fn)</code></td><td>Override error rendering for this layout tree.</td></tr>
+            <tr><td><code>SetDebugRenderer(fn)</code></td><td>Override debug rendering for this layout tree.</td></tr>
+            <tr><td><code>SetErrorMode(mode)</code></td><td>Override safe or detailed embedded error output for this layout tree.</td></tr>
+            <tr><td><code>UseFuncs(map)</code></td><td>Add template functions for this layout tree.</td></tr>
+            <tr><td><code>RenderWithRequest(ctx, r)</code></td><td>Render through the request-aware layout pipeline and return HTML.</td></tr>
+            <tr><td><code>WriteWithRequest(ctx, w, r)</code></td><td>Render through the request-aware layout pipeline and write the HTTP response.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Rendering methods</h2>
+    <table>
+        <thead><tr><th>Method</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>Render(ctx)</code></td><td>Render without a request. Useful for tests or offline rendering.</td></tr>
+            <tr><td><code>RenderWithRequest(ctx, r)</code></td><td>Render with connector request context. Returns HTML or an error; it does not write fallback error pages.</td></tr>
+            <tr><td><code>WriteWithRequest(ctx, w, r)</code></td><td>Render and write the response. This is the preferred HTTP path because it can apply response headers and embedded error output.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>SSE writer</h2>
+    <table>
+        <thead><tr><th>Call</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>partial.NewSSEWriter(w)</code></td><td>Create a neutral server-sent event writer and apply the expected SSE response headers.</td></tr>
+            <tr><td><code>PatchHTML(target, html)</code></td><td>Emit a <code>partial:patch</code> event with a target selector and HTML fragment.</td></tr>
+            <tr><td><code>PatchPartial(ctx, r, target, p)</code></td><td>Render a partial and emit it as a <code>partial:patch</code> event.</td></tr>
+            <tr><td><code>Signal(name, value)</code></td><td>Emit a <code>partial:signal</code> event with JSON data.</td></tr>
+            <tr><td><code>Error(err)</code></td><td>Emit a <code>partial:error</code> event.</td></tr>
+            <tr><td><code>Comment(text)</code>, <code>Retry(duration)</code>, <code>Flush()</code></td><td>Write standard SSE comments, retry timing, and flush the stream.</td></tr>
+        </tbody>
+    </table>
+
+    <p>SSE header and event names are constants, such as <code>SSEHeaderContentType</code>, <code>SSEContentTypeEventStream</code>, <code>SSEEventPatch</code>, <code>SSEEventSignal</code>, and <code>SSEEventError</code>.</p>
+
+    <h2>Template context</h2>
+    <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+            <tr><td><code>.Data</code></td><td>The current partial's data.</td></tr>
+            <tr><td><code>.Parent</code></td><td>The immediate parent's data when rendered as a child.</td></tr>
+            <tr><td><code>.Global</code></td><td>Merged global data from ancestors.</td></tr>
+            <tr><td><code>.Service</code></td><td>Service-level data from <code>svc.SetData</code>.</td></tr>
+            <tr><td><code>.Layout</code></td><td>Layout-level data from <code>layout.SetData</code>.</td></tr>
+            <tr><td><code>.Request</code>, <code>.URL</code>, <code>.Ctx</code></td><td>Request, URL, and context for request-aware rendering.</td></tr>
+            <tr><td><code>.Loc</code>, <code>.Csrf</code>, <code>.BasePath</code></td><td>Localization, CSRF, and base-path helpers.</td></tr>
+        </tbody>
+    </table>
+</article>

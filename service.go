@@ -18,11 +18,14 @@ type (
 	}
 
 	Config struct {
-		Connector connector.Connector
-		UseCache  bool
-		FuncMap   template.FuncMap
-		Logger    Logger
-		fs        fs.FS
+		Connector        connector.Connector
+		UseTemplateCache bool
+		Logger           Logger
+		FS               fs.FS
+		ErrorRenderer    ErrorRenderer
+		DebugRenderer    DebugRenderer
+		ErrorMode        ErrorMode
+		fs               fs.FS
 	}
 
 	Service struct {
@@ -48,29 +51,37 @@ type (
 
 // NewService returns a new partial service.
 func NewService(cfg *Config) *Service {
-	if cfg.FuncMap == nil {
-		cfg.FuncMap = DefaultTemplateFuncMap
+	if cfg == nil {
+		cfg = &Config{}
 	}
 
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default().WithGroup("partial")
 	}
 
+	if cfg.Connector == nil {
+		cfg.Connector = connector.NewPartial(nil)
+	}
+
 	return &Service{
 		config:            cfg,
 		data:              make(map[string]any),
 		funcMapLock:       sync.RWMutex{},
-		combinedFunctions: cfg.FuncMap,
+		combinedFunctions: copyFuncMap(),
 		connector:         cfg.Connector,
 	}
 }
 
 // NewLayout returns a new layout.
 func (svc *Service) NewLayout() *Layout {
+	fsys := svc.config.FS
+	if fsys == nil {
+		fsys = svc.config.fs
+	}
 	return &Layout{
 		service:           svc,
 		data:              make(map[string]any),
-		filesystem:        svc.config.fs,
+		filesystem:        fsys,
 		connector:         svc.connector,
 		combinedFunctions: svc.getFuncMap(),
 	}
@@ -93,19 +104,27 @@ func (svc *Service) SetConnector(conn connector.Connector) *Service {
 	return svc
 }
 
-// MergeFuncMap merges the given FuncMap with the existing FuncMap.
-func (svc *Service) MergeFuncMap(funcMap template.FuncMap) {
+func (svc *Service) SetErrorRenderer(renderer ErrorRenderer) *Service {
+	svc.config.ErrorRenderer = renderer
+	return svc
+}
+
+func (svc *Service) SetDebugRenderer(renderer DebugRenderer) *Service {
+	svc.config.DebugRenderer = renderer
+	return svc
+}
+
+func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
+	svc.config.ErrorMode = mode
+	return svc
+}
+
+// UseFuncs adds template functions to the Service.
+func (svc *Service) UseFuncs(funcMap template.FuncMap) {
 	svc.funcMapLock.Lock()
 	defer svc.funcMapLock.Unlock()
 
-	for k, v := range funcMap {
-		if _, ok := protectedFunctionNames[k]; ok {
-			svc.config.Logger.Warn("function name is protected and cannot be overwritten", "function", k)
-			continue
-		}
-		// Modify the existing map directly
-		svc.combinedFunctions[k] = v
-	}
+	mergeFuncMap(svc.combinedFunctions, funcMap, svc.config.Logger)
 }
 
 func (svc *Service) getFuncMap() template.FuncMap {
@@ -114,9 +133,58 @@ func (svc *Service) getFuncMap() template.FuncMap {
 	return svc.combinedFunctions
 }
 
+func mergeFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) {
+	for k, v := range src {
+		if _, ok := protectedFunctionNames[k]; ok {
+			if logger != nil {
+				logger.Warn("function name is protected and cannot be overwritten", "function", k)
+			}
+			continue
+		}
+		dst[k] = v
+	}
+}
+
 // FS sets the filesystem for the Layout.
 func (l *Layout) FS(fs fs.FS) *Layout {
 	l.filesystem = fs
+	return l
+}
+
+func (l *Layout) Connector() connector.Connector {
+	return l.connector
+}
+
+func (l *Layout) SetErrorRenderer(renderer ErrorRenderer) *Layout {
+	l.service.config.ErrorRenderer = renderer
+	if l.content != nil {
+		l.content.SetErrorRenderer(renderer)
+	}
+	if l.wrapper != nil {
+		l.wrapper.SetErrorRenderer(renderer)
+	}
+	return l
+}
+
+func (l *Layout) SetDebugRenderer(renderer DebugRenderer) *Layout {
+	l.service.config.DebugRenderer = renderer
+	if l.content != nil {
+		l.content.SetDebugRenderer(renderer)
+	}
+	if l.wrapper != nil {
+		l.wrapper.SetDebugRenderer(renderer)
+	}
+	return l
+}
+
+func (l *Layout) SetErrorMode(mode ErrorMode) *Layout {
+	l.service.config.ErrorMode = mode
+	if l.content != nil {
+		l.content.SetErrorMode(mode)
+	}
+	if l.wrapper != nil {
+		l.wrapper.SetErrorMode(mode)
+	}
 	return l
 }
 
@@ -146,19 +214,12 @@ func (l *Layout) AddData(key string, value any) *Layout {
 	return l
 }
 
-// MergeFuncMap merges the given FuncMap with the existing FuncMap in the Layout.
-func (l *Layout) MergeFuncMap(funcMap template.FuncMap) {
+// UseFuncs adds template functions to the Layout.
+func (l *Layout) UseFuncs(funcMap template.FuncMap) {
 	l.funcMapLock.Lock()
 	defer l.funcMapLock.Unlock()
 
-	for k, v := range funcMap {
-		if _, ok := protectedFunctionNames[k]; ok {
-			l.service.config.Logger.Warn("function name is protected and cannot be overwritten", "function", k)
-			continue
-		}
-		// Modify the existing map directly
-		l.combinedFunctions[k] = v
-	}
+	mergeFuncMap(l.combinedFunctions, funcMap, l.service.config.Logger)
 }
 
 func (l *Layout) getFuncMap() template.FuncMap {
@@ -171,6 +232,9 @@ func (l *Layout) getFuncMap() template.FuncMap {
 // RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
 	l.request = r
+	if l.connector == nil {
+		l.connector = connector.NewPartial(nil)
+	}
 
 	if l.wrapper != nil {
 		l.wrapper.With(l.content)
@@ -185,6 +249,9 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 // WriteWithRequest writes the layout to the response writer.
 func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 	l.request = r
+	if l.connector == nil {
+		l.connector = connector.NewPartial(nil)
+	}
 
 	if l.connector.RenderPartial(r) {
 		if l.wrapper != nil {
@@ -232,8 +299,20 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	if l.service.config.Logger != nil {
 		p.logger = l.service.config.Logger
 	}
-	p.useCache = l.service.config.UseCache
-	p.globalData = l.service.data
+	p.useCache = l.service.config.UseTemplateCache
+	if l.service.config.ErrorRenderer != nil {
+		p.errorRenderer = l.service.config.ErrorRenderer
+	}
+	if l.service.config.DebugRenderer != nil {
+		p.debugRenderer = l.service.config.DebugRenderer
+	}
+	p.errorMode = l.service.config.ErrorMode
+	p.errorModeSet = true
+	p.serviceData = l.service.data
 	p.layoutData = l.data
 	p.request = l.request
+
+	for _, child := range p.children {
+		l.applyConfigToPartial(child)
+	}
 }

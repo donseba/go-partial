@@ -1,0 +1,18 @@
+<form class="flow-form" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
+    <div>
+        <h2>Confirm</h2>
+        <p>The confirmation step receives the merged data from the previous steps.</p>
+    </div>
+    <dl class="facts">
+        <dt>Email</dt>
+        <dd>{{ index .Data.AllData "email" }}</dd>
+        <dt>Project</dt>
+        <dd>{{ index .Data.AllData "name" }}</dd>
+        <dt>Plan</dt>
+        <dd>{{ index .Data.AllData "plan" }}</dd>
+    </dl>
+    <div class="toolbar">
+        <button type="submit" name="direction" value="back">Back</button>
+        <button type="submit" name="direction" value="reset">Start over</button>
+    </div>
+</form>

@@ -1,0 +1,19 @@
+{{ range .Data.Rows }}
+    {{ partial "infinite-row" "Number" . }}
+{{ end }}
+
+{{ if .Data.Done }}
+    {{ child "rickroll" }}
+{{ else }}
+    <div id="infinite-sentinel-{{ .Data.Next }}"
+         class="sentinel"
+         hx-get="/infinite/load"
+         hx-target="#infinite-sentinel-{{ .Data.Next }}"
+         hx-swap="outerHTML"
+         hx-trigger="revealed"
+         hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ .Data.Next }}"}'>
+        Loading more rows after {{ .Data.Next }}...
+    </div>
+{{ end }}
+
+{{ child "infinite-toast" "Start" .Data.Start "Next" .Data.Next "Current" .Data.Current "ActionHeader" .Data.ActionHeader }}

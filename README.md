@@ -17,18 +17,137 @@ To install the package, run:
 go get github.com/donseba/go-partial
 ```
 
-## Advanced use cases 
-Advanced usecases are documented in the [ADVANCED.md](ADVANCED.md) file
+## Template functions
+Template-facing helpers and accessors are documented in [TEMPLATE_FUNCTIONS.md](TEMPLATE_FUNCTIONS.md).
+
+## Example Applications
+A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
+
+```bash
+go run ./examples/docs
+```
+
+Open http://localhost:8091.
+
+An htmx-backed feature showcase with real template files is available in [examples/showcase](examples/showcase).
+
+```bash
+go run ./examples/showcase
+```
+
+Open http://localhost:8090 to see pages for scoped rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, infinite scroll with cursor-style `X-Action` values, and the embedded error page.
 
 ## Integrations
-Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file
+Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file.
+
 - htmx
 - Turbo
-- Stimulus
 - Unpoly
-- Alpine.js / Alpine Ajax (not great)
-- Vue.js (not great)
-- Standalone
+- Partial, for framework-neutral fetch clients and tests
+- SSE writer, for streaming rendered HTML patches
+
+## Embedded Error Page
+`WriteWithRequest` renders a built-in HTML error page when template parsing or execution fails. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
+
+Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200` and `X-Go-Partial-Error: true`, because HTMX does not swap `500` responses by default.
+
+The default renderer does not show a Go stack trace. Template parse and execution errors already carry the useful template location, while a stack captured during fallback rendering mostly describes the application render wrapper path.
+
+You can replace the default renderer globally:
+
+```go
+service := partial.NewService(&partial.Config{
+    ErrorRenderer: func(ctx context.Context, p *partial.Partial, r *http.Request, err error) (template.HTML, error) {
+        return template.HTML(`<div class="error">` + template.HTMLEscapeString(err.Error()) + `</div>`), nil
+    },
+})
+```
+
+Or on one partial:
+
+```go
+content.SetErrorRenderer(partial.DefaultErrorRenderer())
+```
+
+`RenderWithRequest` still returns the render error directly. The fallback page is written by `WriteWithRequest`.
+
+## Localization
+Templates receive a request localizer as `.Loc`. The core interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.UseFuncs`:
+
+```go
+service.UseFuncs(translator.FuncMap())
+```
+
+```go
+ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+_ = content.WriteWithRequest(ctx, w, r)
+```
+
+```html
+<p>{{ tl .Loc "Hello, World!" }}</p>
+<p>{{ tn .Loc "You have one message." "You have %d messages." 5 5 }}</p>
+<button>{{ ctl .Loc "button" "save" }}</button>
+```
+
+`tl`, `tn`, `ctl`, and `ctn` are not built into go-partial. For a fuller translation backend, [github.com/donseba/go-translator](https://github.com/donseba/go-translator) fits this pattern well because it exposes a compatible `FuncMap()`.
+
+## HTMX Response Helpers
+The configured connector turns partial response instructions into protocol-specific response headers:
+
+```go
+content := partial.NewID("notice", "notice.gohtml")
+
+content.Response().
+    Retarget("#notice").
+    ReswapWith(connector.NewSwap().Style(connector.SwapOuterHTML).Transition(true)).
+    TriggerWith(connector.NewTrigger().AddEventObject("notice", map[string]any{
+        "message": "Saved",
+    }))
+```
+
+You can also set the response instructions as data:
+
+```go
+content.SetResponse(connector.Response{
+    Retarget: "#notice",
+    Trigger: connector.NewTrigger().AddEventObject("notice", map[string]any{
+        "message": "Saved",
+    }).String(),
+})
+```
+
+With the HTMX connector, these become `HX-Retarget`, `HX-Reswap`, and `HX-Trigger` headers during `WriteWithRequest`.
+
+## Debug Helper
+The `debug` template helper renders a styled diagnostic box using an embedded template:
+
+```gotemplate
+{{ debug .Data }}
+```
+
+Override debug output globally, per layout, or per partial:
+
+```go
+service.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
+    return template.HTML(`<pre class="debug">` + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + `</pre>`), nil
+})
+```
+
+## Server-Sent Events
+SSE is a writer layer, not a connector. Use it after deciding which partials changed:
+
+```go
+events := partial.NewSSEWriter(w)
+
+notice := partial.NewID("notice", "notice.gohtml").
+    SetData(map[string]any{"Message": "Saved"})
+
+_ = events.PatchPartial(r.Context(), r, "#notice", notice)
+_ = events.Signal("saved", true)
+events.Flush()
+```
+
+The writer declares constants for expected headers and event names, such as `SSEHeaderContentType`, `SSEContentTypeEventStream`, `SSEEventPatch`, `SSEEventSignal`, and `SSEEventError`.
 
 ## Basic Usage
 Here's a simple example of how to use the package to render a template.
@@ -38,13 +157,16 @@ The `Service` holds global configurations and data.
 
 ```go 
 cfg := &partial.Config{
-    PartialHeader: "X-Target",          // Optional: Header to determine which partial to render
-    UseCache:      true,                 // Enable template caching
-    FuncMap:       template.FuncMap{},   // Global template functions
-    Logger:        myLogger,             // Implement the Logger interface or use nil
+    Connector:        connector.NewHTMX(nil), // Choose how request headers are read
+    FS:               os.DirFS("web"),        // Template filesystem
+    UseTemplateCache: true,                   // Enable parsed template caching
+    Logger:           myLogger,               // Implement the Logger interface or use nil
 }
 
 service := partial.NewService(cfg)
+service.UseFuncs(template.FuncMap{
+    "money": formatMoney,
+})
 service.SetData(map[string]any{
     "AppName": "My Application",
 })
@@ -139,7 +261,7 @@ Use the child function to render child partials within your templates.
 ```html
 {{ child "partial_id" }}
 ```
-You can also pass data to the child partial using key-value pairs:
+You can also pass scoped data to the child partial using key/value pairs:
 
 ```html
 {{ child "sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
@@ -150,6 +272,42 @@ Child Partial (sidebar):
     <p>User: {{ .Data.UserName }}</p>
     <p>Notifications: {{ .Data.Notifications }}</p>
 </div>
+```
+
+The same child-local data is also available through the `scoped` helper. This can make repeated fragments easier to read:
+
+```html
+{{ child "sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
+```
+
+```html
+<div>
+    <p>User: {{ scoped.UserName }}</p>
+    <p>Notifications: {{ scoped.Notifications }}</p>
+</div>
+```
+
+For reusable named partials, use `partial` with the same scoped data style:
+
+```html
+{{ partial "partials/sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
+```
+
+```html
+<div>
+    <p>User: {{ scoped.UserName }}</p>
+    <p>Notifications: {{ scoped.Notifications }}</p>
+</div>
+```
+
+For dynamic DOM targets such as table rows, use `WithTargetResolver` to map a target like `row-2` to a reusable row partial and fresh scoped data:
+
+```go
+table.With(rowPartial)
+table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+    row := findRowForTarget(target)
+    return rowPartial, map[string]any{"Row": row}, true
+})
 ```
 
 ## Using Out-of-Band (OOB) Partials
@@ -168,11 +326,11 @@ p.WithOOB(footer)
 ```
 
 ### Using OOB Partials in Templates
-In your templates, you can use the swapOOB function to conditionally render OOB attributes.
+In your templates, you can use the `oobAttr` function to conditionally render OOB attributes.
 
 templates/footer.html
 ```html
-<div {{ if swapOOB }}hx-swap-oob="true"{{ end }} id="footer">{{ .Data.Text }}</div>
+<div{{ oobAttr }} id="footer">{{ .Data.Text }}</div>
 ```
 
 ## Wrapping Partials
@@ -198,8 +356,8 @@ funcs := template.FuncMap{
     "upper": strings.ToUpper,
 }
 
-// Set the functions for the partial
-p.SetFuncs(funcs)
+// Add the functions for this partial tree
+p.UseFuncs(funcs)
 ```
 
 ### Usage in Template:
@@ -208,7 +366,7 @@ p.SetFuncs(funcs)
 ```
 
 ### Using a Custom File System
-If your templates are stored in a custom file system, you can set it using WithFS:
+If your templates are stored in a custom file system, set it with `SetFileSystem`:
 
 ```go
 import (
@@ -218,7 +376,7 @@ import (
 //go:embed templates/*
 var content embed.FS
 
-p.WithFS(content)
+p.SetFileSystem(content)
 ```
 
 If you do not use a custom file system, the package will use the default file system and look for templates relative to the current working directory.
@@ -232,7 +390,7 @@ templates/table.html
 ```html
 <table>
     {{ range $i := .Data.Rows }}
-    {{ child "row" "RowNumber" $i }}
+    {{ partial "users/row" "RowNumber" $i }}
     {{ end }}
 </table>
 ```
@@ -240,14 +398,14 @@ templates/table.html
 templates/row.html
 ```html
 <tr>
-    <td>{{ .Data.RowNumber }}</td>
+    <td>{{ scoped.RowNumber }}</td>
 </tr>
 ```
 
 Go Code:
 ```go
 // Create the row partial
-rowPartial := partial.New("templates/row.html").ID("row")
+rowPartial := partial.New("templates/row.html").ID("users/row")
 
 // Create the table partial and set data
 tablePartial := partial.New("templates/table.html").ID("table")
@@ -278,7 +436,7 @@ The package includes concurrency safety measures for template caching:
 
 ```go
 cfg := &partial.Config{
-    UseCache: true,
+    UseTemplateCache: true,
 }
 ```
 

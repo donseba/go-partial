@@ -1,0 +1,57 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Selected children</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>The shell stays the same while the selected partial is chosen by <code>{{ selectionHeader }}</code>.</p>
+    </header>
+
+    <div class="example-surface">
+        <div class="tabs" role="tablist">
+            <button
+                role="tab"
+                aria-selected="{{ if selectionIf true "summary" }}true{{ else }}false{{ end }}"
+                class="{{ selectionIf "active" "summary" }}"
+                hx-get="/selection"
+                hx-target="#content"
+                hx-headers='{"{{ selectionHeader }}":"summary"}'>
+                Summary
+            </button>
+            <button
+                role="tab"
+                aria-selected="{{ if selectionIf true "details" }}true{{ else }}false{{ end }}"
+                class="{{ selectionIf "active" "details" }}"
+                hx-get="/selection"
+                hx-target="#content"
+                hx-headers='{"{{ selectionHeader }}":"details"}'>
+                Details
+            </button>
+        </div>
+
+        <div class="tab-panel" role="tabpanel">
+            {{ selection }}
+        </div>
+    </div>
+
+    <article class="description-panel">
+        <h2>Header-driven selection</h2>
+        <p>The selected key comes from <code>{{ selectionHeader }}</code>. The server maps that key to a registered child partial and renders only that choice.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content.WithSelectMap("summary", map[string]*partial.Partial{
+    "summary": summary,
+    "details": details,
+})</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;button class="{{ "{{ selectionIf \"active\" \"summary\" }}" }}"
+        hx-headers='{"{{ "{{ selectionHeader }}" }}":"summary"}'&gt;
+    Summary
+&lt;/button&gt;
+
+{{ "{{ selection }}" }}</code></pre>
+    </article>
+</section>

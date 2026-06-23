@@ -1,0 +1,51 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Selected children</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>Tabs are just selected partials. Each tab click sends <code>{{ selectionHeader }}</code>, and the server renders the selected child into the same panel.</p>
+    </header>
+
+    <div class="example-surface">
+        <div class="tabs" role="tablist">
+            {{ range .Data.Tabs }}
+                <button
+                    role="tab"
+                    aria-selected="{{ if selectionIf true .Key }}true{{ else }}false{{ end }}"
+                    class="{{ selectionIf "active" .Key }}"
+                    hx-get="/tabs"
+                    hx-target="#content"
+                    hx-headers='{"{{ selectionHeader }}":"{{ .Key }}"}'>
+                    {{ .Label }}
+                </button>
+            {{ end }}
+        </div>
+
+        <div class="tab-panel" role="tabpanel">
+            {{ selection }}
+        </div>
+    </div>
+
+    <article class="description-panel">
+        <h2>Same primitive, different UI</h2>
+        <p>The tabs use the same selection mechanism as the selection page. The active state is derived from the current request header.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content.WithSelectMap("overview", map[string]*partial.Partial{
+    "overview": overview,
+    "activity": activity,
+    "settings": settings,
+    "failing": failing,
+})</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;button hx-get="/tabs"
+        hx-target="#content"
+        hx-headers='{"{{ selectionHeader }}":"overview"}'&gt;
+    Overview
+&lt;/button&gt;</code></pre>
+    </article>
+</section>

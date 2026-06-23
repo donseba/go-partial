@@ -1,0 +1,44 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Template composition</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>Rows are rendered by a child partial using <code>partial</code> with scoped key/value pairs.</p>
+    </header>
+
+    <table class="example-surface">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Price</th>
+                <th>Status</th>
+                <th>Owner</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .Data.Rows }}
+                {{ partial "row" "Row" . "Owner" $.Data.Owner }}
+            {{ end }}
+        </tbody>
+    </table>
+
+    <article class="description-panel">
+        <h2>Scoped row data</h2>
+        <p>The table owns the loop, while each row receives explicit local data. That keeps row templates reusable without relying on hidden parent fields.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>row := partial.NewID("row", "templates/row.gohtml")
+table := partial.NewID("content", "templates/scoped.gohtml")
+table.With(row)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>{{ "{{ range .Data.Rows }}" }}
+    {{ "{{ partial \"row\" \"Row\" . \"Owner\" $.Data.Owner }}" }}
+{{ "{{ end }}" }}</code></pre>
+    </article>
+</section>

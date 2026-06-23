@@ -1,0 +1,14 @@
+<header id="app-header" class="app-header"{{ oobAttr }}>
+    <a class="brand" href="/" hx-get="/" hx-target="#content" hx-push-url="true">
+        <span class="brand-mark">gp</span>
+        <span>
+            <strong>go-partial</strong>
+            <small>server-rendered partials for Go</small>
+        </span>
+    </a>
+    <nav class="top-nav">
+        <a href="/" hx-get="/" hx-target="#content" hx-push-url="true" class="{{ if urlIs "/" }}active{{ end }}">Docs</a>
+        <a href="http://localhost:8090">Showcase</a>
+        <a href="https://github.com/donseba/go-partial">GitHub</a>
+    </nav>
+</header>

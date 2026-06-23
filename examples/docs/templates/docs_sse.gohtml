@@ -1,0 +1,46 @@
+<article class="docs-page">
+    <p class="eyebrow">Integration</p>
+    <h1>Server-sent events</h1>
+    <p class="lead">SSE is a streaming writer layer. It does not replace connectors; it sends events after your handler decides what changed.</p>
+
+    <h2>Patch a rendered partial</h2>
+    <p>Use <code>NewSSEWriter</code> to apply the expected event-stream headers, then render a partial into a <code>partial:patch</code> event.</p>
+
+    <pre><code>events := partial.NewSSEWriter(w)
+
+notice := partial.NewID("notice", "templates/notice.gohtml").
+    SetData(map[string]any{"Message": "Saved"})
+
+_ = events.PatchPartial(r.Context(), r, "#notice", notice)
+_ = events.Signal("saved", true)
+events.Flush()</code></pre>
+
+    <h2>Client listener</h2>
+    <p>The default event names are neutral. Your client can decide whether to replace <code>outerHTML</code>, update state, or hand the HTML to another library.</p>
+
+    <pre><code>const stream = new EventSource("/events")
+
+stream.addEventListener("partial:patch", (event) =&gt; {
+    const patch = JSON.parse(event.data)
+    document.querySelector(patch.target).outerHTML = patch.html
+})
+
+stream.addEventListener("partial:signal", (event) =&gt; {
+    console.log(JSON.parse(event.data))
+})</code></pre>
+
+    <h2>Event names and headers</h2>
+    <table>
+        <thead><tr><th>Constant</th><th>Meaning</th></tr></thead>
+        <tbody>
+            <tr><td><code>SSEHeaderContentType</code></td><td><code>Content-Type</code></td></tr>
+            <tr><td><code>SSEContentTypeEventStream</code></td><td><code>text/event-stream</code></td></tr>
+            <tr><td><code>SSEEventPatch</code></td><td><code>partial:patch</code></td></tr>
+            <tr><td><code>SSEEventSignal</code></td><td><code>partial:signal</code></td></tr>
+            <tr><td><code>SSEEventError</code></td><td><code>partial:error</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2>Why it is not a connector</h2>
+    <p>A connector interprets one request and writes one response. SSE keeps the response open and writes many events, so it is better as an explicit writer that can still render normal partials.</p>
+</article>

@@ -1,0 +1,67 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Localization</h1>
+    <p class="lead">Localization is intentionally split in two: <code>.Loc</code> carries the active locale, while translation functions such as <code>tl</code>, <code>tn</code>, <code>ctl</code>, and <code>ctn</code> are user-provided template functions.</p>
+
+    <h2>Core interface</h2>
+    <p>The built-in interface only requires a locale string. That keeps the core package independent from any translation catalog format.</p>
+
+    <pre><code>type Localizer interface {
+    GetLocale() string
+}</code></pre>
+
+    <h2>Attach a request localizer</h2>
+    <p>Store a localizer in the request context before calling <code>WriteWithRequest</code>. Templates receive it as <code>.Loc</code>.</p>
+
+    <pre><code>type Localizer struct {
+    Locale string
+}
+
+func (l Localizer) GetLocale() string { return l.Locale }
+
+ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+_ = content.WriteWithRequest(ctx, w, r)</code></pre>
+
+    <h2>Register translation functions</h2>
+    <p>The translation behavior should live in the service template function map. go-partial does not own a translation API; add the functions your application wants with <code>Service.UseFuncs</code>.</p>
+
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector:   connector.NewHTMX(nil),
+    FS:          os.DirFS("web"),
+})
+svc.UseFuncs(myTranslations.FuncMap())</code></pre>
+
+    <h2>Use it in templates</h2>
+    <p>This keeps the localizer interface small. The functions receive <code>.Loc</code>, read its locale, and resolve the translation however the provider wants.</p>
+
+    <pre><code>&lt;h1&gt;{{ "{{ tl .Loc \"Hello, World!\" }}" }}&lt;/h1&gt;
+&lt;p&gt;{{ "{{ tn .Loc \"You have one message.\" \"You have %d messages.\" 5 5 }}" }}&lt;/p&gt;
+&lt;button&gt;{{ "{{ ctl .Loc \"button\" \"save\" }}" }}&lt;/button&gt;
+&lt;small&gt;{{ "{{ .Loc.GetLocale }}" }}&lt;/small&gt;</code></pre>
+
+    <h2>With go-translator</h2>
+    <p><a href="https://github.com/donseba/go-translator">github.com/donseba/go-translator</a> is a good fit for this hook. It supports dynamic languages from PO files, template integration, plural forms, contextual translations, and prefix handling.</p>
+
+    <p>go-translator already exposes <code>tr.FuncMap()</code>, including <code>tl</code>, <code>tn</code>, <code>ctl</code>, and <code>ctn</code>. Wire those functions into the service:</p>
+
+    <pre><code>tr := translator.NewTranslator("translations", "templates")
+_ = tr.AddLanguage("en_US")
+_ = tr.AddLanguage("nl_NL")
+
+svc := partial.NewService(&partial.Config{
+    Connector:   connector.NewHTMX(nil),
+})
+svc.UseFuncs(tr.FuncMap())</code></pre>
+
+    <p>This keeps the core package out of translation semantics. Your translation package owns pluralization, context, fallback language, catalog loading, and missing-key behavior.</p>
+
+    <h2>Why this shape</h2>
+    <ul>
+        <li>Applications can use go-translator, map catalogs, database-backed translations, gettext, or another library.</li>
+        <li>The renderer does not need to know about pluralization, interpolation, or fallback rules.</li>
+        <li>HTMX language switches can re-render only the content region while the layout and OOB navigation stay intact.</li>
+    </ul>
+
+    <h2>Showcase</h2>
+    <p>The showcase app includes a live localization page with <code>en_US</code>, <code>nl_NL</code>, and <code>fr_FR</code> examples.</p>
+</article>

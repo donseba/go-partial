@@ -1,0 +1,15 @@
+<form class="flow-form" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
+    <div>
+        <h2>Account</h2>
+        <p>Start with an email address. Validation runs on the server before the next partial is rendered.</p>
+    </div>
+    {{ if .Data.Error }}<p class="form-error">{{ .Data.Error }}</p>{{ end }}
+    <label>
+        Email
+        <input name="email" type="email" value="{{ .Data.Email }}" placeholder="ada@example.com">
+    </label>
+    <div class="toolbar">
+        <button type="submit">Continue</button>
+        <button type="submit" name="direction" value="reset">Reset</button>
+    </div>
+</form>

@@ -1,0 +1,119 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Streaming partials</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>This page opens an <code>EventSource</code> stream. The server renders normal go-partial templates and sends them as <code>partial:patch</code> events.</p>
+    </header>
+
+    <div class="sse-demo">
+        <section class="sse-stage">
+            <article id="sse-status" class="sse-status">
+                <div class="status-meta">
+                    <span class="pill">Idle</span>
+                    <span>Waiting for EventSource</span>
+                </div>
+                <h2>Ready to stream</h2>
+                <p>Start the stream to receive server-rendered patches.</p>
+            </article>
+        </section>
+
+        <aside class="sse-controls" aria-label="SSE client state">
+            <h2>Client state</h2>
+            <dl class="state-list">
+                <div>
+                    <dt>Progress</dt>
+                    <dd><span id="sse-progress">0</span> / 5</dd>
+                </div>
+                <div>
+                    <dt>Connection</dt>
+                    <dd id="sse-connection">Closed</dd>
+                </div>
+            </dl>
+            <div class="toolbar">
+                <button type="button" id="sse-start">Start stream</button>
+                <button type="button" id="sse-stop">Stop stream</button>
+            </div>
+        </aside>
+    </div>
+
+    <article class="description-panel">
+        <h2>Streamed HTML patches</h2>
+        <p>SSE is a writer layer. The server can render an ordinary partial and send it as a named event while the client decides how to apply that patch.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>events := partial.NewSSEWriter(w)
+_ = events.PatchPartial(ctx, r, "#sse-status", statusPartial)
+_ = events.Signal("progress", map[string]any{"step": step})
+events.Flush()</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>source.addEventListener("partial:patch", (event) =&gt; {
+    const patch = JSON.parse(event.data);
+    document.querySelector(patch.target).outerHTML = patch.html;
+});</code></pre>
+    </article>
+</section>
+
+<script>
+(() => {
+    let source;
+    const start = document.getElementById("sse-start");
+    const stop = document.getElementById("sse-stop");
+    const progress = document.getElementById("sse-progress");
+    const connection = document.getElementById("sse-connection");
+
+    const close = () => {
+        if (source) {
+            source.close();
+            source = null;
+        }
+        connection.textContent = "Closed";
+    };
+
+    start.addEventListener("click", () => {
+        close();
+        progress.textContent = "0";
+        connection.textContent = "Opening";
+        source = new EventSource("/sse/stream");
+
+        source.addEventListener("open", () => {
+            connection.textContent = "Open";
+        });
+
+        source.addEventListener("partial:patch", (event) => {
+            const patch = JSON.parse(event.data);
+            const target = document.querySelector(patch.target);
+            if (target) {
+                target.outerHTML = patch.html;
+            }
+        });
+
+        source.addEventListener("partial:signal", (event) => {
+            const signal = JSON.parse(event.data);
+            if (signal.name === "progress") {
+                progress.textContent = signal.value.step;
+                if (signal.value.done) {
+                    close();
+                }
+            }
+        });
+
+        source.addEventListener("partial:error", (event) => {
+            connection.textContent = JSON.parse(event.data).error;
+            close();
+        });
+
+        source.addEventListener("error", () => {
+            if (source) {
+                connection.textContent = "Retrying";
+            }
+        });
+    });
+
+    stop.addEventListener("click", close);
+})();
+</script>

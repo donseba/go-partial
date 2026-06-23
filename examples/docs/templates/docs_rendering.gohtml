@@ -1,0 +1,39 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Rendering model</h1>
+    <p class="lead">A page is a partial tree. A layout wraps content, content owns children, and HTMX can request one target without losing the surrounding model.</p>
+
+    <h2>Layout plus content</h2>
+    <p>The layout owns the page shell. The content partial owns the route-specific body. For a normal request, the wrapper renders and calls <code>{{ "{{ child \"content\" }}" }}</code>. For an HTMX request, the connector can render only the requested target.</p>
+
+    <pre><code>wrapper := partial.NewID("layout", "layout.gohtml")
+content := partial.NewID("content", "pages/dashboard.gohtml")
+
+layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
+
+    <h2>Children</h2>
+    <p>Register children in Go and render them from templates.</p>
+    <pre><code>content.With(partial.NewID("stats", "partials/stats.gohtml"))</code></pre>
+    <pre><code>{{ "{{ child \"stats\" }}" }}</code></pre>
+    <p>Children inherit request, connector, filesystem, service data, and error rendering behavior from the parent tree. They also receive the immediate parent's data as <code>.Parent</code>.</p>
+
+    <h2>Request rendering flow</h2>
+    <ol>
+        <li>The route creates the content partial and any children needed for that request.</li>
+        <li>The layout applies service configuration: filesystem, connector, function map, logger, cache, service data, and error renderer.</li>
+        <li>The connector decides whether this is a full render or a partial render.</li>
+        <li>For a full render, the wrapper renders the page shell and calls child partials from the template.</li>
+        <li>For a partial render, go-partial renders the requested target and appends any out-of-band ancestors that should update too.</li>
+    </ol>
+
+    <h2>Dynamic targets</h2>
+    <p>Use a target resolver when DOM IDs are dynamic, such as table rows. The resolver maps a browser target like <code>row-42</code> back to a reusable row partial and fresh scoped data.</p>
+    <pre><code>table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+    row := findRow(target)
+    return rowPartial, map[string]any{"Row": row}, true
+})</code></pre>
+    <p><a href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">Read the full target resolver guide</a>.</p>
+
+    <h2>Writer APIs versus render APIs</h2>
+    <p>Use <code>WriteWithRequest</code> in HTTP handlers when possible. It owns response headers, protocol response instructions, and embedded error output. Use <code>RenderWithRequest</code> when you want HTML and error handling under your own control.</p>
+</article>

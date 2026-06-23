@@ -1,0 +1,35 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Connector response</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>The button calls a small handler that sets response instructions on the partial. The configured connector writes the HTMX headers.</p>
+    </header>
+
+    <div class="example-surface stack">
+        <div id="notice" class="notice">No response header update yet.</div>
+        <button hx-post="/headers/notify" hx-target="#notice" hx-swap="outerHTML">Send htmx headers</button>
+    </div>
+
+    <article class="description-panel">
+        <h2>Connector-owned output</h2>
+        <p>The partial declares response intent, such as retargeting and triggers. The configured connector translates that intent into framework-specific headers.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content.Response().
+    Retarget("#notice").
+    TriggerWith(connector.NewTrigger().AddEvent("showcase:notice"))</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;div id="notice"&gt;No response header update yet.&lt;/div&gt;
+
+&lt;button hx-post="/headers/notify"
+        hx-target="#notice"
+        hx-swap="outerHTML"&gt;
+    Send htmx headers
+&lt;/button&gt;</code></pre>
+    </article>
+</section>

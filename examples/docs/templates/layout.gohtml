@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .Service.AppName }} documentation</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link rel="stylesheet" href="/static/site.css">
+</head>
+<body>
+    {{ child "header" }}
+    <div class="docs-shell">
+        {{ child "sidebar" }}
+        <main id="content" class="docs-content">
+            {{ child "content" }}
+        </main>
+    </div>
+</body>
+</html>

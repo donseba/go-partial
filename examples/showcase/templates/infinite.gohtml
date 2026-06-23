@@ -1,0 +1,48 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Cursor loading</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>The sentinel sends the current cursor in <code>X-Action</code>, such as <code>current-25</code>. The server returns the next chunk until row 150.</p>
+    </header>
+
+    <div class="feed example-surface" id="infinite-feed">
+        {{ range .Data.Rows }}
+            {{ partial "infinite-row" "Number" . }}
+        {{ end }}
+
+        {{ if .Data.Done }}
+            {{ child "rickroll" }}
+        {{ else }}
+            <div id="infinite-sentinel-{{ .Data.Next }}"
+                 class="sentinel"
+                 hx-get="/infinite/load"
+                 hx-target="#infinite-sentinel-{{ .Data.Next }}"
+                 hx-swap="outerHTML"
+                 hx-trigger="revealed"
+                 hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ .Data.Next }}"}'>
+                Loading more rows after {{ .Data.Next }}...
+            </div>
+        {{ end }}
+    </div>
+
+    <article class="description-panel">
+        <h2>No shared server cursor</h2>
+        <p>The client sends the current row number, and the server calculates the next chunk from that value. Opening the page in another tab starts from its own cursor.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>current := parseCursor(r.Header.Get(connector.HeaderAction.String()))
+start := current + 1
+content := infinitePartial("infinite-chunk", start, 25)
+content.Render(ctx)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;div hx-get="/infinite/load"
+     hx-trigger="revealed"
+     hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ "{{ .Data.Next }}" }}"}'&gt;
+&lt;/div&gt;</code></pre>
+    </article>
+</section>

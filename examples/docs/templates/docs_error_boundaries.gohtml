@@ -1,0 +1,36 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Error boundaries</h1>
+    <p class="lead">A failing child partial renders a section-level fallback. The page shell survives, which is useful for development and production.</p>
+
+    <h2>Default behavior</h2>
+    <p>Direct top-level failures render a useful error page. Child failures render an error section inside the parent output.</p>
+    <p>The built-in renderer focuses on the template failure itself. In detailed mode it shows the partial ID, template list, request URL, extracted template location, and original render error.</p>
+
+    <h2>Where boundaries apply</h2>
+    <table>
+        <thead><tr><th>Failure</th><th>Result</th></tr></thead>
+        <tbody>
+            <tr><td>Top-level content fails during <code>WriteWithRequest</code></td><td>A full error page for normal requests, or a swappable error fragment for HTMX requests.</td></tr>
+            <tr><td>Child partial fails inside a parent template</td><td>The parent keeps rendering and the child position receives an error fragment.</td></tr>
+            <tr><td>Selected partial fails inside <code>{{ "{{ selection }}" }}</code></td><td>The selected tab or panel receives an error fragment while the rest of the page survives.</td></tr>
+            <tr><td><code>RenderWithRequest</code> returns an error</td><td>The caller decides how to handle it. The embedded page is a writer-level behavior.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Development and production</h2>
+    <p>The default mode is <code>ErrorModeSafe</code>. It keeps the fallback useful but hides detailed error messages. During development, opt into <code>ErrorModeDetailed</code> to show the partial ID, template list, URL, template location, and original error.</p>
+
+    <pre><code>svc := partial.NewService(&partial.Config{
+    ErrorMode: partial.ErrorModeDetailed,
+})</code></pre>
+
+    <h2>Custom renderer</h2>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    ErrorRenderer: func(ctx context.Context, p *partial.Partial, r *http.Request, err error) (template.HTML, error) {
+        return template.HTML("&lt;section&gt;Something went wrong&lt;/section&gt;"), nil
+    },
+})</code></pre>
+
+    <p>The separate showcase app includes a live broken-template example. It keeps the shell in place and only replaces the failing content section.</p>
+</article>

@@ -1,0 +1,45 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Data and context</h1>
+    <p class="lead">go-partial deliberately separates data by where it comes from. That keeps repeated rows, layout state, service settings, request values, and parent context from collapsing into one large bag.</p>
+
+    <h2>The render data object</h2>
+    <p>Every template receives a structured object. The most common field is <code>.Data</code>, but the surrounding fields are what make nested partials useful.</p>
+
+    <table>
+        <thead><tr><th>Field</th><th>Lifetime</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>.Data</code></td><td>Current partial</td><td>Local data for the partial currently being rendered.</td></tr>
+            <tr><td><code>.Parent</code></td><td>Immediate parent</td><td>Data from the partial that rendered this child.</td></tr>
+            <tr><td><code>.Global</code></td><td>Ancestor tree</td><td>Merged global data from parent partials.</td></tr>
+            <tr><td><code>.Service</code></td><td>Application/service</td><td>Shared app data configured on <code>Service</code>.</td></tr>
+            <tr><td><code>.Layout</code></td><td>One layout render</td><td>Data configured on the layout pipeline.</td></tr>
+            <tr><td><code>.Request</code>, <code>.URL</code>, <code>.Ctx</code></td><td>HTTP request</td><td>Request-aware helpers, links, and context integrations.</td></tr>
+            <tr><td><code>.Loc</code>, <code>.Csrf</code>, <code>.BasePath</code></td><td>Request or tree</td><td>Extension hooks for localization, CSRF, and URL generation.</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Local row data</h2>
+    <p>When rendering repeated fragments, prefer explicit local data. The row partial gets only the row it needs, plus whatever parent context is intentionally available.</p>
+
+    <pre><code>{{ "{{ range .Data.Rows }}" }}
+    {{ "{{ partial \"users/row\" \"Row\" . }}" }}
+{{ "{{ end }}" }}</code></pre>
+
+    <pre><code>&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
+    &lt;td&gt;{{ "{{ scoped.Row.Name }}" }}&lt;/td&gt;
+    &lt;td&gt;{{ "{{ .Parent.Owner }}" }}&lt;/td&gt;
+&lt;/tr&gt;</code></pre>
+
+    <h2>Choosing a scope</h2>
+    <ul>
+        <li>Use <code>.Data</code> for the current template's direct model.</li>
+        <li>Use <code>scoped</code> when the data was passed by a <code>child</code> or <code>partial</code> call and you want that intent to be visible.</li>
+        <li>Use <code>.Parent</code> when a child needs information from the component that rendered it.</li>
+        <li>Use <code>.Service</code> for stable application values such as app name, version, or feature flags.</li>
+        <li>Use request context for per-request concerns such as locale, authenticated user experiments, and tracing.</li>
+    </ul>
+
+    <h2>Caching note</h2>
+    <p>Template caching caches parsed templates, not rendered HTML. Dynamic data should still be loaded per request and passed into the partial. Avoid caching rendered row output unless the data is truly immutable.</p>
+</article>

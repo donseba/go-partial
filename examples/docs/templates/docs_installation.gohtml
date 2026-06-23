@@ -1,0 +1,25 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Installation</h1>
+    <p class="lead">Install the package, choose a connector, and point the renderer at your template filesystem.</p>
+
+    <pre><code>go get github.com/donseba/go-partial</code></pre>
+
+    <h2>Recommended setup</h2>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewHTMX(nil),
+    FS:        os.DirFS("web"),
+    UseTemplateCache: true,
+    ErrorMode: partial.ErrorModeDetailed,
+})</code></pre>
+
+    <p>During development you can leave template caching off. In production, cache parsed templates and keep data request-scoped. Error output defaults to safe mode; opt into detailed mode for local development diagnostics.</p>
+
+    <h2>Template layout</h2>
+    <pre><code>web/
+  layout.gohtml
+  header.gohtml
+  pages/
+    home.gohtml
+    settings.gohtml</code></pre>
+</article>

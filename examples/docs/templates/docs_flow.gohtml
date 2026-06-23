@@ -1,0 +1,93 @@
+<article class="docs-page">
+    <p class="eyebrow">Guide</p>
+    <h1>Page flows</h1>
+    <p class="lead">PageFlow is a small coordinator for multi-step server-rendered screens. It knows the ordered steps, current step, validation callbacks, and collected step data; your application still owns routing and storage.</p>
+
+    <h2>When to use it</h2>
+    <p>Use a flow when a page is split into a sequence of partials, such as onboarding, checkout, setup wizards, or multi-step forms. Each step can be a normal partial and can be rendered with HTMX into the same page region.</p>
+
+    <h2>Define steps</h2>
+    <pre><code>steps := []partial.FlowStep{
+    {
+        Name:    "account",
+        Partial: partial.NewID("account", "flow/account.gohtml"),
+        Validate: func(r *http.Request, data map[string]any) error {
+            if data["email"] == "" {
+                return errors.New("email is required")
+            }
+            return nil
+        },
+    },
+    {Name: "details", Partial: partial.NewID("details", "flow/details.gohtml")},
+    {Name: "confirm", Partial: partial.NewID("confirm", "flow/confirm.gohtml")},
+}
+
+flow := partial.NewPageFlow(steps)</code></pre>
+
+    <h2>Store session data yourself</h2>
+    <p><code>FlowSessionData</code> is intentionally plain. Store it in your session system, encrypted cookie, database row, or in-memory map for a local demo. The package should not decide how users are identified.</p>
+
+    <pre><code>session.SetStepData("account", map[string]any{
+    "email": r.FormValue("email"),
+})
+session.SetStepValidated("account", true)
+session.Current = "details"</code></pre>
+
+    <h2>Render the current step</h2>
+    <p>Register each step partial as a child of the flow content partial. The template can render the current child by name.</p>
+
+    <pre><code>content := partial.NewID("content", "flow.gohtml").SetData(map[string]any{
+    "Steps":       flow.Steps,
+    "CurrentStep": flow.CurrentStep(session).Name,
+    "Validated":   session.Validated,
+})
+
+for _, step := range flow.Steps {
+    content.With(step.Partial)
+}</code></pre>
+
+    <pre><code>&lt;aside&gt;
+{{ "{{ range .Data.Steps }}" }}
+    &lt;span class="{{ "{{ if eq $.Data.CurrentStep .Name }}" }}active{{ "{{ end }}" }}"&gt;
+        {{ "{{ .Name }}" }}
+    &lt;/span&gt;
+{{ "{{ end }}" }}
+&lt;/aside&gt;
+
+{{ "{{ child .Data.CurrentStep }}" }}</code></pre>
+
+    <h2>Validation and navigation</h2>
+    <p>Validation lives on the step because each step usually has different form rules. Navigation is explicit: after validation succeeds, set the session state and advance the flow.</p>
+
+    <pre><code>step := flow.CurrentStep(session)
+data := map[string]any{"email": r.FormValue("email")}
+
+if step.Validate != nil {
+    if err := step.Validate(r, data); err != nil {
+        session.SetStepValidated(step.Name, false)
+        return renderCurrentStep(err)
+    }
+}
+
+session.SetStepData(step.Name, data)
+session.SetStepValidated(step.Name, true)
+flow.Next(session)</code></pre>
+
+    <h2>HTMX shape</h2>
+    <p>A step form can post back to the same route and target the page content. The server rebuilds the partial tree from session state and returns the next step.</p>
+
+    <pre><code>&lt;form method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML"&gt;
+    &lt;input name="email"&gt;
+    &lt;button&gt;Continue&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+
+    <h2>What PageFlow does not own</h2>
+    <ul>
+        <li>It does not create sessions or cookies.</li>
+        <li>It does not redirect automatically.</li>
+        <li>It does not validate forms globally.</li>
+        <li>It does not require HTMX; HTMX is just a useful transport for replacing the current step.</li>
+    </ul>
+
+    <p>For method-level details, see the <a href="/docs/api/pageflow" hx-get="/docs/api/pageflow" hx-target="#content" hx-push-url="true">PageFlow API reference</a>.</p>
+</article>

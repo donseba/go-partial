@@ -1,0 +1,83 @@
+<article class="docs-page">
+    <p class="eyebrow">Reference</p>
+    <h1>Connectors</h1>
+    <p class="lead">Connectors let go-partial understand request headers from a frontend library or a custom fetch client.</p>
+
+    <h2>Choose a connector</h2>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewHTMX(nil),
+    FS:        os.DirFS("web"),
+})</code></pre>
+
+    <p>The connector is applied to layouts, content partials, children, selected partials, and out-of-band partials rendered through the service.</p>
+
+    <h2>Included connectors</h2>
+    <table>
+        <thead><tr><th>Connector</th><th>Target header</th><th>Use</th></tr></thead>
+        <tbody>
+            <tr><td><code>connector.NewPartial</code></td><td><code>X-Target</code></td><td>Framework-neutral requests from fetch, tests, or custom clients.</td></tr>
+            <tr><td><code>connector.NewHTMX</code></td><td><code>HX-Target</code></td><td>HTMX requests, boosted navigation, response headers, and OOB updates.</td></tr>
+            <tr><td><code>connector.NewUnpoly</code></td><td><code>X-Up-Target</code></td><td>Unpoly fragment requests.</td></tr>
+            <tr><td><code>connector.NewTurbo</code></td><td><code>Turbo-Frame</code></td><td>Turbo Frame requests.</td></tr>
+        </tbody>
+    </table>
+
+    <p>Alpine, Stimulus, Vue, and similar frontend libraries do not need built-in connectors unless they define a stable fragment-request protocol. Use <code>connector.NewPartial</code> or a custom connector when your own fetch layer sends project-specific headers.</p>
+
+    <h2>Shared connector values</h2>
+    <p>Every connector exposes the same concepts to go-partial:</p>
+    <table>
+        <thead><tr><th>Concept</th><th>Generic header</th><th>Template helper</th></tr></thead>
+        <tbody>
+            <tr><td>Target</td><td><code>X-Target</code></td><td><code>{{ "{{ targetValue }}" }}</code></td></tr>
+            <tr><td>Selection</td><td><code>X-Select</code></td><td><code>{{ "{{ selectionValue }}" }}</code></td></tr>
+            <tr><td>Action</td><td><code>X-Action</code></td><td><code>{{ "{{ actionValue }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <p>Framework-specific connectors may use a different target header, such as <code>HX-Target</code> or <code>X-Up-Target</code>. Selection and action headers stay generic unless the connector defines otherwise.</p>
+
+    <h2>URL query fallback</h2>
+    <p>Set <code>UseURLQuery</code> when a client cannot send custom headers. go-partial will read <code>target</code>, <code>select</code>, and <code>action</code> from the query string after checking headers.</p>
+
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewPartial(&connector.Config{
+        UseURLQuery: true,
+    }),
+})</code></pre>
+
+    <h2>Response instructions</h2>
+    <p>Partials can set protocol-neutral response instructions. The connector turns them into response headers when supported.</p>
+
+    <pre><code>content.Response().
+    Retarget("#notice").
+    ReswapWith(connector.NewSwap().Style(connector.SwapOuterHTML)).
+    TriggerWith(connector.NewTrigger().AddEvent("saved"))</code></pre>
+
+    <p>With the HTMX connector, this writes headers such as <code>HX-Retarget</code>, <code>HX-Reswap</code>, and <code>HX-Trigger</code>.</p>
+
+    <h2>Custom connector</h2>
+    <p>If your frontend sends different headers, implement the connector interface in your application.</p>
+
+    <pre><code>type Connector interface {
+    RenderPartial(r *http.Request) bool
+    GetTargetValue(r *http.Request) string
+    GetSelectValue(r *http.Request) string
+    GetActionValue(r *http.Request) string
+
+    GetTargetHeader() string
+    GetSelectHeader() string
+    GetActionHeader() string
+    ResponseHeaders(response connector.Response) map[string]string
+}</code></pre>
+
+    <h2>External references</h2>
+    <ul>
+        <li><a href="https://htmx.org/reference/">HTMX reference</a></li>
+        <li><a href="https://turbo.hotwired.dev/handbook/frames">Turbo Frames handbook</a></li>
+        <li><a href="https://unpoly.com/X-Up-Target">Unpoly X-Up-Target</a></li>
+    </ul>
+
+    <h2>Related integration docs</h2>
+    <p>For practical usage, see the <a href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">integration overview</a>, <a href="/docs/integrations/htmx" hx-get="/docs/integrations/htmx" hx-target="#content" hx-push-url="true">HTMX integration</a>, and <a href="/docs/integrations/sse" hx-get="/docs/integrations/sse" hx-target="#content" hx-push-url="true">SSE integration</a>.</p>
+</article>

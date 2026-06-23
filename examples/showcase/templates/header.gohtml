@@ -1,0 +1,20 @@
+<aside id="app-header" class="app-sidebar"{{ oobAttr }}>
+    <div class="app-brand">
+        <strong>{{ .Service.AppName }}</strong>
+        <span>{{ .Service.Now }}</span>
+    </div>
+    <nav class="app-nav" aria-label="Showcase pages">
+        {{ $group := "" }}
+        {{ range .Data.Nav }}
+            {{ if ne .Group $group }}
+                {{ $group = .Group }}
+                <span class="app-nav-group">{{ .Group }}</span>
+            {{ end }}
+            <a href="{{ .Path }}"
+               hx-get="{{ .Path }}"
+               hx-target="#content"
+               hx-push-url="true"
+               class="{{ if urlIs .Path }}active{{ end }}">{{ .Label }}</a>
+        {{ end }}
+    </nav>
+</aside>

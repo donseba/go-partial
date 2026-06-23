@@ -1,5 +1,7 @@
 package partial
 
+import "sort"
+
 type Node struct {
 	ID    string
 	Depth int
@@ -14,8 +16,14 @@ func Tree(p *Partial) *Node {
 func tree(p *Partial, depth int) *Node {
 	var out = &Node{ID: p.id, Depth: depth}
 
-	for _, child := range p.children {
-		out.Nodes = append(out.Nodes, tree(child, depth+1))
+	childIDs := make([]string, 0, len(p.children))
+	for id := range p.children {
+		childIDs = append(childIDs, id)
+	}
+	sort.Strings(childIDs)
+
+	for _, id := range childIDs {
+		out.Nodes = append(out.Nodes, tree(p.children[id], depth+1))
 	}
 
 	return out

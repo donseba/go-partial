@@ -1,0 +1,51 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Multi-step pages</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>PageFlow coordinates the current step, validation state, and accumulated step data while your app keeps ownership of session storage.</p>
+    </header>
+
+    <div class="flow-shell example-surface">
+        <aside class="flow-steps" aria-label="Flow steps">
+            {{ range .Data.Steps }}
+                <div class="flow-step {{ if eq $.Data.CurrentStep .Name }}active{{ end }} {{ if index $.Data.Validated .Name }}done{{ end }}">
+                    <span>{{ upperFirst .Name }}</span>
+                    {{ if index $.Data.Validated .Name }}<small>Validated</small>{{ else }}<small>Pending</small>{{ end }}
+                </div>
+            {{ end }}
+        </aside>
+        <section class="flow-panel">
+            {{ child .Data.CurrentStep }}
+        </section>
+    </div>
+
+    <article class="description-panel">
+        <h2>Application-owned state</h2>
+        <p>The flow object knows the ordered steps and validation rules. The example stores <code>FlowSessionData</code> behind a browser cookie, but a real app can use encrypted cookies, database state, or a server session package.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>steps := []partial.FlowStep{
+    {Name: "account", Partial: account, Validate: validateAccount},
+    {Name: "details", Partial: details, Validate: validateDetails},
+    {Name: "confirm", Partial: confirm},
+}
+
+flow := partial.NewPageFlow(steps)
+session.SetStepData(step.Name, formData)
+session.SetStepValidated(step.Name, true)
+flow.Next(session)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>{{ "{{ range .Data.Steps }}" }}
+    &lt;div class="{{ "{{ if eq $.Data.CurrentStep .Name }}active{{ end }}" }}"&gt;
+        {{ "{{ upperFirst .Name }}" }}
+    &lt;/div&gt;
+{{ "{{ end }}" }}
+
+{{ "{{ child .Data.CurrentStep }}" }}</code></pre>
+    </article>
+</section>

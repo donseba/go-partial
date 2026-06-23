@@ -1,0 +1,33 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Request intent</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>This page keeps the action deliberately small: a POST increments server state, then re-renders the partial.</p>
+    </header>
+
+    <div class="counter example-surface">
+        <span>{{ .Data.Counter }}</span>
+        <button hx-post="/action" hx-target="#content" hx-headers='{"{{ .Data.ActionHeader }}":"increment"}'>Increment</button>
+    </div>
+
+    <article class="description-panel">
+        <h2>Action header</h2>
+        <p>The handler reads <code>{{ .Data.ActionHeader }}</code> to decide what operation was requested before rendering the next state.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>if r.Header.Get(connector.HeaderAction.String()) == "increment" {
+    counter++
+}</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;button hx-post="/action"
+        hx-target="#content"
+        hx-headers='{"{{ actionHeader }}":"increment"}'&gt;
+    Increment
+&lt;/button&gt;</code></pre>
+    </article>
+</section>

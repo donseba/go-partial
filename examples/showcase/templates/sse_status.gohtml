@@ -1,0 +1,9 @@
+<article id="sse-status" class="sse-status {{ if .Data.Done }}done{{ end }}">
+    <div class="status-meta">
+        <span class="pill">{{ if .Data.Done }}Complete{{ else }}Streaming{{ end }}</span>
+        <span>{{ if .Data.Done }}Stream finished{{ else }}Patch received{{ end }}</span>
+        <time>{{ .Data.Time }}</time>
+    </div>
+    <h2>Patch {{ .Data.Step }}</h2>
+    <p>{{ if .Data.Done }}The stream sent its final patch and the client closed the EventSource.{{ else }}This section was rendered on the server and patched into the page over SSE.{{ end }}</p>
+</article>

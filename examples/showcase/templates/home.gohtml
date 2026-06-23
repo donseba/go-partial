@@ -1,0 +1,43 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Overview</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>This application renders normal pages and htmx requests through the same partial tree.</p>
+    </header>
+
+    <div class="grid example-surface">
+        <article>
+            <h2>Core render model</h2>
+            <p>Layouts wrap a content partial. htmx requests target the content partial directly.</p>
+        </article>
+        <article>
+            <h2>Template helpers</h2>
+            <p>Pages demonstrate child rendering, scoped data, selection, actions, OOB swaps, and context helpers.</p>
+        </article>
+        <article>
+            <h2>Error fallback</h2>
+            <p>The error page intentionally renders a broken template so the embedded fallback can take over.</p>
+        </article>
+    </div>
+
+    <article class="description-panel">
+        <h2>How to read this showcase</h2>
+        <p>Each page demonstrates one server-rendering capability with actual template files, HTMX requests, and the same go-partial service setup.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content := partial.NewID("content", "templates/home.gohtml")
+layout := service.NewLayout().Set(content).Wrap(wrapper)
+layout.WriteWithRequest(ctx, w, r)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;section class="page"&gt;
+    &lt;header class="page-heading"&gt;
+        &lt;h1&gt;{{ "{{ .Data.Title }}" }}&lt;/h1&gt;
+    &lt;/header&gt;
+&lt;/section&gt;</code></pre>
+    </article>
+</section>

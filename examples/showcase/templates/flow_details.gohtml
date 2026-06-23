@@ -1,0 +1,23 @@
+<form class="flow-form" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
+    <div>
+        <h2>Details</h2>
+        <p>This step stores its own data and can read data collected by earlier steps on the confirmation screen.</p>
+    </div>
+    {{ if .Data.Error }}<p class="form-error">{{ .Data.Error }}</p>{{ end }}
+    <label>
+        Project name
+        <input name="name" value="{{ .Data.Name }}" placeholder="Static launch">
+    </label>
+    <label>
+        Plan
+        <select name="plan">
+            <option value="static" {{ if eq .Data.Plan "static" }}selected{{ end }}>Static website</option>
+            <option value="dynamic" {{ if eq .Data.Plan "dynamic" }}selected{{ end }}>Dynamic app</option>
+        </select>
+    </label>
+    <div class="toolbar">
+        <button type="submit" name="direction" value="back">Back</button>
+        <button type="submit">Continue</button>
+        <button type="submit" name="direction" value="reset">Reset</button>
+    </div>
+</form>

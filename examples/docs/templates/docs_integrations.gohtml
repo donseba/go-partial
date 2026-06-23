@@ -1,0 +1,36 @@
+<article class="docs-page">
+    <p class="eyebrow">Integration</p>
+    <h1>Integration overview</h1>
+    <p class="lead">go-partial sits on the server side. Integrations decide how a browser request names a target, selection, or action, and how server response intent is written back to the client.</p>
+
+    <h2>Request/response shape</h2>
+    <p>Most integrations follow the same flow: the client sends a target header, go-partial renders the matching partial, and the connector writes protocol-specific response headers when needed.</p>
+
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewHTMX(nil),
+    FS:        os.DirFS("web"),
+})</code></pre>
+
+    <h2>Integration pages</h2>
+    <div class="doc-grid">
+        <a class="doc-card" href="/docs/integrations/htmx" hx-get="/docs/integrations/htmx" hx-target="#content" hx-push-url="true">
+            <strong>HTMX</strong>
+            <span>Targeted requests, OOB updates, response headers, and active navigation.</span>
+        </a>
+        <a class="doc-card" href="/docs/integrations/sse" hx-get="/docs/integrations/sse" hx-target="#content" hx-push-url="true">
+            <strong>Server-sent events</strong>
+            <span>Stream server-rendered partials as patch events.</span>
+        </a>
+        <a class="doc-card" href="/docs/integrations/custom-clients" hx-get="/docs/integrations/custom-clients" hx-target="#content" hx-push-url="true">
+            <strong>Custom clients</strong>
+            <span>Use the neutral connector with fetch, tests, or your own frontend code.</span>
+        </a>
+    </div>
+
+    <h2>What belongs in an integration</h2>
+    <ul>
+        <li>Mapping request headers to target, selection, and action values.</li>
+        <li>Writing response instructions such as retarget, reswap, and trigger headers.</li>
+        <li>Leaving template rendering, scoped data, and error boundaries in the core package.</li>
+    </ul>
+</article>

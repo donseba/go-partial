@@ -1,0 +1,32 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Diagnostics</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>The <code>debug</code> helper renders a styled diagnostic box by default. Applications can replace the renderer to match their own interface.</p>
+    </header>
+
+    <article class="description-panel">
+        <h2>Default debug renderer</h2>
+        <p>This output comes from the embedded go-partial debug template.</p>
+        {{ debug .Data.Payload }}
+    </article>
+
+    <article class="description-panel">
+        <h2>Custom debug renderer</h2>
+        <p>This child partial uses <code>SetDebugRenderer</code> to render the same helper with application-specific markup.</p>
+        {{ child "custom-debug" }}
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>content.With(
+    partial.NewID("custom-debug", "debug_custom.gohtml").
+        SetDebugRenderer(customDebugRenderer),
+)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>{{ "{{ debug .Data.Payload }}" }}</code></pre>
+    </article>
+</section>

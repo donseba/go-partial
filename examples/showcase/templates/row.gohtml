@@ -1,0 +1,11 @@
+{{ $row := scoped.Row }}
+<tr id="row-{{ $row.ID }}">
+    <td>{{ $row.ID }}</td>
+    <td>{{ $row.Name }}</td>
+    <td>{{ $row.Price }}</td>
+    <td><span class="pill">{{ $row.Status }}</span></td>
+    <td>{{ scoped.Owner }}</td>
+    <td class="actions">
+        <button hx-get="/scoped/refresh-row?id={{ $row.ID }}" hx-target="#row-{{ $row.ID }}" hx-swap="outerHTML">Refresh row</button>
+    </td>
+</tr>

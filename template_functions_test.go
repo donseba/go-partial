@@ -1,9 +1,10 @@
 package partial
 
 import (
-	"fmt"
+	"context"
 	"html/template"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -72,7 +73,7 @@ func TestSubstr(t *testing.T) {
 	}
 }
 
-func TestUcFirst(t *testing.T) {
+func TestUpperFirst(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
@@ -98,9 +99,9 @@ func TestUcFirst(t *testing.T) {
 		{"こんにちは world", "こんにちは world"},
 	}
 	for _, c := range cases {
-		output := ucfirst(c.input)
+		output := upperFirst(c.input)
 		if output != c.expected {
-			t.Errorf("ucfirst(%q) = %q; want %q", c.input, output, c.expected)
+			t.Errorf("upperFirst(%q) = %q; want %q", c.input, output, c.expected)
 		}
 	}
 }
@@ -117,9 +118,9 @@ func TestFormatDate(t *testing.T) {
 		{t1, time.RFC3339, "2021-12-31T23:59:59Z"},
 	}
 	for _, c := range cases {
-		output := formatDate(c.input, c.layout)
+		output := formatDate(c.layout, c.input)
 		if output != c.expected {
-			t.Errorf("formatDate(%v, %q) = %q; want %q", c.input, c.layout, output, c.expected)
+			t.Errorf("formatDate(%q, %v) = %q; want %q", c.layout, c.input, output, c.expected)
 		}
 	}
 }
@@ -199,6 +200,35 @@ func TestHasKey(t *testing.T) {
 	}
 }
 
+func TestDict(t *testing.T) {
+	out, err := dict("name", "Ada", "count", 2)
+	if err != nil {
+		t.Fatalf("dict() error = %v", err)
+	}
+
+	expected := map[string]any{
+		"name":  "Ada",
+		"count": 2,
+	}
+	if !reflect.DeepEqual(out, expected) {
+		t.Fatalf("dict() = %#v; want %#v", out, expected)
+	}
+}
+
+func TestDictRejectsOddArgumentCount(t *testing.T) {
+	_, err := dict("name")
+	if err == nil {
+		t.Fatal("expected odd argument count error")
+	}
+}
+
+func TestDictRejectsNonStringKeys(t *testing.T) {
+	_, err := dict(1, "Ada")
+	if err == nil {
+		t.Fatal("expected non-string key error")
+	}
+}
+
 func TestKeys(t *testing.T) {
 	cases := []struct {
 		input    map[string]any
@@ -231,11 +261,72 @@ func equalStringSlices(a, b []string) bool {
 	return reflect.DeepEqual(aMap, bMap)
 }
 
-func TestDebug(t *testing.T) {
-	input := map[string]any{"a": 1, "b": "test"}
-	expected := fmt.Sprintf("%+v", input)
-	output := debug(input)
-	if output != expected {
-		t.Errorf("debug(%v) = %q; want %q", input, output, expected)
+func TestDebugRendersDefaultDebugBox(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("debug.gohtml", `{{ debug .Data }}`)
+
+	p := NewID("debug", "debug.gohtml").SetFileSystem(fsys).SetData(map[string]any{
+		"a": 1,
+		"b": "test",
+	})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	if !strings.Contains(body, `class="go-partial-debug"`) {
+		t.Fatalf("expected styled debug box, got %q", body)
+	}
+	if !strings.Contains(body, `&#34;a&#34;: 1`) || !strings.Contains(body, `&#34;b&#34;: &#34;test&#34;`) {
+		t.Fatalf("expected debug output to contain data, got %q", body)
+	}
+}
+
+func TestDebugUsesCustomDebugRenderer(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("debug.gohtml", `{{ debug .Data.Name }}`)
+
+	p := NewID("debug", "debug.gohtml").
+		SetFileSystem(fsys).
+		SetData(map[string]any{"Name": "Ada"}).
+		SetDebugRenderer(func(ctx context.Context, p *Partial, data *Data, value any) (template.HTML, error) {
+			return template.HTML(`<aside class="custom-debug">` + value.(string) + `</aside>`), nil
+		})
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if string(out) != `<aside class="custom-debug">Ada</aside>` {
+		t.Fatalf("unexpected custom debug output: %q", out)
+	}
+}
+
+func TestChildDebugRendererSurvivesClone(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("parent.gohtml", `{{ child "child" }}`)
+	fsys.AddFile("child.gohtml", `{{ debug .Data.Name }}`)
+
+	child := NewID("child", "child.gohtml").
+		SetFileSystem(fsys).
+		SetData(map[string]any{"Name": "Ada"}).
+		SetDebugRenderer(func(ctx context.Context, p *Partial, data *Data, value any) (template.HTML, error) {
+			return template.HTML(`<aside class="child-debug">` + value.(string) + `</aside>`), nil
+		})
+
+	parent := NewID("parent", "parent.gohtml").
+		SetFileSystem(fsys).
+		With(child)
+
+	out, err := parent.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if string(out) != `<aside class="child-debug">Ada</aside>` {
+		t.Fatalf("expected child debug renderer to survive clone, got %q", out)
 	}
 }

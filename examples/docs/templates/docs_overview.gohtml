@@ -1,0 +1,70 @@
+<article class="docs-page">
+    <p class="eyebrow">Documentation</p>
+    <h1>Server-rendered partials that stay useful with HTMX</h1>
+    <p class="lead">go-partial is a small rendering layer for Go applications that want reusable template regions, targeted updates, out-of-band swaps, and predictable server-side behavior.</p>
+
+    <div class="hero-actions">
+        <a class="primary-action" href="/docs/installation" hx-get="/docs/installation" hx-target="#content" hx-push-url="true">Get started</a>
+        <a class="secondary-action" href="/docs/api" hx-get="/docs/api" hx-target="#content" hx-push-url="true">Read the API</a>
+    </div>
+
+    <div class="doc-grid">
+        <a class="doc-card" href="/docs/rendering" hx-get="/docs/rendering" hx-target="#content" hx-push-url="true">
+            <strong>Rendering model</strong>
+            <span>Layouts, content partials, children, and targeted requests.</span>
+        </a>
+        <a class="doc-card" href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">
+            <strong>Target resolver</strong>
+            <span>Replace one dynamic row or card with fresh request-scoped data.</span>
+        </a>
+        <a class="doc-card" href="/docs/data-context" hx-get="/docs/data-context" hx-target="#content" hx-push-url="true">
+            <strong>Data and context</strong>
+            <span>Understand .Data, .Parent, .Service, .Layout, .Loc, and request scope.</span>
+        </a>
+        <a class="doc-card" href="/docs/localization" hx-get="/docs/localization" hx-target="#content" hx-push-url="true">
+            <strong>Localization</strong>
+            <span>Use request context to expose your app's localizer to templates.</span>
+        </a>
+        <a class="doc-card" href="/docs/template-functions" hx-get="/docs/template-functions" hx-target="#content" hx-push-url="true">
+            <strong>Template functions</strong>
+            <span><code>child</code>, <code>partial</code>, <code>scoped</code>, <code>selection</code>, and friends.</span>
+        </a>
+        <a class="doc-card" href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">
+            <strong>Selection and action</strong>
+            <span>Use request intent to choose a child partial or let Go decide the next render.</span>
+        </a>
+        <a class="doc-card" href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">
+            <strong>Integrations</strong>
+            <span>HTMX, SSE streams, and custom fetch clients built around server-rendered partials.</span>
+        </a>
+        <a class="doc-card" href="/docs/error-boundaries" hx-get="/docs/error-boundaries" hx-target="#content" hx-push-url="true">
+            <strong>Error boundaries</strong>
+            <span>Keep the page alive when one section template fails.</span>
+        </a>
+    </div>
+
+    <h2>A small root</h2>
+    <pre><code>svc := partial.NewService(&partial.Config{
+    Connector: connector.NewHTMX(nil),
+    FS:        os.DirFS("templates"),
+})
+
+layout := svc.NewLayout().
+    Set(partial.NewID("content", "pages/home.gohtml")).
+    Wrap(partial.NewID("layout", "layout.gohtml"))
+
+_ = layout.WriteWithRequest(r.Context(), w, r)</code></pre>
+
+    <p>The rest of this site is rendered by that same pattern. The navigation, sidebar, examples, and error sections are all partials.</p>
+
+    <h2>What go-partial is optimizing for</h2>
+    <ul>
+        <li>Keep templates as normal <code>html/template</code> files.</li>
+        <li>Let the server decide what a target, action, or selected partial means.</li>
+        <li>Make repeated fragments explicit without requiring a new component language.</li>
+        <li>Return useful HTML even when one section fails during development.</li>
+    </ul>
+
+    <h2>Integrates with</h2>
+    <p>go-partial is designed to sit beside packages such as <code>go-translator</code>, <code>go-form</code>, <code>go-importmap</code>, and <code>go-router</code>. The renderer stays focused on partial trees and response behavior while the application stack handles routing, assets, translation, and forms.</p>
+</article>

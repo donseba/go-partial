@@ -6,53 +6,53 @@ import (
 	"time"
 )
 
-type InMemoryFS struct {
+type inMemoryFS struct {
 	Files map[string]string
 }
 
-func (f *InMemoryFS) AddFile(name, content string) {
+func (f *inMemoryFS) AddFile(name, content string) {
 	if f.Files == nil {
 		f.Files = make(map[string]string)
 	}
 	f.Files[name] = content
 }
 
-func (f *InMemoryFS) Open(name string) (fs.File, error) {
+func (f *inMemoryFS) Open(name string) (fs.File, error) {
 	content, ok := f.Files[name]
 	if !ok {
 		return nil, fs.ErrNotExist
 	}
-	return &InMemoryFile{
+	return &inMemoryFile{
 		Reader: strings.NewReader(content),
 		name:   name,
 	}, nil
 }
 
-type InMemoryFile struct {
+type inMemoryFile struct {
 	*strings.Reader
 	name string
 }
 
-func (f *InMemoryFile) Stat() (fs.FileInfo, error) {
-	return &InMemoryFileInfo{name: f.name, size: int64(f.Len())}, nil
+func (f *inMemoryFile) Stat() (fs.FileInfo, error) {
+	return &inMemoryFileInfo{name: f.name, size: int64(f.Len())}, nil
 }
 
-func (f *InMemoryFile) ReadDir(count int) ([]fs.DirEntry, error) {
+func (f *inMemoryFile) ReadDir(count int) ([]fs.DirEntry, error) {
 	return nil, fs.ErrNotExist
 }
 
-func (f *InMemoryFile) Close() error {
+func (f *inMemoryFile) Close() error {
 	return nil
 }
 
-type InMemoryFileInfo struct {
+type inMemoryFileInfo struct {
 	name string
 	size int64
 }
 
-func (fi *InMemoryFileInfo) Name() string       { return fi.name }
-func (fi *InMemoryFileInfo) Size() int64        { return fi.size }
-func (fi *InMemoryFileInfo) Mode() fs.FileMode  { return 0444 }
-func (fi *InMemoryFileInfo) ModTime() time.Time { return time.Time{} }
-func (fi *InMemoryFileInfo) IsDir() bool        { return false }
-func (fi *InMemoryFileInfo) Sys() interface{}   { return nil }
+func (fi *inMemoryFileInfo) Name() string       { return fi.name }
+func (fi *inMemoryFileInfo) Size() int64        { return fi.size }
+func (fi *inMemoryFileInfo) Mode() fs.FileMode  { return 0444 }
+func (fi *inMemoryFileInfo) ModTime() time.Time { return time.Time{} }
+func (fi *inMemoryFileInfo) IsDir() bool        { return false }
+func (fi *inMemoryFileInfo) Sys() interface{}   { return nil }

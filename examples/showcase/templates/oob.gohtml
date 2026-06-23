@@ -1,0 +1,37 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Out-of-band swaps</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>The main content is replaced normally, while the toast is returned as an out-of-band partial.</p>
+    </header>
+
+    <div class="example-surface stack">
+        <button hx-post="/oob/ping" hx-target="#content">Render content and toast</button>
+        {{ if .Data.Ping }}
+            <p class="notice">Content rendered at {{ .Data.Ping }}.</p>
+        {{ end }}
+    </div>
+
+    <article class="description-panel">
+        <h2>Two targets in one response</h2>
+        <p>The content partial updates <code>#content</code>. The wrapper also returns a toast partial marked with <code>hx-swap-oob</code>.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>wrapper.WithOOB(
+    partial.NewID("toast", "templates/toast.gohtml").SetAlwaysSwapOOB(true),
+)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>&lt;button hx-post="/oob/ping" hx-target="#content"&gt;
+    Render content and toast
+&lt;/button&gt;
+
+&lt;aside id="toast"{{ "{{ oobAttr }}" }}&gt;
+    {{ "{{ .Data.Message }}" }}
+&lt;/aside&gt;</code></pre>
+    </article>
+</section>

@@ -29,11 +29,12 @@ var DefaultTemplateFuncMap = template.FuncMap{
 	"stringSlice": stringSlice,
 	"title":       title,
 	"substr":      substr,
-	"ucfirst":     ucfirst,
+	"upperFirst":  upperFirst,
 	"compare":     strings.Compare,
 	"equalFold":   strings.EqualFold,
-	"urlencode":   url.QueryEscape,
-	"urldecode":   url.QueryUnescape,
+	"urlEncode":   url.QueryEscape,
+	"urlDecode":   url.QueryUnescape,
+	"safeURL":     safeURL,
 	// Time functions
 
 	"now":        time.Now,
@@ -45,19 +46,39 @@ var DefaultTemplateFuncMap = template.FuncMap{
 	"last":  last,
 
 	// Map functions
+	"dict":   dict,
 	"hasKey": hasKey,
 	"keys":   keys,
 
-	// Debug functions
-	"debug": debug,
+	"inc": inc,
+	"dec": dec,
+}
+
+// AddGlobalFunc adds a function to the package-level default template function map.
+// Services created after this call receive the function when they copy the defaults.
+func AddGlobalFunc(name string, f any) error {
+	if _, ok := protectedFunctionNames[name]; ok {
+		return fmt.Errorf("function name [%s] is protected and cannot be overwritten", name)
+	}
+
+	DefaultTemplateFuncMap[name] = f
+	return nil
+}
+
+func copyFuncMap() template.FuncMap {
+	funcMap := make(template.FuncMap, len(DefaultTemplateFuncMap))
+	for k, v := range DefaultTemplateFuncMap {
+		funcMap[k] = v
+	}
+	return funcMap
 }
 
 func safeHTML(s string) template.HTML {
 	return template.HTML(s)
 }
 
-// ucfirst capitalizes the first character of the string.
-func ucfirst(s string) string {
+// upperFirst capitalizes the first character of the string.
+func upperFirst(s string) string {
 	if s == "" {
 		return ""
 	}
@@ -135,8 +156,103 @@ func keys(m map[string]any) []string {
 	return out
 }
 
+func safeURL(s string) template.URL {
+	if s == "" {
+		return template.URL("")
+	}
+	return template.URL(url.QueryEscape(s))
+}
+
+func inc(args ...any) any {
+	if len(args) == 0 {
+		return 1
+	}
+	switch v := args[0].(type) {
+	case int:
+		if len(args) > 1 {
+			if by, ok := args[1].(int); ok {
+				return v + by
+			}
+		}
+		return v + 1
+	case int64:
+		if len(args) > 1 {
+			if by, ok := args[1].(int64); ok {
+				return v + by
+			}
+		}
+		return v + 1
+	case float64:
+		if len(args) > 1 {
+			if by, ok := args[1].(float64); ok {
+				return v + by
+			}
+		}
+		return v + 1
+	case float32:
+		if len(args) > 1 {
+			if by, ok := args[1].(float32); ok {
+				return v + by
+			}
+		}
+		return v + 1
+	case uint:
+		if len(args) > 1 {
+			if by, ok := args[1].(uint); ok {
+				return v + by
+			}
+		}
+		return v + 1
+	}
+	return args[0]
+}
+
+func dec(args ...any) any {
+	if len(args) == 0 {
+		return -1
+	}
+	switch v := args[0].(type) {
+	case int:
+		if len(args) > 1 {
+			if by, ok := args[1].(int); ok {
+				return v - by
+			}
+		}
+		return v - 1
+	case int64:
+		if len(args) > 1 {
+			if by, ok := args[1].(int64); ok {
+				return v - by
+			}
+		}
+		return v - 1
+	case float64:
+		if len(args) > 1 {
+			if by, ok := args[1].(float64); ok {
+				return v - by
+			}
+		}
+		return v - 1
+	case float32:
+		if len(args) > 1 {
+			if by, ok := args[1].(float32); ok {
+				return v - by
+			}
+		}
+		return v - 1
+	case uint:
+		if len(args) > 1 {
+			if by, ok := args[1].(uint); ok {
+				return v - by
+			}
+		}
+		return v - 1
+	}
+	return args[0]
+}
+
 // formatDate formats the time with the layout.
-func formatDate(t time.Time, layout string) string {
+func formatDate(layout string, t time.Time) string {
 	return t.Format(layout)
 }
 
@@ -145,9 +261,21 @@ func parseDate(layout, value string) (time.Time, error) {
 	return time.Parse(layout, value)
 }
 
-// debug returns the string representation of the value.
-func debug(v any) string {
-	return fmt.Sprintf("%+v", v)
+func dict(values ...any) (map[string]any, error) {
+	if len(values)%2 != 0 {
+		return nil, fmt.Errorf("dict expects key/value pairs")
+	}
+
+	out := make(map[string]any, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		key, ok := values[i].(string)
+		if !ok {
+			return nil, fmt.Errorf("dict key must be string, got %T", values[i])
+		}
+		out[key] = values[i+1]
+	}
+
+	return out, nil
 }
 
 func selectionFunc(p *Partial, data *Data) func() template.HTML {
@@ -160,45 +288,43 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 			return template.HTML(fmt.Sprintf("no selection partials found in parent '%s'", p.id))
 		}
 
-		requestedSelect := p.getConnector().GetSelectValue(p.GetRequest())
-		if requestedSelect != "" {
-			selectedPartial = partials[requestedSelect]
+		selectionValue := p.getConnector().GetSelectValue(p.GetRequest())
+		if selectionValue != "" {
+			selectedPartial = partials[selectionValue]
 		} else {
 			selectedPartial = partials[p.selection.Default]
 		}
 
 		if selectedPartial == nil {
-			p.getLogger().Error("selected partial not found", "id", requestedSelect, "parent", p.id)
-			return template.HTML(fmt.Sprintf("selected partial '%s' not found in parent '%s'", requestedSelect, p.id))
+			p.getLogger().Error("selected partial not found", "id", selectionValue, "parent", p.id)
+			return template.HTML(fmt.Sprintf("selected partial '%s' not found in parent '%s'", selectionValue, p.id))
 		}
 
 		selectedPartial.fs = p.fs
 
-		html, err := selectedPartial.renderSelf(data.Ctx, p.GetRequest())
+		selectedClone := selectedPartial.clone()
+		selectedClone.parent = p
+
+		html, err := selectedClone.renderSelf(data.Ctx, p.GetRequest())
 		if err != nil {
-			p.getLogger().Error("error rendering selected partial", "id", requestedSelect, "parent", p.id, "error", err)
-			return template.HTML(fmt.Sprintf("error rendering selected partial '%s'", requestedSelect))
+			p.getLogger().Error("error rendering selected partial", "id", selectionValue, "parent", p.id, "error", err)
+			fallback, fallbackErr := selectedClone.renderErrorFragment(data.Ctx, p.GetRequest(), err)
+			if fallbackErr != nil {
+				p.getLogger().Error("error rendering selected partial fallback", "id", selectionValue, "parent", p.id, "error", fallbackErr)
+				return template.HTML(fmt.Sprintf("error rendering selected partial '%s': %v", selectionValue, fallbackErr))
+			}
+			return fallback
 		}
 
 		return html
 	}
 }
 
-func childFunc(p *Partial, data *Data) func(id string, vals ...any) template.HTML {
-	return func(id string, vals ...any) template.HTML {
-		if len(vals) > 0 && len(vals)%2 != 0 {
-			p.getLogger().Warn("invalid child data for partial, they come in key-value pairs", "id", id)
-			return template.HTML(fmt.Sprintf("invalid child data for partial '%s'", id))
-		}
-
-		d := make(map[string]any)
-		for i := 0; i < len(vals); i += 2 {
-			key, ok := vals[i].(string)
-			if !ok {
-				p.getLogger().Warn("invalid child data key for partial, it must be a string", "id", id, "key", vals[i])
-				return template.HTML(fmt.Sprintf("invalid child data key for partial '%s', want string, got %T", id, vals[i]))
-			}
-			d[key] = vals[i+1]
+func childFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
+	return func(id string, args ...any) template.HTML {
+		d, ok := scopedDataArg(p, id, args...)
+		if !ok {
+			return template.HTML(fmt.Sprintf("invalid scoped data for partial '%s'", id))
 		}
 
 		html, err := p.renderChildPartial(data.Ctx, id, d)
@@ -209,6 +335,81 @@ func childFunc(p *Partial, data *Data) func(id string, vals ...any) template.HTM
 		}
 
 		return html
+	}
+}
+
+func partialFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
+	return func(id string, args ...any) template.HTML {
+		d, ok := scopedDataArg(p, id, args...)
+		if !ok {
+			return template.HTML(fmt.Sprintf("invalid scoped data for partial '%s'", id))
+		}
+
+		html, err := p.renderChildPartial(data.Ctx, id, d)
+		if err != nil {
+			p.getLogger().Error("error rendering partial", "id", id, "error", err)
+			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
+		}
+
+		return html
+	}
+}
+
+func childIfFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
+	return func(id string, args ...any) template.HTML {
+		if len(p.children) == 0 {
+			return ""
+		}
+
+		if p.children[id] == nil {
+			return ""
+		}
+
+		return childFunc(p, data)(id, args...)
+	}
+}
+
+func scopedDataArg(p *Partial, id string, args ...any) (map[string]any, bool) {
+	if len(args) == 0 {
+		return nil, true
+	}
+	if len(args) == 1 {
+		if scoped, ok := args[0].(map[string]any); ok {
+			return scoped, true
+		}
+		p.getLogger().Warn("invalid scoped data for partial, pass a map or key/value pairs", "id", id, "type", fmt.Sprintf("%T", args[0]))
+		return nil, false
+	}
+	if len(args)%2 != 0 {
+		p.getLogger().Warn("invalid scoped data for partial, pass key/value pairs", "id", id)
+		return nil, false
+	}
+
+	scoped := make(map[string]any, len(args)/2)
+	for i := 0; i < len(args); i += 2 {
+		key, ok := args[i].(string)
+		if !ok {
+			p.getLogger().Warn("invalid scoped data key for partial", "id", id, "type", fmt.Sprintf("%T", args[i]))
+			return nil, false
+		}
+		scoped[key] = args[i+1]
+	}
+	return scoped, true
+}
+
+func debugFunc(p *Partial, data *Data) func(value any) template.HTML {
+	return func(value any) template.HTML {
+		renderer := p.getDebugRenderer()
+		if renderer == nil {
+			return template.HTML(template.HTMLEscapeString(fmt.Sprintf("%#v", value)))
+		}
+
+		out, err := renderer(data.Ctx, p, data, value)
+		if err != nil {
+			p.getLogger().Error("error rendering debug helper", "id", p.id, "error", err)
+			return template.HTML(`<pre class="go-partial-debug">` + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + `</pre>`)
+		}
+		return out
 	}
 }
 

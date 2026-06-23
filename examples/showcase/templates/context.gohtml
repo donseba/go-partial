@@ -1,0 +1,40 @@
+<section class="page">
+    <header class="page-heading">
+        <span class="eyebrow">Request context</span>
+        <h1>{{ .Data.Title }}</h1>
+        <p>These values are injected into the template context on every render.</p>
+    </header>
+
+    <dl class="facts example-surface">
+        <dt>URL path</dt>
+        <dd>{{ if .URL }}{{ .URL.Path }}{{ end }}</dd>
+        <dt>Base path</dt>
+        <dd>{{ if .BasePath }}{{ .BasePath }}{{ else }}/{{ end }}</dd>
+        <dt>Locale</dt>
+        <dd>{{ .Loc.GetLocale }}</dd>
+        <dt>CSRF key</dt>
+        <dd>{{ .Csrf.Key }}</dd>
+        <dt>CSRF token</dt>
+        <dd>{{ .Csrf.Token .Ctx }}</dd>
+    </dl>
+
+    <article class="description-panel">
+        <h2>Available everywhere</h2>
+        <p>The package builds a consistent render context so templates can read request, localization, base path, service data, and application-provided CSRF values without custom glue per page.</p>
+    </article>
+
+    <article class="code-panel">
+        <h2>Server setup</h2>
+        <pre><code>ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+ctx = context.WithValue(ctx, partial.CsrfContextKey, csrf)
+content.WriteWithRequest(ctx, w, r)</code></pre>
+    </article>
+
+    <article class="code-panel">
+        <h2>Template usage</h2>
+        <pre><code>{{ "{{ .URL.Path }}" }}
+{{ "{{ .BasePath }}" }}
+{{ "{{ .Loc.GetLocale }}" }}
+{{ "{{ .Csrf.Token .Ctx }}" }}</code></pre>
+    </article>
+</section>
