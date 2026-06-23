@@ -166,6 +166,83 @@ func TestRequestWrap(t *testing.T) {
 	})
 }
 
+func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/layout.html":  `<html><body>{{ child "content" }}</body></html>`,
+			"templates/content.html": `<div>{{ .Data.Text }}</div>`,
+		},
+	}
+	svc := NewService(&Config{
+		FS:               fsys,
+		UseTemplateCache: true,
+	})
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	render := func(text string) string {
+		t.Helper()
+		content := NewID("content", "templates/content.html").SetData(map[string]any{
+			"Text": text,
+		})
+		layout := NewID("layout", "templates/layout.html")
+		out, err := svc.NewLayout().Set(content).Wrap(layout).RenderWithRequest(request.Context(), request)
+		if err != nil {
+			t.Fatalf("failed to render %q: %v", text, err)
+		}
+		return string(out)
+	}
+
+	if got := render("first"); got != "<html><body><div>first</div></body></html>" {
+		t.Fatalf("unexpected first render: %s", got)
+	}
+	if got := render("second"); got != "<html><body><div>second</div></body></html>" {
+		t.Fatalf("cached render used stale functions or data: %s", got)
+	}
+}
+
+func TestTemplateCacheIsServiceScoped(t *testing.T) {
+	firstFS := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `<p>first {{ .Data.Name }}</p>`,
+		},
+	}
+	secondFS := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `<p>second {{ .Data.Name }}</p>`,
+		},
+	}
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	render := func(fsys *inMemoryFS, name string) string {
+		t.Helper()
+		svc := NewService(&Config{
+			FS:               fsys,
+			UseTemplateCache: true,
+		})
+		content := NewID("content", "templates/content.html").SetData(map[string]any{
+			"Name": name,
+		})
+		out, err := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+		if err != nil {
+			t.Fatalf("failed to render %q: %v", name, err)
+		}
+		return string(out)
+	}
+
+	if got := render(firstFS, "Ada"); got != "<p>first Ada</p>" {
+		t.Fatalf("unexpected first service render: %s", got)
+	}
+	if got := render(secondFS, "Grace"); got != "<p>second Grace</p>" {
+		t.Fatalf("service cache reused template from another filesystem: %s", got)
+	}
+}
+
 func TestRequestOOB(t *testing.T) {
 	svc := NewService(&Config{})
 

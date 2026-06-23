@@ -14,9 +14,9 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"reflect"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"sync"
 
@@ -24,10 +24,6 @@ import (
 )
 
 var (
-	// templateCache is the cache for parsed templates
-	templateCache = sync.Map{}
-	// mutexCache is a cache of mutexes for each template key
-	mutexCache = sync.Map{}
 	// protectedFunctionNames is a set of function names that are protected from being overridden
 	protectedFunctionNames = map[string]struct{}{
 		"action":          {},
@@ -65,9 +61,56 @@ var (
 		"urlPath":         {},
 		"urlStarts":       {},
 	}
+
+	renderFunctionSignature = functionNameSignatureFromNames([]string{
+		"action",
+		"actionHeader",
+		"actionIf",
+		"actionValue",
+		"async",
+		"child",
+		"childIf",
+		"context",
+		"debug",
+		"dict",
+		"island",
+		"joinPath",
+		"on",
+		"oob",
+		"oobAttr",
+		"partial",
+		"poll",
+		"prefetch",
+		"refresh",
+		"reveal",
+		"scoped",
+		"selection",
+		"selectionHeader",
+		"selectionIf",
+		"selectionValue",
+		"stream",
+		"targetHeader",
+		"targetIf",
+		"targetValue",
+		"url",
+		"urlContains",
+		"urlIs",
+		"urlPath",
+		"urlStarts",
+	})
 )
 
 type (
+	cachedTemplate struct {
+		base *template.Template
+		pool sync.Pool
+	}
+
+	templateStore struct {
+		templates sync.Map
+		mutexes   sync.Map
+	}
+
 	errorFragmentContextKey struct{}
 
 	// Partial represents a renderable component with optional children and data.
@@ -83,6 +126,7 @@ type (
 		useCache            bool
 		templates           []string
 		combinedFunctions   template.FuncMap
+		functionSignature   string
 		basePath            string
 		data                map[string]any
 		layoutData          map[string]any
@@ -94,6 +138,7 @@ type (
 		errorRenderer       ErrorRenderer
 		debugRenderer       DebugRenderer
 		interactionRenderer InteractionRenderer
+		templateCache       *templateStore
 		errorMode           ErrorMode
 		errorModeSet        bool
 		targetResolver      TargetResolver
@@ -241,10 +286,12 @@ const HeaderGoPartialError = "X-Go-Partial-Error"
 
 // New creates a new root.
 func New(templates ...string) *Partial {
+	functions := copyFuncMap()
 	return &Partial{
 		id:                  "root",
 		templates:           templates,
-		combinedFunctions:   copyFuncMap(),
+		combinedFunctions:   functions,
+		functionSignature:   templateFunctionSignature(functions),
 		data:                make(map[string]any),
 		layoutData:          make(map[string]any),
 		globalData:          make(map[string]any),
@@ -256,6 +303,7 @@ func New(templates ...string) *Partial {
 		errorRenderer:       DefaultErrorRenderer(),
 		debugRenderer:       DefaultDebugRenderer(),
 		interactionRenderer: DefaultInteractionRenderer(),
+		templateCache:       newTemplateStore(),
 	}
 }
 
@@ -592,6 +640,7 @@ func (p *Partial) UseFuncs(funcMap template.FuncMap) {
 
 		p.combinedFunctions[k] = v
 	}
+	p.functionSignature = templateFunctionSignature(p.combinedFunctions)
 }
 
 // SetLogger sets the logger for the partial.
@@ -814,6 +863,7 @@ func (p *Partial) mergeFuncMapInternal(funcMap template.FuncMap) {
 		p.combinedFunctions = make(template.FuncMap, len(funcMap))
 	}
 	maps.Copy(p.combinedFunctions, funcMap)
+	p.functionSignature = templateFunctionSignature(p.combinedFunctions)
 }
 
 // getFuncMap returns the combined function map of the partial.
@@ -822,15 +872,23 @@ func (p *Partial) getFuncMap() template.FuncMap {
 	defer p.mu.RUnlock()
 
 	if p.parent != nil {
-		if p.combinedFunctions == nil {
-			p.combinedFunctions = make(template.FuncMap)
-		}
-		maps.Copy(p.combinedFunctions, p.parent.getFuncMap())
-
-		return p.combinedFunctions
+		funcs := maps.Clone(p.parent.getFuncMap())
+		maps.Copy(funcs, p.combinedFunctions)
+		return funcs
 	}
 
-	return p.combinedFunctions
+	return maps.Clone(p.combinedFunctions)
+}
+
+func (p *Partial) getFunctionSignature() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	signature := p.functionSignature
+	if p.parent != nil {
+		signature = mergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
+	}
+	return signature
 }
 
 func (p *Partial) getFuncs(data *Data) template.FuncMap {
@@ -1375,13 +1433,14 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 	}
 
 	functions := p.getFuncs(data)
-	funcMapPtr := reflect.ValueOf(functions).Pointer()
-
-	cacheKey := p.generateCacheKey(p.templates, funcMapPtr)
-	tmpl, err := p.getOrParseTemplate(cacheKey, functions)
+	cacheKey := p.generateCacheKey(p.templates, p.getFunctionSignature())
+	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, functions)
 	if err != nil {
 		p.getLogger().Error("error getting or parsing template", "error", err)
 		return "", err
+	}
+	if releaseTemplate != nil {
+		defer releaseTemplate()
 	}
 
 	var buf bytes.Buffer
@@ -1395,21 +1454,29 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 
 func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, renderOOB bool, isAncestor bool) (template.HTML, error) {
 	var out template.HTML
-	p.mu.RLock()
-	defer p.mu.RUnlock()
 
+	children := make(map[string]*Partial)
+	p.mu.RLock()
 	for id := range p.oobChildren {
 		if child, ok := p.children[id]; ok {
 			if isAncestor || child.alwaysSwapOOB {
-				child.renderOOB = renderOOB
-				childData, err := child.renderSelf(ctx, r)
-				if err != nil {
-					return "", fmt.Errorf("error rendering OOB child '%s': %w", id, err)
-				}
-				out += childData
+				children[id] = child
 			}
 		}
 	}
+	p.mu.RUnlock()
+
+	for id, child := range children {
+		childClone := child.clone()
+		childClone.parent = p
+		childClone.renderOOB = renderOOB
+		childData, err := childClone.renderSelf(ctx, r)
+		if err != nil {
+			return "", fmt.Errorf("error rendering OOB child '%s': %w", id, err)
+		}
+		out += childData
+	}
+
 	return out, nil
 }
 
@@ -1427,36 +1494,117 @@ func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Requ
 	return out, nil
 }
 
-func (p *Partial) getOrParseTemplate(cacheKey string, functions template.FuncMap) (*template.Template, error) {
-	if tmpl, cached := templateCache.Load(cacheKey); cached && p.useCache {
-		if t, ok := tmpl.(*template.Template); ok {
-			return t, nil
+func (p *Partial) getTemplateForRender(cacheKey string, functions template.FuncMap) (*template.Template, func(), error) {
+	store := p.getTemplateStore()
+	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
+		if entry, ok := tmpl.(*cachedTemplate); ok {
+			return entry.template(functions)
 		}
 	}
 
-	muInterface, _ := mutexCache.LoadOrStore(cacheKey, &sync.Mutex{})
+	muInterface, _ := store.mutexes.LoadOrStore(cacheKey, &sync.Mutex{})
 	mu := muInterface.(*sync.Mutex)
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Double-check after acquiring lock
-	if tmpl, cached := templateCache.Load(cacheKey); cached && p.useCache {
-		if t, ok := tmpl.(*template.Template); ok {
-			return t, nil
+	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
+		if entry, ok := tmpl.(*cachedTemplate); ok {
+			return entry.template(functions)
 		}
 	}
 
 	t := template.New(path.Base(p.templates[0])).Funcs(functions)
 	tmpl, err := t.ParseFS(p.getFS(), p.templates...)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing templates: %w", err)
+		return nil, nil, fmt.Errorf("error parsing templates: %w", err)
 	}
 
 	if p.useCache {
-		templateCache.Store(cacheKey, tmpl)
+		entry := &cachedTemplate{base: tmpl}
+		store.templates.Store(cacheKey, entry)
+		return entry.template(functions)
 	}
 
-	return tmpl, nil
+	return tmpl, nil, nil
+}
+
+func newTemplateStore() *templateStore {
+	return &templateStore{}
+}
+
+func functionNameSignature(funcs template.FuncMap) string {
+	names := make([]string, 0, len(funcs))
+	for name := range funcs {
+		names = append(names, name)
+	}
+	return functionNameSignatureFromNames(names)
+}
+
+func templateFunctionSignature(funcs template.FuncMap) string {
+	return mergeFunctionSignatures(functionNameSignature(funcs), renderFunctionSignature)
+}
+
+func functionNameSignatureFromNames(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+
+	names = slices.Clone(names)
+	sort.Strings(names)
+	names = slices.Compact(names)
+
+	var builder strings.Builder
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		builder.WriteString(name)
+		builder.WriteString(";")
+	}
+	return builder.String()
+}
+
+func mergeFunctionSignatures(signatures ...string) string {
+	var names []string
+	for _, signature := range signatures {
+		for _, name := range strings.Split(signature, ";") {
+			if name == "" {
+				continue
+			}
+			names = append(names, name)
+		}
+	}
+	return functionNameSignatureFromNames(names)
+}
+
+func (p *Partial) getTemplateStore() *templateStore {
+	if p.templateCache != nil {
+		return p.templateCache
+	}
+	if p.parent != nil {
+		return p.parent.getTemplateStore()
+	}
+	p.templateCache = newTemplateStore()
+	return p.templateCache
+}
+
+func (c *cachedTemplate) template(functions template.FuncMap) (*template.Template, func(), error) {
+	if pooled := c.pool.Get(); pooled != nil {
+		t, ok := pooled.(*template.Template)
+		if !ok {
+			return nil, nil, fmt.Errorf("cached template pool contained %T", pooled)
+		}
+		t.Funcs(functions)
+		return t, func() { c.pool.Put(t) }, nil
+	}
+
+	t, err := c.base.Clone()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error cloning cached template: %w", err)
+	}
+	t.Funcs(functions)
+	return t, func() { c.pool.Put(t) }, nil
 }
 
 func (p *Partial) clone() *Partial {
@@ -1478,6 +1626,7 @@ func (p *Partial) clone() *Partial {
 		targetResolver:      p.targetResolver,
 		templates:           slices.Clone(p.templates),
 		combinedFunctions:   maps.Clone(p.combinedFunctions),
+		functionSignature:   p.functionSignature,
 		basePath:            p.basePath,
 		data:                maps.Clone(p.data),
 		layoutData:          maps.Clone(p.layoutData),
@@ -1488,6 +1637,7 @@ func (p *Partial) clone() *Partial {
 		errorRenderer:       p.errorRenderer,
 		debugRenderer:       p.debugRenderer,
 		interactionRenderer: p.interactionRenderer,
+		templateCache:       p.templateCache,
 		errorMode:           p.errorMode,
 		errorModeSet:        p.errorModeSet,
 		children:            maps.Clone(p.children),
@@ -1497,18 +1647,17 @@ func (p *Partial) clone() *Partial {
 	return clone
 }
 
-// Generate a hash of the function names to include in the cache key
-func (p *Partial) generateCacheKey(templates []string, funcMapPtr uintptr) string {
+// Generate a hash of the template paths and available function names to include in the cache key.
+func (p *Partial) generateCacheKey(templates []string, functionSignature string) string {
 	var builder strings.Builder
 
-	// Include all template names
 	for _, tmpl := range templates {
 		builder.WriteString(tmpl)
 		builder.WriteString(";")
 	}
 
-	// Include function map pointer
-	_, _ = fmt.Fprintf(&builder, "funcMap:%x", funcMapPtr)
+	builder.WriteString("funcs:")
+	builder.WriteString(functionSignature)
 
 	return builder.String()
 }

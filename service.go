@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
 	"sync"
 
@@ -34,6 +35,7 @@ type (
 		data              map[string]any
 		combinedFunctions template.FuncMap
 		connector         connector.Connector
+		templateCache     *templateStore
 		funcMapLock       sync.RWMutex // Add a read-write mutex
 	}
 
@@ -64,12 +66,14 @@ func NewService(cfg *Config) *Service {
 		cfg.Connector = connector.NewPartial(nil)
 	}
 
+	functions := copyFuncMap()
 	return &Service{
 		config:            cfg,
 		data:              make(map[string]any),
 		funcMapLock:       sync.RWMutex{},
-		combinedFunctions: copyFuncMap(),
+		combinedFunctions: functions,
 		connector:         cfg.Connector,
+		templateCache:     newTemplateStore(),
 	}
 }
 
@@ -79,12 +83,13 @@ func (svc *Service) NewLayout() *Layout {
 	if fsys == nil {
 		fsys = svc.config.fs
 	}
+	functions := svc.getFuncMap()
 	return &Layout{
 		service:           svc,
 		data:              make(map[string]any),
 		filesystem:        fsys,
 		connector:         svc.connector,
-		combinedFunctions: svc.getFuncMap(),
+		combinedFunctions: functions,
 	}
 }
 
@@ -136,7 +141,7 @@ func (svc *Service) UseFuncs(funcMap template.FuncMap) {
 func (svc *Service) getFuncMap() template.FuncMap {
 	svc.funcMapLock.RLock()
 	defer svc.funcMapLock.RUnlock()
-	return svc.combinedFunctions
+	return maps.Clone(svc.combinedFunctions)
 }
 
 func mergeFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) {
@@ -243,7 +248,7 @@ func (l *Layout) getFuncMap() template.FuncMap {
 	l.funcMapLock.RLock()
 	defer l.funcMapLock.RUnlock()
 
-	return l.combinedFunctions
+	return maps.Clone(l.combinedFunctions)
 }
 
 // RenderWithRequest renders the partial with the given http.Request.
@@ -328,6 +333,7 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	}
 	p.errorMode = l.service.config.ErrorMode
 	p.errorModeSet = true
+	p.templateCache = l.service.templateCache
 	p.serviceData = l.service.data
 	p.layoutData = l.data
 	p.request = l.request

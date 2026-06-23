@@ -430,9 +430,11 @@ In your templates, you can access the following data:
 ## Concurrency and Template Caching
 The package includes concurrency safety measures for template caching:
 
-- Templates are cached using a sync.Map.
-- Mutexes are used to prevent race conditions during template parsing.
-- Set UseTemplateCache to true to enable template caching.
+- Parsed templates are cached per service.
+- Mutexes prevent duplicate parsing for the same service/template/function shape.
+- Cached templates are rebound with request-specific functions per render.
+- Rendered HTML is not cached.
+- Set `UseTemplateCache` to `true` to enable parsed template caching.
 
 ```go
 cfg := &partial.Config{

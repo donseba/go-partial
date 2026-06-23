@@ -30,9 +30,45 @@ func BenchmarkRenderLayoutPerRequestWithCache(b *testing.B) {
 	benchmarkRenderPerRequestLayout(b, true)
 }
 
-func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
-	resetBenchmarkTemplateCache(b)
+func BenchmarkRenderWithRequestSimpleNoCache(b *testing.B) {
+	benchmarkRenderWithRequestSimple(b, false)
+}
 
+func BenchmarkRenderWithRequestSimpleWithCache(b *testing.B) {
+	benchmarkRenderWithRequestSimple(b, true)
+}
+
+func benchmarkRenderWithRequestSimple(b *testing.B, useCache bool) {
+	partial := NewID("content", "templates/simple.gohtml").
+		SetFileSystem(benchmarkFS()).
+		UseTemplateCache(useCache).
+		SetData(map[string]any{
+			"Title": "Benchmark",
+			"Body":  "A small direct render.",
+		})
+	request := benchmarkRequest()
+	ctx := context.Background()
+
+	if useCache {
+		if _, err := partial.RenderWithRequest(ctx, request); err != nil {
+			b.Fatalf("prime render: %v", err)
+		}
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		out, err := partial.RenderWithRequest(ctx, request)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(out) == 0 {
+			b.Fatal("empty render output")
+		}
+	}
+}
+
+func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
 	svc := NewService(&Config{
 		FS:               benchmarkFS(),
 		UseTemplateCache: useCache,
@@ -62,8 +98,6 @@ func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
 }
 
 func benchmarkRenderPerRequestLayout(b *testing.B, useCache bool) {
-	resetBenchmarkTemplateCache(b)
-
 	svc := NewService(&Config{
 		FS:               benchmarkFS(),
 		UseTemplateCache: useCache,
@@ -127,16 +161,11 @@ func benchmarkFS() *inMemoryFS {
 		"templates/content.gohtml": `<section><h1>{{ .Data.Title }}</h1><table>{{ range .Data.Rows }}{{ partial "row" "Row" . "Owner" $.Data.Owner }}{{ end }}</table></section>`,
 		"templates/row.gohtml":     `<tr id="row-{{ scoped.Row.ID }}"><td>{{ scoped.Row.Name }}</td><td>{{ scoped.Row.Price }}</td><td>{{ scoped.Row.Status }}</td><td>{{ scoped.Owner }}</td></tr>`,
 		"templates/notice.gohtml":  `<aside id="notice"{{ oobAttr }}>{{ .Data.Message }}</aside>`,
+		"templates/simple.gohtml":  `<article><h1>{{ .Data.Title }}</h1><p>{{ .Data.Body }}</p></article>`,
 	}}
 }
 
 func benchmarkRequest() *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, "/benchmark", nil)
 	return req
-}
-
-func resetBenchmarkTemplateCache(b *testing.B) {
-	b.Helper()
-	templateCache.Clear()
-	mutexCache.Clear()
 }
