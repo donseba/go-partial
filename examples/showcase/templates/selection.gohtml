@@ -9,8 +9,8 @@
         <div class="flex items-center gap-1.5 overflow-x-auto border-b border-stone-300" role="tablist">
             <button
                 role="tab"
-                aria-selected="{{ if selectionIf true "summary" }}true{{ else }}false{{ end }}"
-                class="{{ if selectionIf true "summary" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
+                aria-selected="{{ if selectionIs "summary" }}true{{ else }}false{{ end }}"
+                class="{{ if selectionIs "summary" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                 hx-get="/selection"
                 hx-target="#content"
                 hx-headers='{"{{ selectionHeader }}":"summary"}'>
@@ -18,8 +18,8 @@
             </button>
             <button
                 role="tab"
-                aria-selected="{{ if selectionIf true "details" }}true{{ else }}false{{ end }}"
-                class="{{ if selectionIf true "details" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
+                aria-selected="{{ if selectionIs "details" }}true{{ else }}false{{ end }}"
+                class="{{ if selectionIs "details" }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                 hx-get="/selection"
                 hx-target="#content"
                 hx-headers='{"{{ selectionHeader }}":"details"}'>
@@ -47,7 +47,7 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button class="{{"{{ selectionIf \"active\" \"summary\" }}" }}"
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button class="{{"{{ if selectionIs \"summary\" }}active{{ end }}" }}"
         hx-headers='{"{{ "{{ selectionHeader }}" }}":"summary"}'&gt;
     Summary
 &lt;/button&gt;
@@ -55,3 +55,4 @@
 {{ "{{ selection }}" }}</code></pre>
     </article>
 </section>
+

@@ -243,6 +243,241 @@ func TestTemplateCacheIsServiceScoped(t *testing.T) {
 	}
 }
 
+func TestTemplateCacheUsesCurrentCustomFunctions(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `<p>{{ label }}</p>`,
+		},
+	}
+	svc := NewService(&Config{
+		FS:               fsys,
+		UseTemplateCache: true,
+	})
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	render := func(label string) string {
+		t.Helper()
+		content := NewID("content", "templates/content.html")
+		content.UseFuncs(template.FuncMap{
+			"label": func() string {
+				return label
+			},
+		})
+		out, err := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+		if err != nil {
+			t.Fatalf("failed to render %q: %v", label, err)
+		}
+		return string(out)
+	}
+
+	if got := render("first"); got != "<p>first</p>" {
+		t.Fatalf("unexpected first render: %s", got)
+	}
+	if got := render("second"); got != "<p>second</p>" {
+		t.Fatalf("cached render used stale custom function: %s", got)
+	}
+}
+
+func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `<p>{{ label }}</p>`,
+		},
+	}
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		render func(t *testing.T, label string) string
+	}{
+		{
+			name: "service",
+			render: func() func(t *testing.T, label string) string {
+				svc := NewService(&Config{
+					FS:               fsys,
+					UseTemplateCache: true,
+				})
+				return func(t *testing.T, label string) string {
+					t.Helper()
+					svc.UseFuncs(template.FuncMap{
+						"label": func() string {
+							return label
+						},
+					})
+					content := NewID("content", "templates/content.html")
+					out, renderErr := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+					if renderErr != nil {
+						t.Fatalf("failed to render service label %q: %v", label, renderErr)
+					}
+					return string(out)
+				}
+			}(),
+		},
+		{
+			name: "layout",
+			render: func() func(t *testing.T, label string) string {
+				svc := NewService(&Config{
+					FS:               fsys,
+					UseTemplateCache: true,
+				})
+				return func(t *testing.T, label string) string {
+					t.Helper()
+					content := NewID("content", "templates/content.html")
+					layout := svc.NewLayout()
+					layout.UseFuncs(template.FuncMap{
+						"label": func() string {
+							return label
+						},
+					})
+					layout.Set(content)
+					out, renderErr := layout.RenderWithRequest(request.Context(), request)
+					if renderErr != nil {
+						t.Fatalf("failed to render layout label %q: %v", label, renderErr)
+					}
+					return string(out)
+				}
+			}(),
+		},
+		{
+			name: "partial",
+			render: func() func(t *testing.T, label string) string {
+				svc := NewService(&Config{
+					FS:               fsys,
+					UseTemplateCache: true,
+				})
+				return func(t *testing.T, label string) string {
+					t.Helper()
+					content := NewID("content", "templates/content.html")
+					content.UseFuncs(template.FuncMap{
+						"label": func() string {
+							return label
+						},
+					})
+					out, renderErr := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+					if renderErr != nil {
+						t.Fatalf("failed to render partial label %q: %v", label, renderErr)
+					}
+					return string(out)
+				}
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.render(t, "first"); got != "<p>first</p>" {
+				t.Fatalf("unexpected first render: %s", got)
+			}
+			if got := tt.render(t, "second"); got != "<p>second</p>" {
+				t.Fatalf("cached render used stale %s custom function: %s", tt.name, got)
+			}
+		})
+	}
+}
+
+func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/layout.html":  `<main>{{ child "content" }}{{ child "notice" }}</main>`,
+			"templates/content.html": `<section>{{ partial "row" "Name" "Ada" }}</section>`,
+			"templates/row.html":     `<p>{{ scoped.Name }}</p>`,
+			"templates/notice.html":  `<aside id="notice"{{ oobAttr }}>{{ .Data.Message }}</aside>`,
+		},
+	}
+	service := NewService(&Config{
+		FS:               fsys,
+		UseTemplateCache: true,
+	})
+	content := NewID("content", "templates/content.html").With(NewID("row", "templates/row.html"))
+	notice := NewID("notice", "templates/notice.html").
+		SetData(map[string]any{"Message": "Saved"}).
+		SetAlwaysSwapOOB(true)
+	layout := NewID("layout", "templates/layout.html").WithOOB(notice)
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	out, err := service.NewLayout().Set(content).Wrap(layout).RenderWithRequest(request.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	html := string(out)
+	if !strings.Contains(html, `<p>Ada</p>`) {
+		t.Fatalf("filtered render did not use request scoped helper: %s", html)
+	}
+	if !strings.Contains(html, `<aside id="notice">Saved</aside>`) {
+		t.Fatalf("filtered render did not render second child: %s", html)
+	}
+}
+
+func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/layout.html":  `<main>{{ child "content" }}</main>`,
+			"templates/content.html": `<p>{{ label }}</p>`,
+		},
+	}
+	svc := NewService(&Config{
+		FS:               fsys,
+		UseTemplateCache: true,
+	})
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	render := func(label string) string {
+		t.Helper()
+		content := NewID("content", "templates/content.html")
+		wrapper := NewID("layout", "templates/layout.html")
+		wrapper.UseFuncs(template.FuncMap{
+			"label": func() string {
+				return label
+			},
+		})
+		out, renderErr := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
+		if renderErr != nil {
+			t.Fatalf("failed to render inherited label %q: %v", label, renderErr)
+		}
+		return string(out)
+	}
+
+	if got := render("parent"); got != "<main><p>parent</p></main>" {
+		t.Fatalf("unexpected inherited custom function render: %s", got)
+	}
+	if got := render("fresh"); got != "<main><p>fresh</p></main>" {
+		t.Fatalf("cached child render used stale inherited custom function: %s", got)
+	}
+}
+
+func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
+	svc := NewService(nil)
+	svc.UseFuncs(template.FuncMap{
+		"child": func() string {
+			return "blocked"
+		},
+		"label": func() string {
+			return "allowed"
+		},
+	})
+
+	customFuncs := svc.getCustomFuncMap()
+	if _, ok := customFuncs["child"]; ok {
+		t.Fatal("protected child helper should not be stored as a custom function")
+	}
+	if _, ok := customFuncs["label"]; !ok {
+		t.Fatal("allowed label helper should be stored as a custom function")
+	}
+}
+
 func TestRequestOOB(t *testing.T) {
 	svc := NewService(&Config{})
 
@@ -635,7 +870,7 @@ func TestSelectionPartialInheritsParentConnectorContext(t *testing.T) {
 
 func TestSelectionIfUsesDefaultSelection(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("content.gohtml", `<button class="{{ selectionIf "active" "summary" }}">Summary</button>`)
+	fsys.AddFile("content.gohtml", `<button class="{{ if selectionIs "summary" }}active{{ end }}">Summary</button>`)
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
 	content.WithSelectMap("summary", map[string]*Partial{
@@ -649,7 +884,7 @@ func TestSelectionIfUsesDefaultSelection(t *testing.T) {
 	}
 
 	if string(out) != `<button class="active">Summary</button>` {
-		t.Fatalf("expected selectionIf to use default selection, got %q", out)
+		t.Fatalf("expected selectionIs to use default selection, got %q", out)
 	}
 }
 
@@ -716,7 +951,7 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 		t.Fatalf("expected translation function output, got %q", out)
 	}
 
-	if _, ok := svc.getFuncMap()["child"]; ok {
+	if _, ok := svc.getStaticFuncMap()["child"]; ok {
 		t.Fatal("translation functions should not overwrite protected child helper")
 	}
 }
@@ -1008,7 +1243,7 @@ func TestUseFuncs(t *testing.T) {
 		"scoped":       func() string { return "should not overwrite" },
 	})
 
-	funcs := svc.getFuncMap()
+	funcs := svc.getStaticFuncMap()
 	if _, ok := funcs["newFunc"]; !ok {
 		t.Error("newFunc should be added to FuncMap")
 	}

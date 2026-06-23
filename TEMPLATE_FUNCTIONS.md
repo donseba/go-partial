@@ -384,3 +384,4 @@ Safe render flow:
 ```text
 resolve target -> load current data -> clone parsed template -> bind accessors -> execute
 ```
+

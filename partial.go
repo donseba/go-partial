@@ -45,13 +45,13 @@ var (
 		"reveal":          {},
 		"stream":          {},
 		"actionHeader":    {},
-		"actionIf":        {},
+		"actionIs":        {},
 		"actionValue":     {},
 		"selectionHeader": {},
-		"selectionIf":     {},
+		"selectionIs":     {},
 		"selectionValue":  {},
 		"targetHeader":    {},
-		"targetIf":        {},
+		"targetIs":        {},
 		"targetValue":     {},
 		"scoped":          {},
 		"selection":       {},
@@ -62,17 +62,16 @@ var (
 		"urlStarts":       {},
 	}
 
-	renderFunctionSignature = functionNameSignatureFromNames([]string{
+	requestFuncSignature = functionNameSignatureFromNames([]string{
 		"action",
 		"actionHeader",
-		"actionIf",
+		"actionIs",
 		"actionValue",
 		"async",
 		"child",
 		"childIf",
 		"context",
 		"debug",
-		"dict",
 		"island",
 		"joinPath",
 		"on",
@@ -86,11 +85,11 @@ var (
 		"scoped",
 		"selection",
 		"selectionHeader",
-		"selectionIf",
+		"selectionIs",
 		"selectionValue",
 		"stream",
 		"targetHeader",
-		"targetIf",
+		"targetIs",
 		"targetValue",
 		"url",
 		"urlContains",
@@ -102,8 +101,9 @@ var (
 
 type (
 	cachedTemplate struct {
-		base *template.Template
-		pool sync.Pool
+		base          *template.Template
+		requiredFuncs map[string]struct{}
+		pool          sync.Pool
 	}
 
 	templateStore struct {
@@ -115,39 +115,41 @@ type (
 
 	// Partial represents a renderable component with optional children and data.
 	Partial struct {
-		id                  string
-		parent              *Partial
-		request             *http.Request
-		renderOOB           bool
-		alwaysSwapOOB       bool
-		fs                  fs.FS
-		logger              Logger
-		connector           connector.Connector
-		useCache            bool
-		templates           []string
-		combinedFunctions   template.FuncMap
-		functionSignature   string
-		basePath            string
-		data                map[string]any
-		layoutData          map[string]any
-		globalData          map[string]any
-		serviceData         map[string]any
-		interact            map[string]any
-		responseHeaders     map[string]string
-		response            connector.Response
-		errorRenderer       ErrorRenderer
-		debugRenderer       DebugRenderer
-		interactionRenderer InteractionRenderer
-		templateCache       *templateStore
-		errorMode           ErrorMode
-		errorModeSet        bool
-		targetResolver      TargetResolver
-		mu                  sync.RWMutex
-		children            map[string]*Partial
-		oobChildren         map[string]struct{}
-		selection           *Selection
-		templateAction      func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
-		action              func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		id                    string
+		parent                *Partial
+		request               *http.Request
+		renderOOB             bool
+		alwaysSwapOOB         bool
+		fs                    fs.FS
+		logger                Logger
+		connector             connector.Connector
+		useCache              bool
+		templates             []string
+		staticFuncs           template.FuncMap
+		customFuncs           template.FuncMap
+		templateFuncSignature string
+		hasCustomFunctions    bool
+		basePath              string
+		data                  map[string]any
+		layoutData            map[string]any
+		globalData            map[string]any
+		serviceData           map[string]any
+		interact              map[string]any
+		responseHeaders       map[string]string
+		response              connector.Response
+		errorRenderer         ErrorRenderer
+		debugRenderer         DebugRenderer
+		interactionRenderer   InteractionRenderer
+		templateCache         *templateStore
+		errorMode             ErrorMode
+		errorModeSet          bool
+		targetResolver        TargetResolver
+		mu                    sync.RWMutex
+		children              map[string]*Partial
+		oobChildren           map[string]struct{}
+		selection             *Selection
+		templateAction        func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		action                func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
 	}
 
 	Selection struct {
@@ -288,22 +290,23 @@ const HeaderGoPartialError = "X-Go-Partial-Error"
 func New(templates ...string) *Partial {
 	functions := copyFuncMap()
 	return &Partial{
-		id:                  "root",
-		templates:           templates,
-		combinedFunctions:   functions,
-		functionSignature:   templateFunctionSignature(functions),
-		data:                make(map[string]any),
-		layoutData:          make(map[string]any),
-		globalData:          make(map[string]any),
-		serviceData:         make(map[string]any),
-		interact:            make(map[string]any),
-		children:            make(map[string]*Partial),
-		oobChildren:         make(map[string]struct{}),
-		fs:                  os.DirFS("./"),
-		errorRenderer:       DefaultErrorRenderer(),
-		debugRenderer:       DefaultDebugRenderer(),
-		interactionRenderer: DefaultInteractionRenderer(),
-		templateCache:       newTemplateStore(),
+		id:                    "root",
+		templates:             templates,
+		staticFuncs:           functions,
+		customFuncs:           make(template.FuncMap),
+		templateFuncSignature: templateFuncSignature(functions),
+		data:                  make(map[string]any),
+		layoutData:            make(map[string]any),
+		globalData:            make(map[string]any),
+		serviceData:           make(map[string]any),
+		interact:              make(map[string]any),
+		children:              make(map[string]*Partial),
+		oobChildren:           make(map[string]struct{}),
+		fs:                    os.DirFS("./"),
+		errorRenderer:         DefaultErrorRenderer(),
+		debugRenderer:         DefaultDebugRenderer(),
+		interactionRenderer:   DefaultInteractionRenderer(),
+		templateCache:         newTemplateStore(),
 	}
 }
 
@@ -632,15 +635,24 @@ func (p *Partial) UseFuncs(funcMap template.FuncMap) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	customFuncs := make(template.FuncMap, len(funcMap))
 	for k, v := range funcMap {
 		if _, ok := protectedFunctionNames[k]; ok {
 			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", k)
 			continue
 		}
 
-		p.combinedFunctions[k] = v
+		p.staticFuncs[k] = v
+		customFuncs[k] = v
 	}
-	p.functionSignature = templateFunctionSignature(p.combinedFunctions)
+	if len(customFuncs) > 0 {
+		p.hasCustomFunctions = true
+	}
+	if p.customFuncs == nil {
+		p.customFuncs = make(template.FuncMap)
+	}
+	maps.Copy(p.customFuncs, customFuncs)
+	p.templateFuncSignature = templateFuncSignature(p.staticFuncs)
 }
 
 // SetLogger sets the logger for the partial.
@@ -855,48 +867,84 @@ func (p *Partial) Render(ctx context.Context) (template.HTML, error) {
 	return p.renderSelf(ctx, nil)
 }
 
-func (p *Partial) mergeFuncMapInternal(funcMap template.FuncMap) {
+func (p *Partial) mergeFuncMapInternal(funcMap, customFuncMap template.FuncMap) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.combinedFunctions == nil {
-		p.combinedFunctions = make(template.FuncMap, len(funcMap))
+	if p.staticFuncs == nil {
+		p.staticFuncs = make(template.FuncMap, len(funcMap))
 	}
-	maps.Copy(p.combinedFunctions, funcMap)
-	p.functionSignature = templateFunctionSignature(p.combinedFunctions)
+	maps.Copy(p.staticFuncs, funcMap)
+	if len(customFuncMap) > 0 {
+		p.hasCustomFunctions = true
+		if p.customFuncs == nil {
+			p.customFuncs = make(template.FuncMap, len(customFuncMap))
+		}
+		maps.Copy(p.customFuncs, customFuncMap)
+	}
+	p.templateFuncSignature = templateFuncSignature(p.staticFuncs)
 }
 
-// getFuncMap returns the combined function map of the partial.
-func (p *Partial) getFuncMap() template.FuncMap {
+// getStaticFuncMap returns the combined function map of the partial.
+func (p *Partial) getStaticFuncMap() template.FuncMap {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
 	if p.parent != nil {
-		funcs := maps.Clone(p.parent.getFuncMap())
-		maps.Copy(funcs, p.combinedFunctions)
+		funcs := maps.Clone(p.parent.getStaticFuncMap())
+		maps.Copy(funcs, p.staticFuncs)
 		return funcs
 	}
 
-	return maps.Clone(p.combinedFunctions)
+	return maps.Clone(p.staticFuncs)
+}
+
+func (p *Partial) getCustomFuncMap() template.FuncMap {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.parent != nil {
+		funcs := maps.Clone(p.parent.getCustomFuncMap())
+		maps.Copy(funcs, p.customFuncs)
+		return funcs
+	}
+
+	return maps.Clone(p.customFuncs)
 }
 
 func (p *Partial) getFunctionSignature() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	signature := p.functionSignature
+	signature := p.templateFuncSignature
 	if p.parent != nil {
 		signature = mergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
 	}
 	return signature
 }
 
-func (p *Partial) getFuncs(data *Data) template.FuncMap {
-	funcs := p.getFuncMap()
+func (p *Partial) getHasCustomFunctions() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
+	if p.hasCustomFunctions {
+		return true
+	}
+	if p.parent != nil {
+		return p.parent.getHasCustomFunctions()
+	}
+	return false
+}
+
+func (p *Partial) getRequestFuncMap(data *Data) template.FuncMap {
+	funcs := make(template.FuncMap, 40)
+	p.addRequestFuncs(funcs, data)
+	return funcs
+}
+
+func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 	funcs["child"] = childFunc(p, data)
 	funcs["childIf"] = childIfFunc(p, data)
-	funcs["dict"] = dict
 	funcs["partial"] = partialFunc(p, data)
 	funcs["async"] = interactionFunc(p, data, connector.InteractionAsync)
 	funcs["reveal"] = interactionFunc(p, data, connector.InteractionReveal)
@@ -960,12 +1008,9 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return p.getConnector().GetTargetValue(p.GetRequest())
 	}
 
-	funcs["targetIf"] = func(out any, in ...string) any {
+	funcs["targetIs"] = func(in ...string) bool {
 		target := p.getConnector().GetTargetValue(p.GetRequest())
-		if slices.Contains(in, target) {
-			return out
-		}
-		return nil
+		return slices.Contains(in, target)
 	}
 
 	funcs["selectionHeader"] = func() string {
@@ -985,12 +1030,9 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 	}
 	funcs["selectionValue"] = selectionValue
 
-	funcs["selectionIf"] = func(out any, in ...string) any {
+	funcs["selectionIs"] = func(in ...string) bool {
 		selected := selectionValue()
-		if slices.Contains(in, selected) {
-			return out
-		}
-		return nil
+		return slices.Contains(in, selected)
 	}
 
 	funcs["actionHeader"] = func() string {
@@ -1001,12 +1043,9 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		return p.getConnector().GetActionValue(p.GetRequest())
 	}
 
-	funcs["actionIf"] = func(out any, in ...string) any {
+	funcs["actionIs"] = func(in ...string) bool {
 		action := p.getConnector().GetActionValue(p.GetRequest())
-		if slices.Contains(in, action) {
-			return out
-		}
-		return nil
+		return slices.Contains(in, action)
 	}
 
 	funcs["oob"] = func() bool {
@@ -1023,8 +1062,65 @@ func (p *Partial) getFuncs(data *Data) template.FuncMap {
 		}
 		return template.HTMLAttr("")
 	}
+}
 
+func placeholderRequestFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"child":           func(string, ...any) template.HTML { return "" },
+		"childIf":         func(string, ...any) template.HTML { return "" },
+		"partial":         func(string, ...any) template.HTML { return "" },
+		"async":           func(any, ...any) template.HTML { return "" },
+		"reveal":          func(any, ...any) template.HTML { return "" },
+		"poll":            func(any, ...any) template.HTML { return "" },
+		"stream":          func(any, ...any) template.HTML { return "" },
+		"prefetch":        func(any, ...any) template.HTML { return "" },
+		"refresh":         func(any, ...any) template.HTML { return "" },
+		"on":              func(any, ...any) template.HTML { return "" },
+		"island":          func(any, ...any) template.HTML { return "" },
+		"selection":       func() template.HTML { return "" },
+		"action":          func() template.HTML { return "" },
+		"debug":           func(any) template.HTML { return "" },
+		"url":             func() *url.URL { return nil },
+		"urlIs":           func(string) bool { return false },
+		"urlStarts":       func(string) bool { return false },
+		"urlContains":     func(string) bool { return false },
+		"joinPath":        func(...string) string { return "" },
+		"urlPath":         func(string, ...string) template.URL { return "" },
+		"context":         func() context.Context { return nil },
+		"scoped":          func() map[string]any { return nil },
+		"targetHeader":    func() string { return "" },
+		"targetValue":     func() string { return "" },
+		"targetIs":        func(...string) bool { return false },
+		"selectionHeader": func() string { return "" },
+		"selectionValue":  func() string { return "" },
+		"selectionIs":     func(...string) bool { return false },
+		"actionHeader":    func() string { return "" },
+		"actionValue":     func() string { return "" },
+		"actionIs":        func(...string) bool { return false },
+		"oob":             func() bool { return false },
+		"oobAttr":         func(...string) template.HTMLAttr { return "" },
+	}
+}
+
+func mergeFuncMaps(staticFuncs, requestFuncs template.FuncMap) template.FuncMap {
+	funcs := make(template.FuncMap, len(staticFuncs)+len(requestFuncs))
+	maps.Copy(funcs, staticFuncs)
+	maps.Copy(funcs, requestFuncs)
 	return funcs
+}
+
+func filterFuncMap(funcs template.FuncMap, required map[string]struct{}) template.FuncMap {
+	if required == nil {
+		return funcs
+	}
+
+	filtered := make(template.FuncMap, min(len(funcs), len(required)))
+	for name := range required {
+		if fn, ok := funcs[name]; ok {
+			filtered[name] = fn
+		}
+	}
+	return filtered
 }
 
 func copyDataMap(in map[string]any) map[string]any {
@@ -1432,9 +1528,16 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		}
 	}
 
-	functions := p.getFuncs(data)
 	cacheKey := p.generateCacheKey(p.templates, p.getFunctionSignature())
-	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, functions)
+	var funcs template.FuncMap
+	if p.useCache {
+		funcs = p.getRequestFuncMap(data)
+	} else {
+		funcs = p.getStaticFuncMap()
+		p.addRequestFuncs(funcs, data)
+	}
+
+	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache)
 	if err != nil {
 		p.getLogger().Error("error getting or parsing template", "error", err)
 		return "", err
@@ -1494,11 +1597,17 @@ func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Requ
 	return out, nil
 }
 
-func (p *Partial) getTemplateForRender(cacheKey string, functions template.FuncMap) (*template.Template, func(), error) {
+func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
 	store := p.getTemplateStore()
 	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
 		if entry, ok := tmpl.(*cachedTemplate); ok {
-			return entry.template(functions)
+			if applyFullFuncs {
+				if funcsAreFull {
+					return entry.template(funcs)
+				}
+				return entry.template(mergeFuncMaps(p.getCustomFuncMap(), funcs))
+			}
+			return entry.template(funcs)
 		}
 	}
 
@@ -1510,20 +1619,42 @@ func (p *Partial) getTemplateForRender(cacheKey string, functions template.FuncM
 	// Double-check after acquiring lock
 	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
 		if entry, ok := tmpl.(*cachedTemplate); ok {
-			return entry.template(functions)
+			if applyFullFuncs {
+				if funcsAreFull {
+					return entry.template(funcs)
+				}
+				return entry.template(mergeFuncMaps(p.getCustomFuncMap(), funcs))
+			}
+			return entry.template(funcs)
 		}
 	}
 
-	t := template.New(path.Base(p.templates[0])).Funcs(functions)
+	functions := funcs
+	if !funcsAreFull {
+		functions = mergeFuncMaps(p.getStaticFuncMap(), funcs)
+	}
+	parseFuncs := functions
+	if p.useCache {
+		parseFuncs = mergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
+	}
+	t := template.New(path.Base(p.templates[0])).Funcs(parseFuncs)
 	tmpl, err := t.ParseFS(p.getFS(), p.templates...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing templates: %w", err)
 	}
 
 	if p.useCache {
-		entry := &cachedTemplate{base: tmpl}
+		var requiredFuncs map[string]struct{}
+		requiredFuncs, err = requiredFuncsFromFS(p.getFS(), p.templates)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error scanning template requirements: %w", err)
+		}
+		entry := &cachedTemplate{base: tmpl, requiredFuncs: requiredFuncs}
 		store.templates.Store(cacheKey, entry)
-		return entry.template(functions)
+		if applyFullFuncs {
+			return entry.template(functions)
+		}
+		return entry.template(funcs)
 	}
 
 	return tmpl, nil, nil
@@ -1541,8 +1672,8 @@ func functionNameSignature(funcs template.FuncMap) string {
 	return functionNameSignatureFromNames(names)
 }
 
-func templateFunctionSignature(funcs template.FuncMap) string {
-	return mergeFunctionSignatures(functionNameSignature(funcs), renderFunctionSignature)
+func templateFuncSignature(funcs template.FuncMap) string {
+	return mergeFunctionSignatures(functionNameSignature(funcs), requestFuncSignature)
 }
 
 func functionNameSignatureFromNames(names []string) string {
@@ -1590,12 +1721,16 @@ func (p *Partial) getTemplateStore() *templateStore {
 }
 
 func (c *cachedTemplate) template(functions template.FuncMap) (*template.Template, func(), error) {
+	functions = filterFuncMap(functions, c.requiredFuncs)
+
 	if pooled := c.pool.Get(); pooled != nil {
 		t, ok := pooled.(*template.Template)
 		if !ok {
 			return nil, nil, fmt.Errorf("cached template pool contained %T", pooled)
 		}
-		t.Funcs(functions)
+		if len(functions) > 0 {
+			t.Funcs(functions)
+		}
 		return t, func() { c.pool.Put(t) }, nil
 	}
 
@@ -1603,7 +1738,9 @@ func (c *cachedTemplate) template(functions template.FuncMap) (*template.Templat
 	if err != nil {
 		return nil, nil, fmt.Errorf("error cloning cached template: %w", err)
 	}
-	t.Funcs(functions)
+	if len(functions) > 0 {
+		t.Funcs(functions)
+	}
 	return t, func() { c.pool.Put(t) }, nil
 }
 
@@ -1613,42 +1750,44 @@ func (p *Partial) clone() *Partial {
 
 	// Create a new Partial instance
 	clone := &Partial{
-		id:                  p.id,
-		parent:              p.parent,
-		request:             p.request,
-		renderOOB:           p.renderOOB,
-		alwaysSwapOOB:       p.alwaysSwapOOB,
-		fs:                  p.fs,
-		logger:              p.logger,
-		connector:           p.connector,
-		useCache:            p.useCache,
-		selection:           p.selection,
-		targetResolver:      p.targetResolver,
-		templates:           slices.Clone(p.templates),
-		combinedFunctions:   maps.Clone(p.combinedFunctions),
-		functionSignature:   p.functionSignature,
-		basePath:            p.basePath,
-		data:                maps.Clone(p.data),
-		layoutData:          maps.Clone(p.layoutData),
-		globalData:          maps.Clone(p.globalData),
-		serviceData:         maps.Clone(p.serviceData),
-		interact:            maps.Clone(p.interact),
-		response:            p.response,
-		errorRenderer:       p.errorRenderer,
-		debugRenderer:       p.debugRenderer,
-		interactionRenderer: p.interactionRenderer,
-		templateCache:       p.templateCache,
-		errorMode:           p.errorMode,
-		errorModeSet:        p.errorModeSet,
-		children:            maps.Clone(p.children),
-		oobChildren:         maps.Clone(p.oobChildren),
+		id:                    p.id,
+		parent:                p.parent,
+		request:               p.request,
+		renderOOB:             p.renderOOB,
+		alwaysSwapOOB:         p.alwaysSwapOOB,
+		fs:                    p.fs,
+		logger:                p.logger,
+		connector:             p.connector,
+		useCache:              p.useCache,
+		selection:             p.selection,
+		targetResolver:        p.targetResolver,
+		templates:             slices.Clone(p.templates),
+		staticFuncs:           maps.Clone(p.staticFuncs),
+		customFuncs:           maps.Clone(p.customFuncs),
+		templateFuncSignature: p.templateFuncSignature,
+		hasCustomFunctions:    p.hasCustomFunctions,
+		basePath:              p.basePath,
+		data:                  maps.Clone(p.data),
+		layoutData:            maps.Clone(p.layoutData),
+		globalData:            maps.Clone(p.globalData),
+		serviceData:           maps.Clone(p.serviceData),
+		interact:              maps.Clone(p.interact),
+		response:              p.response,
+		errorRenderer:         p.errorRenderer,
+		debugRenderer:         p.debugRenderer,
+		interactionRenderer:   p.interactionRenderer,
+		templateCache:         p.templateCache,
+		errorMode:             p.errorMode,
+		errorModeSet:          p.errorModeSet,
+		children:              maps.Clone(p.children),
+		oobChildren:           maps.Clone(p.oobChildren),
 	}
 
 	return clone
 }
 
 // Generate a hash of the template paths and available function names to include in the cache key.
-func (p *Partial) generateCacheKey(templates []string, functionSignature string) string {
+func (p *Partial) generateCacheKey(templates []string, templateFuncSignature string) string {
 	var builder strings.Builder
 
 	for _, tmpl := range templates {
@@ -1657,7 +1796,7 @@ func (p *Partial) generateCacheKey(templates []string, functionSignature string)
 	}
 
 	builder.WriteString("funcs:")
-	builder.WriteString(functionSignature)
+	builder.WriteString(templateFuncSignature)
 
 	return builder.String()
 }

@@ -10,8 +10,8 @@
             {{ range .Data.Tabs }}
                 <button
                     role="tab"
-                    aria-selected="{{ if selectionIf true .Key }}true{{ else }}false{{ end }}"
-                    class="{{ if selectionIf true .Key }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
+                    aria-selected="{{ if selectionIs .Key }}true{{ else }}false{{ end }}"
+                    class="{{ if selectionIs .Key }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-bold text-white shadow-[0_2px_0_#174f49]{{ else }}inline-flex min-h-9 cursor-pointer items-center rounded-t-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900{{ end }}"
                     hx-get="/tabs"
                     hx-target="#content"
                     hx-headers='{"{{ selectionHeader }}":"{{ .Key }}"}'>
@@ -49,3 +49,4 @@
 &lt;/button&gt;</code></pre>
     </article>
 </section>
+

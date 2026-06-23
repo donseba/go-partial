@@ -31,24 +31,28 @@ type (
 	}
 
 	Service struct {
-		config            *Config
-		data              map[string]any
-		combinedFunctions template.FuncMap
-		connector         connector.Connector
-		templateCache     *templateStore
-		funcMapLock       sync.RWMutex // Add a read-write mutex
+		config             *Config
+		data               map[string]any
+		staticFuncs        template.FuncMap
+		customFuncs        template.FuncMap
+		hasCustomFunctions bool
+		connector          connector.Connector
+		templateCache      *templateStore
+		funcsLock          sync.RWMutex // Add a read-write mutex
 	}
 
 	Layout struct {
-		service           *Service
-		filesystem        fs.FS
-		content           *Partial
-		wrapper           *Partial
-		data              map[string]any
-		request           *http.Request
-		combinedFunctions template.FuncMap
-		connector         connector.Connector
-		funcMapLock       sync.RWMutex // Add a read-write mutex
+		service            *Service
+		filesystem         fs.FS
+		content            *Partial
+		wrapper            *Partial
+		data               map[string]any
+		request            *http.Request
+		staticFuncs        template.FuncMap
+		customFuncs        template.FuncMap
+		hasCustomFunctions bool
+		connector          connector.Connector
+		funcsLock          sync.RWMutex // Add a read-write mutex
 	}
 )
 
@@ -68,12 +72,13 @@ func NewService(cfg *Config) *Service {
 
 	functions := copyFuncMap()
 	return &Service{
-		config:            cfg,
-		data:              make(map[string]any),
-		funcMapLock:       sync.RWMutex{},
-		combinedFunctions: functions,
-		connector:         cfg.Connector,
-		templateCache:     newTemplateStore(),
+		config:        cfg,
+		data:          make(map[string]any),
+		funcsLock:     sync.RWMutex{},
+		staticFuncs:   functions,
+		customFuncs:   make(template.FuncMap),
+		connector:     cfg.Connector,
+		templateCache: newTemplateStore(),
 	}
 }
 
@@ -83,13 +88,16 @@ func (svc *Service) NewLayout() *Layout {
 	if fsys == nil {
 		fsys = svc.config.fs
 	}
-	functions := svc.getFuncMap()
+	functions := svc.getStaticFuncMap()
+	customFuncs := svc.getCustomFuncMap()
 	return &Layout{
-		service:           svc,
-		data:              make(map[string]any),
-		filesystem:        fsys,
-		connector:         svc.connector,
-		combinedFunctions: functions,
+		service:            svc,
+		data:               make(map[string]any),
+		filesystem:         fsys,
+		connector:          svc.connector,
+		staticFuncs:        functions,
+		customFuncs:        customFuncs,
+		hasCustomFunctions: svc.getHasCustomFunctions(),
 	}
 }
 
@@ -132,19 +140,36 @@ func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
 
 // UseFuncs adds template functions to the Service.
 func (svc *Service) UseFuncs(funcMap template.FuncMap) {
-	svc.funcMapLock.Lock()
-	defer svc.funcMapLock.Unlock()
+	svc.funcsLock.Lock()
+	defer svc.funcsLock.Unlock()
 
-	mergeFuncMap(svc.combinedFunctions, funcMap, svc.config.Logger)
+	customFuncs := mergeStaticFuncMap(svc.staticFuncs, funcMap, svc.config.Logger)
+	if len(customFuncs) > 0 {
+		maps.Copy(svc.customFuncs, customFuncs)
+		svc.hasCustomFunctions = true
+	}
 }
 
-func (svc *Service) getFuncMap() template.FuncMap {
-	svc.funcMapLock.RLock()
-	defer svc.funcMapLock.RUnlock()
-	return maps.Clone(svc.combinedFunctions)
+func (svc *Service) getStaticFuncMap() template.FuncMap {
+	svc.funcsLock.RLock()
+	defer svc.funcsLock.RUnlock()
+	return maps.Clone(svc.staticFuncs)
 }
 
-func mergeFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) {
+func (svc *Service) getCustomFuncMap() template.FuncMap {
+	svc.funcsLock.RLock()
+	defer svc.funcsLock.RUnlock()
+	return maps.Clone(svc.customFuncs)
+}
+
+func (svc *Service) getHasCustomFunctions() bool {
+	svc.funcsLock.RLock()
+	defer svc.funcsLock.RUnlock()
+	return svc.hasCustomFunctions
+}
+
+func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) template.FuncMap {
+	merged := make(template.FuncMap, len(src))
 	for k, v := range src {
 		if _, ok := protectedFunctionNames[k]; ok {
 			if logger != nil {
@@ -153,7 +178,9 @@ func mergeFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) {
 			continue
 		}
 		dst[k] = v
+		merged[k] = v
 	}
+	return merged
 }
 
 // FS sets the filesystem for the Layout.
@@ -238,17 +265,28 @@ func (l *Layout) AddData(key string, value any) *Layout {
 
 // UseFuncs adds template functions to the Layout.
 func (l *Layout) UseFuncs(funcMap template.FuncMap) {
-	l.funcMapLock.Lock()
-	defer l.funcMapLock.Unlock()
+	l.funcsLock.Lock()
+	defer l.funcsLock.Unlock()
 
-	mergeFuncMap(l.combinedFunctions, funcMap, l.service.config.Logger)
+	customFuncs := mergeStaticFuncMap(l.staticFuncs, funcMap, l.service.config.Logger)
+	if len(customFuncs) > 0 {
+		maps.Copy(l.customFuncs, customFuncs)
+		l.hasCustomFunctions = true
+	}
 }
 
-func (l *Layout) getFuncMap() template.FuncMap {
-	l.funcMapLock.RLock()
-	defer l.funcMapLock.RUnlock()
+func (l *Layout) getStaticFuncMap() template.FuncMap {
+	l.funcsLock.RLock()
+	defer l.funcsLock.RUnlock()
 
-	return maps.Clone(l.combinedFunctions)
+	return maps.Clone(l.staticFuncs)
+}
+
+func (l *Layout) getCustomFuncMap() template.FuncMap {
+	l.funcsLock.RLock()
+	defer l.funcsLock.RUnlock()
+
+	return maps.Clone(l.customFuncs)
 }
 
 // RenderWithRequest renders the partial with the given http.Request.
@@ -310,9 +348,10 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	}
 
 	// Combine functions only once
-	combinedFunctions := l.getFuncMap()
+	staticFuncs := l.getStaticFuncMap()
+	customFuncs := l.getCustomFuncMap()
 
-	p.mergeFuncMapInternal(combinedFunctions)
+	p.mergeFuncMapInternal(staticFuncs, customFuncs)
 
 	p.connector = l.service.connector
 	if l.filesystem != nil {

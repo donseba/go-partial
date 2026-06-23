@@ -29,7 +29,7 @@ content.WithSelectMap("summary", map[string]*partial.Partial{
 &lt;/section&gt;</code></pre>
 
     <p class="leading-7 text-slate-400">Use connector helpers when the selected key also affects control state.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button class="{{"{{ selectionIf \"active\" \"details\" }}" }}"&gt;
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button class="{{"{{ if selectionIs \"details\" }}active{{ end }}" }}"&gt;
     Details
 &lt;/button&gt;</code></pre>
 
@@ -71,3 +71,4 @@ content.WithTemplateAction(func(ctx context.Context, p *partial.Partial, data *p
         </tbody>
     </table>
 </article>
+
