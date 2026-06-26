@@ -20,28 +20,6 @@ go get github.com/donseba/go-partial
 ## Template functions
 Template-facing helpers and accessors are documented in [TEMPLATE_FUNCTIONS.md](TEMPLATE_FUNCTIONS.md).
 
-## Typed Model Contracts
-go-partial can bind typed model contracts at render time. The contract lives in a normal Go template comment:
-
-```gotemplate
-{{/*
-@model Page github.com/example/app.Page
-*/}}
-
-<h1>{{ Page.Title }}</h1>
-```
-
-The application binds the matching value with the same name:
-
-```go
-content := partial.NewID("content", "templates/page.gohtml").
-    SetModels(partial.Model("Page", page))
-```
-
-`Page` is a template function registered by go-partial. The annotation and the Go call are the two ends of the same tunnel: the template declares the name and expected type, and the application supplies the value for that name. Missing models fail before execution with a clear error.
-
-go-doc is the companion tool for typeahead, hover, diagnostics, and go-to-definition for `@model`, `@dot`, `@func`, includes, blocks, and generated helpers. go-partial does not duplicate that static analysis; it only provides the runtime binding needed to render.
-
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
 

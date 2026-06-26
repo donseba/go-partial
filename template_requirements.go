@@ -1,6 +1,7 @@
 package partial
 
 import (
+	"io/fs"
 	"sort"
 	"text/template/parse"
 )
@@ -40,6 +41,24 @@ func RequiredFuncs(name, src string) ([]string, error) {
 
 	sort.Strings(funcs)
 	return funcs, nil
+}
+
+func requiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error) {
+	found := make(map[string]struct{})
+	for _, name := range names {
+		content, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return nil, err
+		}
+		funcs, err := RequiredFuncs(name, string(content))
+		if err != nil {
+			return nil, err
+		}
+		for _, fn := range funcs {
+			found[fn] = struct{}{}
+		}
+	}
+	return found, nil
 }
 
 func walk(n parse.Node, found map[string]bool) {

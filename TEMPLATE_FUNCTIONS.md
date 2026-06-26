@@ -8,17 +8,15 @@ The goal is to keep templates readable while making the source of each value cle
 
 Template names are split into a few groups:
 
-- Model accessors: render-level functions declared with `@model`, such as `Page` or `User`.
 - Regular helpers: renderer helpers such as `scoped`, `child`, `partial`, `selection`, and `action`. `dict` is a data/map helper, not a composition helper.
 - Interaction declarations live on `.Interact`, not `.Data`, when they are configured in Go.
 
-Model names are normal template function names. Avoid names that collide with built-in template actions or go-partial helpers such as `range`, `len`, `child`, `partial`, `scoped`, and `selection`.
+User-defined functions are normal Go template functions. Avoid names that collide with built-in template actions or go-partial helpers such as `range`, `len`, `child`, `partial`, `scoped`, and `selection`.
 
 ## Quick Reference
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
-| `Page`, `User`, etc. | Model accessor | Render-level models declared with `@model` and bound from Go with `partial.Model`. |
 | `scoped` | Built-in helper/accessor | Local scope passed by a parent `child` or `partial` call. |
 | `child` | Helper | Render a registered child partial by ID. |
 | `childIf` | Helper | Render a child only when it has been registered. |
@@ -73,39 +71,6 @@ Rules:
 - `scoped` is best for repeated fragments such as rows, cards, list items, tabs, and inline partials.
 - `scoped` should not become a generic dumping ground for application-wide data.
 
-## Model Accessors
-
-Model accessors connect a template contract to values supplied by Go. They are plain template functions, generated at parse time as placeholders and rebound with the real value for each render.
-
-Contract:
-
-```gotemplate
-{{/*
-@partial navbar
-@model User github.com/example/app.User
-*/}}
-```
-
-Template usage:
-
-```gotemplate
-<nav>Hello {{ User.Name }}</nav>
-```
-
-Go binding:
-
-```go
-content.SetModels(partial.Model("User", user))
-```
-
-The model is:
-
-- `@model User ...` declares an inherited render-level model named `User`.
-- `User` exposes that value to templates as a function, so `{{ User.Name }}` works.
-- Models are inherited through the render tree unless a child overrides the same model name.
-- `User` is different from `scoped.Row`: `User` is inherited render context, `scoped.Row` is local call scope.
-- go-doc owns editor typeahead, go-to-definition, and static validation. go-partial only binds the runtime value and validates that required models are present.
-
 ## `dict`
 
 `dict` builds a map for templates that need one. It is still accepted by `child`, `childIf`, and `partial`, but direct key/value pairs are the preferred scoped-data syntax.
@@ -133,7 +98,7 @@ Current behavior:
 
 - first argument identifies a registered partial by its full partial ID, such as `users/row`
 - second argument is local scope for `scoped`
-- inherited models such as `User` remain available
+- inherited render data such as `.Global`, `.Service`, and `.Layout` remains available
 - dynamic DOM instances use target resolution rather than becoming separate partial IDs
 
 `partial` is related to `child`, but it is meant for reusable named partials and should use full partial IDs:
@@ -369,7 +334,6 @@ Template helpers may use cached parsed templates, but they must bind request-spe
 Safe to cache:
 
 - parsed templates
-- contracts
 - dependency metadata
 - target resolver registrations
 
@@ -377,12 +341,12 @@ Not safe to cache by default:
 
 - rendered HTML
 - `scoped` values
-- model values such as `User`
+- request data and application values
 - dynamic target lookup results
 
 Safe render flow:
 
 ```text
-resolve target -> load current data -> clone parsed template -> bind accessors -> execute
+resolve target -> load current data -> clone parsed template -> bind request helpers -> execute
 ```
 
