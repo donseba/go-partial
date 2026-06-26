@@ -28,6 +28,8 @@ go.work.sum
 .git/
 /references/
 .idea/
+.go-doc/
+.partial/
 docs/
 !examples/docs/
 !examples/docs/static/

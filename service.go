@@ -171,7 +171,7 @@ func (svc *Service) getHasCustomFunctions() bool {
 func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) template.FuncMap {
 	merged := make(template.FuncMap, len(src))
 	for k, v := range src {
-		if _, ok := protectedFunctionNames[k]; ok {
+		if isProtectedFunctionName(k) {
 			if logger != nil {
 				logger.Warn("function name is protected and cannot be overwritten", "function", k)
 			}

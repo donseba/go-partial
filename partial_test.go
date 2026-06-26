@@ -418,6 +418,161 @@ func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 	}
 }
 
+func TestContractModelRendersAccessor(t *testing.T) {
+	type userModel struct {
+		Name string
+	}
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `{{/*
+@partial content
+@model User User
+*/}}<p>{{ User.Name }}</p>`,
+		},
+	}
+	content := NewID("content", "templates/content.html").
+		SetFileSystem(fsys).
+		SetModels(Model("User", userModel{Name: "Ada"}))
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	out, err := content.RenderWithRequest(request.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "<p>Ada</p>" {
+		t.Fatalf("rendered contract model = %s", got)
+	}
+}
+
+func TestContractModelRendersAccessorWithCache(t *testing.T) {
+	type userModel struct {
+		Name string
+	}
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `{{/*
+@partial content
+@model User User
+*/}}<p>{{ User.Name }}</p>`,
+		},
+	}
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	render := func(name string) string {
+		t.Helper()
+		content := NewID("content", "templates/content.html").
+			SetFileSystem(fsys).
+			UseTemplateCache(true).
+			SetModels(Model("User", userModel{Name: name}))
+		out, renderErr := content.RenderWithRequest(request.Context(), request)
+		if renderErr != nil {
+			t.Fatalf("failed to render %q: %v", name, renderErr)
+		}
+		return strings.TrimSpace(string(out))
+	}
+
+	if got := render("Ada"); got != "<p>Ada</p>" {
+		t.Fatalf("first cached render = %s", got)
+	}
+	if got := render("Grace"); got != "<p>Grace</p>" {
+		t.Fatalf("cached render used stale contract model: %s", got)
+	}
+}
+
+func TestContractModelIsInheritedByChild(t *testing.T) {
+	type userModel struct {
+		Name string
+	}
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/page.html": `{{ child "content" }}`,
+			"templates/content.html": `{{/*
+@partial content
+@model User User
+*/}}<p>{{ User.Name }}</p>`,
+		},
+	}
+	page := NewID("page", "templates/page.html").
+		SetFileSystem(fsys).
+		SetModels(Model("User", userModel{Name: "Ada"})).
+		With(NewID("content", "templates/content.html"))
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	out, err := page.RenderWithRequest(request.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "<p>Ada</p>" {
+		t.Fatalf("rendered inherited contract model = %s", got)
+	}
+}
+
+func TestContractModelOnChildWorksWhenParentHasNoModels(t *testing.T) {
+	type pageModel struct {
+		Title string
+	}
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/layout.html": `<main>{{ child "content" }}</main>`,
+			"templates/content.html": `{{/*
+@model Page Page
+*/}}<p>{{ Page.Title }}</p>`,
+		},
+	}
+	layout := NewID("layout", "templates/layout.html").SetFileSystem(fsys)
+	content := NewID("content", "templates/content.html").
+		SetModels(Model("Page", pageModel{Title: "Todos"}))
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	out, err := NewService(&Config{FS: fsys, UseTemplateCache: true}).
+		NewLayout().
+		Set(content).
+		Wrap(layout).
+		RenderWithRequest(request.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "<main><p>Todos</p></main>" {
+		t.Fatalf("rendered child contract model = %s", got)
+	}
+}
+
+func TestContractModelMissingReturnsValidationError(t *testing.T) {
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/content.html": `{{/*
+@partial content
+@model User User
+*/}}<p>{{ User.Name }}</p>`,
+		},
+	}
+	content := NewID("content", "templates/content.html").SetFileSystem(fsys)
+	request, err := http.NewRequest(http.MethodGet, "/", nil)
+	if err != nil {
+		t.Fatalf("failed to create request: %v", err)
+	}
+
+	_, err = content.RenderWithRequest(request.Context(), request)
+	if err == nil {
+		t.Fatal("expected missing model error")
+	}
+	if !strings.Contains(err.Error(), `template model "User" (User) is required`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{

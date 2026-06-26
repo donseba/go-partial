@@ -28,22 +28,40 @@ var (
 	protectedFunctionNames = map[string]struct{}{
 		"action":          {},
 		"async":           {},
+		"and":             {},
 		"child":           {},
 		"childIf":         {},
 		"context":         {},
 		"dict":            {},
 		"debug":           {},
+		"eq":              {},
+		"ge":              {},
+		"gt":              {},
+		"html":            {},
+		"index":           {},
+		"js":              {},
 		"joinPath":        {},
 		"island":          {},
+		"le":              {},
+		"len":             {},
+		"lt":              {},
+		"ne":              {},
+		"not":             {},
 		"on":              {},
+		"or":              {},
 		"oob":             {},
 		"oobAttr":         {},
 		"partial":         {},
 		"poll":            {},
 		"prefetch":        {},
+		"print":           {},
+		"printf":          {},
+		"println":         {},
 		"refresh":         {},
 		"reveal":          {},
+		"slice":           {},
 		"stream":          {},
+		"urlquery":        {},
 		"actionHeader":    {},
 		"actionIs":        {},
 		"actionValue":     {},
@@ -103,6 +121,7 @@ type (
 	cachedTemplate struct {
 		base          *template.Template
 		requiredFuncs map[string]struct{}
+		contract      templateContract
 		pool          sync.Pool
 	}
 
@@ -134,6 +153,7 @@ type (
 		layoutData            map[string]any
 		globalData            map[string]any
 		serviceData           map[string]any
+		models                map[string]any
 		interact              map[string]any
 		responseHeaders       map[string]string
 		response              connector.Response
@@ -177,6 +197,8 @@ type (
 		Global map[string]any
 		// Parent contains the immediate parent partial's data.
 		Parent map[string]any
+		// Models contains render-level typed models inherited through the partial tree.
+		Models map[string]any
 		// Loc contains the request localizer.
 		Loc Localizer
 		// Csrf contains the request CSRF token.
@@ -527,6 +549,42 @@ func (p *Partial) AddData(key string, value any) *Partial {
 	return p
 }
 
+// SetModels sets render-level typed models for the partial and its children.
+func (p *Partial) SetModels(models ...TemplateModel) *Partial {
+	if p == nil {
+		return nil
+	}
+	if len(models) == 0 {
+		p.models = nil
+		return p
+	}
+	p.models = make(map[string]any, len(models))
+	for _, model := range models {
+		if !validContractModelName(model.Name) {
+			p.getLogger().Warn("invalid template model name", "model", model.Name)
+			continue
+		}
+		p.models[model.Name] = model.Value
+	}
+	return p
+}
+
+// AddModel adds one render-level typed model for the partial and its children.
+func (p *Partial) AddModel(name string, value any) *Partial {
+	if p == nil {
+		return nil
+	}
+	if !validContractModelName(name) {
+		p.getLogger().Warn("invalid template model name", "model", name)
+		return p
+	}
+	if p.models == nil {
+		p.models = make(map[string]any)
+	}
+	p.models[name] = value
+	return p
+}
+
 // SetInteractions sets client interaction declarations for the partial.
 func (p *Partial) SetInteractions(interactions map[string]any) *Partial {
 	if p == nil {
@@ -637,7 +695,7 @@ func (p *Partial) UseFuncs(funcMap template.FuncMap) {
 
 	customFuncs := make(template.FuncMap, len(funcMap))
 	for k, v := range funcMap {
-		if _, ok := protectedFunctionNames[k]; ok {
+		if isProtectedFunctionName(k) {
 			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", k)
 			continue
 		}
@@ -1109,6 +1167,22 @@ func mergeFuncMaps(staticFuncs, requestFuncs template.FuncMap) template.FuncMap 
 	return funcs
 }
 
+func addMissingFuncs(funcs template.FuncMap, defaults template.FuncMap) {
+	for name, fn := range defaults {
+		if _, ok := funcs[name]; ok {
+			continue
+		}
+		funcs[name] = fn
+	}
+}
+
+func isProtectedFunctionName(name string) bool {
+	if _, ok := protectedFunctionNames[name]; ok {
+		return true
+	}
+	return strings.HasPrefix(name, "_")
+}
+
 func filterFuncMap(funcs template.FuncMap, required map[string]struct{}) template.FuncMap {
 	if required == nil {
 		return funcs
@@ -1165,6 +1239,23 @@ func (p *Partial) getServiceData() map[string]any {
 		return merged
 	}
 	return p.serviceData
+}
+
+func (p *Partial) getModels() map[string]any {
+	if p.parent != nil {
+		models := p.parent.getModels()
+		if len(p.models) == 0 {
+			return models
+		}
+		merged := make(map[string]any, len(models)+len(p.models))
+		maps.Copy(merged, models)
+		maps.Copy(merged, p.models)
+		return merged
+	}
+	if len(p.models) == 0 {
+		return nil
+	}
+	return maps.Clone(p.models)
 }
 
 func (p *Partial) getParentData() map[string]any {
@@ -1515,6 +1606,7 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		Service:  p.getServiceData(),
 		Layout:   p.getLayoutData(),
 		Parent:   p.getParentData(),
+		Models:   p.getModels(),
 		Loc:      getLocalizer(ctx),
 		Csrf:     getCsrfToken(ctx),
 	}
@@ -1530,14 +1622,26 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 
 	cacheKey := p.generateCacheKey(p.templates, p.getFunctionSignature())
 	var funcs template.FuncMap
+	var analysis *templateAnalysis
 	if p.useCache {
 		funcs = p.getRequestFuncMap(data)
 	} else {
+		analyzed, err := analyzeTemplatesFromFS(p.getFS(), p.templates)
+		if err != nil {
+			return "", fmt.Errorf("error analyzing templates: %w", err)
+		}
+		analysis = &analyzed
+		if err := analysis.Contract.validateModels(data.Models); err != nil {
+			return "", err
+		}
 		funcs = p.getStaticFuncMap()
 		p.addRequestFuncs(funcs, data)
+		if len(analysis.Contract.Models) > 0 {
+			maps.Copy(funcs, contractFuncMap(analysis.Contract, data.Models))
+		}
 	}
 
-	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache)
+	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache, data.Models, analysis)
 	if err != nil {
 		p.getLogger().Error("error getting or parsing template", "error", err)
 		return "", err
@@ -1597,17 +1701,11 @@ func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Requ
 	return out, nil
 }
 
-func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
+func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool, models map[string]any, analysis *templateAnalysis) (*template.Template, func(), error) {
 	store := p.getTemplateStore()
 	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
 		if entry, ok := tmpl.(*cachedTemplate); ok {
-			if applyFullFuncs {
-				if funcsAreFull {
-					return entry.template(funcs)
-				}
-				return entry.template(mergeFuncMaps(p.getCustomFuncMap(), funcs))
-			}
-			return entry.template(funcs)
+			return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull, models)
 		}
 	}
 
@@ -1619,13 +1717,7 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	// Double-check after acquiring lock
 	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
 		if entry, ok := tmpl.(*cachedTemplate); ok {
-			if applyFullFuncs {
-				if funcsAreFull {
-					return entry.template(funcs)
-				}
-				return entry.template(mergeFuncMaps(p.getCustomFuncMap(), funcs))
-			}
-			return entry.template(funcs)
+			return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull, models)
 		}
 	}
 
@@ -1633,9 +1725,19 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	if !funcsAreFull {
 		functions = mergeFuncMaps(p.getStaticFuncMap(), funcs)
 	}
-	parseFuncs := functions
+	var parseFuncs template.FuncMap
 	if p.useCache {
+		analyzed, err := analyzeTemplatesFromFS(p.getFS(), p.templates)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error analyzing templates: %w", err)
+		}
+		analysis = &analyzed
 		parseFuncs = mergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
+	} else {
+		parseFuncs = maps.Clone(functions)
+	}
+	if len(analysis.Contract.Models) > 0 {
+		addMissingFuncs(parseFuncs, contractPlaceholderFuncMap(analysis.Contract))
 	}
 	t := template.New(path.Base(p.templates[0])).Funcs(parseFuncs)
 	tmpl, err := t.ParseFS(p.getFS(), p.templates...)
@@ -1644,20 +1746,29 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	}
 
 	if p.useCache {
-		var requiredFuncs map[string]struct{}
-		requiredFuncs, err = requiredFuncsFromFS(p.getFS(), p.templates)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error scanning template requirements: %w", err)
-		}
-		entry := &cachedTemplate{base: tmpl, requiredFuncs: requiredFuncs}
+		entry := &cachedTemplate{base: tmpl, requiredFuncs: analysis.RequiredFuncs, contract: analysis.Contract}
 		store.templates.Store(cacheKey, entry)
-		if applyFullFuncs {
-			return entry.template(functions)
-		}
-		return entry.template(funcs)
+		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull, models)
 	}
 
 	return tmpl, nil, nil
+}
+
+func (p *Partial) templateFromCacheEntry(entry *cachedTemplate, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool, models map[string]any) (*template.Template, func(), error) {
+	functions := funcs
+	if applyFullFuncs && !funcsAreFull {
+		functions = mergeFuncMaps(p.getCustomFuncMap(), funcs)
+	}
+	if len(entry.contract.Models) > 0 {
+		if err := entry.contract.validateModels(models); err != nil {
+			return nil, nil, err
+		}
+		if functions == nil {
+			functions = make(template.FuncMap, len(entry.contract.Models))
+		}
+		maps.Copy(functions, contractFuncMap(entry.contract, models))
+	}
+	return entry.template(functions)
 }
 
 func newTemplateStore() *templateStore {
@@ -1771,6 +1882,7 @@ func (p *Partial) clone() *Partial {
 		layoutData:            maps.Clone(p.layoutData),
 		globalData:            maps.Clone(p.globalData),
 		serviceData:           maps.Clone(p.serviceData),
+		models:                maps.Clone(p.models),
 		interact:              maps.Clone(p.interact),
 		response:              p.response,
 		errorRenderer:         p.errorRenderer,
