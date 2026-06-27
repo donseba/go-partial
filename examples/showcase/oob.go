@@ -5,8 +5,8 @@ import (
 )
 
 func (app *App) oob(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "content", "templates/oob.gohtml", map[string]any{
-		"Title": "Navigation jokes",
+	app.render(w, r, "content", "templates/oob.gohtml", PageTitle{
+		Title: "Navigation jokes",
 	})
 }
 

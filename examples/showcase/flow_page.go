@@ -55,17 +55,20 @@ func (app *App) flow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) flowSteps(session *partial.FlowSessionData, errorMessage string) []partial.FlowStep {
-	account := partial.NewID("account", "templates/flow_account.gohtml").SetData(map[string]any{
-		"Email": session.GetStepData("account")["email"],
-		"Error": errorMessage,
+	email, _ := session.GetStepData("account")["email"].(string)
+	name, _ := session.GetStepData("details")["name"].(string)
+	plan, _ := session.GetStepData("details")["plan"].(string)
+	account := partial.NewID("account", "templates/flow_account.gohtml").SetDot(FlowAccountPage{
+		Email: email,
+		Error: errorMessage,
 	})
-	details := partial.NewID("details", "templates/flow_details.gohtml").SetData(map[string]any{
-		"Name":  session.GetStepData("details")["name"],
-		"Plan":  session.GetStepData("details")["plan"],
-		"Error": errorMessage,
+	details := partial.NewID("details", "templates/flow_details.gohtml").SetDot(FlowDetailsPage{
+		Name:  name,
+		Plan:  plan,
+		Error: errorMessage,
 	})
-	confirm := partial.NewID("confirm", "templates/flow_confirm.gohtml").SetData(map[string]any{
-		"AllData": session.GetAllData(),
+	confirm := partial.NewID("confirm", "templates/flow_confirm.gohtml").SetDot(FlowConfirmPage{
+		AllData: session.GetAllData(),
 	})
 
 	return []partial.FlowStep{
@@ -101,13 +104,12 @@ func (app *App) flowPartial(flow *partial.PageFlow, session *partial.FlowSession
 	if current != nil {
 		currentName = current.Name
 	}
-	content := partial.NewID("content", "templates/flow.gohtml").SetData(map[string]any{
-		"Title":       "Page flow",
-		"Flow":        flow,
-		"Steps":       flow.Steps,
-		"CurrentStep": currentName,
-		"Validated":   session.Validated,
-		"Error":       errorMessage,
+	content := partial.NewID("content", "templates/flow.gohtml").SetDot(FlowPage{
+		Title:       "Page flow",
+		Steps:       flow.Steps,
+		CurrentStep: currentName,
+		Validated:   session.Validated,
+		Error:       errorMessage,
 	})
 	for _, step := range flow.Steps {
 		content.With(step.Partial)

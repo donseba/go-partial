@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.InteractionPage
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Client interactions</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">These helpers declare client-side delivery behavior while the server still owns the rendered partials.</p>
     </header>
 
@@ -58,10 +61,10 @@
 
     <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
-            <h2 class="text-lg font-bold text-stone-950">island</h2>
-            <p class="leading-7 text-stone-600">A named lazy region that can be refreshed or targeted later.</p>
-            {{ island .Interact.Island }}
-            {{ refresh .Interact.IslandRefresh }}
+            <h2 class="text-lg font-bold text-stone-950">named async</h2>
+            <p class="leading-7 text-stone-600">An async region with a stable ID that can be refreshed or targeted later.</p>
+            {{ async .Interact.Profile }}
+            {{ refresh .Interact.ProfileRefresh }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
@@ -124,7 +127,7 @@ func (app *App) interactionsPoll(w http.ResponseWriter, r *http.Request) {
 {{ "{{ stream .Interact.Stream }}" }}
 {{ "{{ prefetch .Interact.Prefetch }}" }}
 {{ "{{ refresh .Interact.Refresh }}" }}
-{{ "{{ refresh .Interact.IslandRefresh }}" }}
-{{ "{{ island .Interact.Island }}" }}</code></pre>
+{{ "{{ async .Interact.Profile }}" }}
+{{ "{{ refresh .Interact.ProfileRefresh }}" }}</code></pre>
     </article>
 </section>

@@ -1,13 +1,16 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.TabsPage
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
-        <span class="text-[13px] font-extrabold uppercase text-teal-900">Selected children</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
-        <p class="leading-7 text-stone-600">Tabs are just selected partials. Each tab click sends <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ selectionHeader }}</code>, and the server renders the selected child into the same panel.</p>
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Selected partialren</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">Tabs are just selected partials. Each tab click sends <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ selectionHeader }}</code>, and the server renders the selected partial into the same panel.</p>
     </header>
 
     <div class="rounded-lg border border-stone-300 bg-white p-4">
         <div class="flex items-center gap-1.5 overflow-x-auto border-b border-stone-300" role="tablist">
-            {{ range .Data.Tabs }}
+            {{ range .Tabs }}
                 <button
                     role="tab"
                     aria-selected="{{ if selectionIs .Key }}true{{ else }}false{{ end }}"
@@ -49,4 +52,5 @@
 &lt;/button&gt;</code></pre>
     </article>
 </section>
+
 

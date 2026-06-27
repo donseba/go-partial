@@ -16,6 +16,18 @@ type NavItem struct {
 	Group string
 }
 
+type DocsPage struct{}
+
+type DocsLayoutPage struct {
+	AppName string
+}
+
+type DocsHeaderPage struct{}
+
+type DocsNavPage struct {
+	Nav []NavItem
+}
+
 type App struct {
 	service *partial.Service
 }
@@ -28,10 +40,6 @@ func main() {
 			ErrorMode: partial.ErrorModeDetailed,
 		}),
 	}
-	app.service.SetData(map[string]any{
-		"AppName": "go-partial",
-	})
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.overview)
 	mux.HandleFunc("/docs/installation", app.installation)
@@ -140,13 +148,13 @@ func (app *App) errorBoundaries(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string) {
-	content := partial.NewID("content", tmpl)
-	wrapper := partial.NewID("layout", "templates/layout.gohtml")
-	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetData(map[string]any{
-		"Nav": app.navItems(),
-	}).SetAlwaysSwapOOB(true))
-	wrapper.WithOOB(partial.NewID("sidebar", "templates/sidebar.gohtml").SetData(map[string]any{
-		"Nav": app.navItems(),
+	content := partial.NewID("content", tmpl).SetDot(DocsPage{})
+	wrapper := partial.NewID("layout", "templates/layout.gohtml").SetDot(DocsLayoutPage{
+		AppName: "go-partial",
+	})
+	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(DocsHeaderPage{}).SetAlwaysSwapOOB(true))
+	wrapper.WithOOB(partial.NewID("sidebar", "templates/sidebar.gohtml").SetDot(DocsNavPage{
+		Nav: app.navItems(),
 	}).SetAlwaysSwapOOB(true))
 
 	layout := app.service.NewLayout().Set(content).Wrap(wrapper)

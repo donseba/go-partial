@@ -1,21 +1,24 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Request context</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">These values are injected into the template context on every render.</p>
     </header>
 
     <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-lg border border-stone-300 bg-white p-4 rounded-lg border border-stone-300 bg-white p-4">
         <dt>URL path</dt>
-        <dd>{{ if .URL }}{{ .URL.Path }}{{ end }}</dd>
+        <dd>{{ if url }}{{ url.Path }}{{ end }}</dd>
         <dt>Base path</dt>
-        <dd>{{ if .BasePath }}{{ .BasePath }}{{ else }}/{{ end }}</dd>
+        <dd>{{ if basePath }}{{ basePath }}{{ else }}/{{ end }}</dd>
         <dt>Locale</dt>
-        <dd>{{ .Loc.GetLocale }}</dd>
+        <dd>{{ locale }}</dd>
         <dt>CSRF key</dt>
-        <dd>{{ .Csrf.Key }}</dd>
+        <dd>{{ csrf.Key }}</dd>
         <dt>CSRF token</dt>
-        <dd>{{ .Csrf.Token .Ctx }}</dd>
+        <dd>{{ csrf.Token context }}</dd>
     </dl>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
@@ -33,8 +36,8 @@ content.WriteWithRequest(ctx, w, r)</code></pre>
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ .URL.Path }}" }}
-{{ "{{ .BasePath }}" }}
-{{ "{{ .Loc.GetLocale }}" }}
-{{ "{{ .Csrf.Token .Ctx }}" }}</code></pre>
+{{ "{{ basePath }}" }}
+{{ "{{ locale }}" }}
+{{ "{{ csrf.Token context }}" }}</code></pre>
     </article>
 </section>

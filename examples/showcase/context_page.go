@@ -7,8 +7,8 @@ import (
 )
 
 func (app *App) contextPage(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("content", "templates/context.gohtml").SetData(map[string]any{
-		"Title": "Context helpers",
+	content := partial.NewID("content", "templates/context.gohtml").SetDot(PageTitle{
+		Title: "Context helpers",
 	})
 	app.renderPartial(w, r, content)
 }

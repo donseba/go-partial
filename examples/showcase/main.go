@@ -50,7 +50,7 @@ func main() {
 	mux.HandleFunc("/interactions/reveal", app.interactionsReveal)
 	mux.HandleFunc("/interactions/poll", app.interactionsPoll)
 	mux.HandleFunc("/interactions/on", app.interactionsOn)
-	mux.HandleFunc("/interactions/island", app.interactionsIsland)
+	mux.HandleFunc("/interactions/profile", app.interactionsProfile)
 	mux.HandleFunc("/interactions/refresh", app.interactionsRefresh)
 	mux.HandleFunc("/interactions/stream", app.interactionsStream)
 	mux.HandleFunc("/oob", app.oob)

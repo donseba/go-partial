@@ -319,24 +319,6 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 	}
 }
 
-func childFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
-	return func(id string, args ...any) template.HTML {
-		d, ok := scopedDataArg(p, id, args...)
-		if !ok {
-			return template.HTML(fmt.Sprintf("invalid scoped data for partial '%s'", id))
-		}
-
-		html, err := p.renderChildPartial(data.Ctx, id, d)
-		if err != nil {
-			p.getLogger().Error("error rendering partial", "id", id, "error", err)
-			// Handle error: you can log it and return an empty string or an error message
-			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
-		}
-
-		return html
-	}
-}
-
 func partialFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
 	return func(id string, args ...any) template.HTML {
 		d, ok := scopedDataArg(p, id, args...)
@@ -354,6 +336,18 @@ func partialFunc(p *Partial, data *Data) func(id string, args ...any) template.H
 	}
 }
 
+func slotFunc(p *Partial, data *Data) func(id string) template.HTML {
+	return func(id string) template.HTML {
+		html, err := p.renderChildPartial(data.Ctx, id, nil)
+		if err != nil {
+			p.getLogger().Error("error rendering slot", "id", id, "error", err)
+			return template.HTML(fmt.Sprintf("error rendering slot '%s': %v", id, err))
+		}
+
+		return html
+	}
+}
+
 func interactionFunc(p *Partial, data *Data, kind connector.InteractionKind) func(value any, args ...any) template.HTML {
 	return func(value any, args ...any) template.HTML {
 		interaction, err := interactionFromValue(kind, "", value, args...)
@@ -362,17 +356,6 @@ func interactionFunc(p *Partial, data *Data, kind connector.InteractionKind) fun
 			return template.HTML(template.HTMLEscapeString(err.Error()))
 		}
 
-		return renderInteraction(p, data, interaction)
-	}
-}
-
-func islandFunc(p *Partial, data *Data) func(value any, args ...any) template.HTML {
-	return func(value any, args ...any) template.HTML {
-		interaction, err := islandInteractionFromValue(value, args...)
-		if err != nil {
-			p.getLogger().Warn("invalid island arguments", "error", err)
-			return template.HTML(template.HTMLEscapeString(err.Error()))
-		}
 		return renderInteraction(p, data, interaction)
 	}
 }
@@ -439,21 +422,6 @@ func onInteractionFromValue(value any, args ...any) (connector.Interaction, erro
 		interaction.Placeholder = ""
 	}
 	return normalizeInteraction(interaction), nil
-}
-
-func islandInteractionFromValue(value any, args ...any) (connector.Interaction, error) {
-	if _, ok := value.(string); !ok {
-		return interactionFromValue(connector.InteractionIsland, "", value, args...)
-	}
-	name := value.(string)
-	if len(args) == 0 {
-		return connector.Interaction{}, fmt.Errorf("island expects an endpoint when the first argument is a name")
-	}
-	endpoint, ok := args[0].(string)
-	if !ok {
-		return connector.Interaction{}, fmt.Errorf("island endpoint must be string, got %T", args[0])
-	}
-	return buildInteraction(connector.InteractionIsland, name, endpoint, args[1:]...)
 }
 
 func renderInteraction(p *Partial, data *Data, interaction connector.Interaction) template.HTML {
@@ -590,20 +558,6 @@ func sanitizeInteractionID(value string) string {
 		return "content"
 	}
 	return out
-}
-
-func childIfFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
-	return func(id string, args ...any) template.HTML {
-		if len(p.children) == 0 {
-			return ""
-		}
-
-		if p.children[id] == nil {
-			return ""
-		}
-
-		return childFunc(p, data)(id, args...)
-	}
 }
 
 func scopedDataArg(p *Partial, id string, args ...any) (map[string]any, bool) {

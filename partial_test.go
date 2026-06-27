@@ -12,6 +12,10 @@ import (
 	"github.com/donseba/go-partial/connector"
 )
 
+type contractPage struct {
+	Title string
+}
+
 func TestNewRoot(t *testing.T) {
 	root := New().Templates("template.gohtml")
 
@@ -57,13 +61,74 @@ func TestNewRoot(t *testing.T) {
 	}
 }
 
+func TestUseModelsRegistersGoDocModelContracts(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}<h1>{{ Page.Title }}</h1>`,
+	}}
+
+	out, err := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		UseTemplateCache(false).
+		UseModels(contractPage{Title: "Typed page"}).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("render contract model: %v", err)
+	}
+	if string(out) != "<h1>Typed page</h1>" {
+		t.Fatalf("expected typed model render, got %q", out)
+	}
+}
+
+func TestUseModelsRegistersGoDocModelContractsWithCache(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}<h1>{{ Page.Title }}</h1>`,
+	}}
+
+	content := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		UseModels(contractPage{Title: "First"})
+
+	out, err := content.Render(context.Background())
+	if err != nil {
+		t.Fatalf("render first contract model: %v", err)
+	}
+	if string(out) != "<h1>First</h1>" {
+		t.Fatalf("expected first typed model render, got %q", out)
+	}
+
+	out, err = content.clone().
+		SetModels(contractPage{Title: "Second"}).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("render second contract model: %v", err)
+	}
+	if string(out) != "<h1>Second</h1>" {
+		t.Fatalf("expected second typed model render, got %q", out)
+	}
+}
+
+func TestUseModelsRejectsProtectedHelperCollision(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/* @model locale github.com/donseba/go-partial.contractPage */}}{{ locale.Title }}`,
+	}}
+
+	_, err := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		UseTemplateCache(false).
+		UseModels(contractPage{Title: "Typed page"}).
+		Render(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "conflicts with a go-partial template helper") {
+		t.Fatalf("expected protected helper collision, got %v", err)
+	}
+}
+
 func TestRequestBasic(t *testing.T) {
 	svc := NewService(&Config{})
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
+				"templates/index.html":   `<html><body>{{ slot "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
@@ -118,7 +183,7 @@ func TestRequestWrap(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
+				"templates/index.html":   `<html><body>{{ slot "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 			},
 		}
@@ -169,7 +234,7 @@ func TestRequestWrap(t *testing.T) {
 func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<html><body>{{ child "content" }}</body></html>`,
+			"templates/layout.html":  `<html><body>{{ slot "content" }}</body></html>`,
 			"templates/content.html": `<div>{{ .Data.Text }}</div>`,
 		},
 	}
@@ -384,7 +449,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<main>{{ child "content" }}{{ child "notice" }}</main>`,
+			"templates/layout.html":  `<main>{{ slot "content" }}{{ slot "notice" }}</main>`,
 			"templates/content.html": `<section>{{ partial "row" "Name" "Ada" }}</section>`,
 			"templates/row.html":     `<p>{{ scoped.Name }}</p>`,
 			"templates/notice.html":  `<aside id="notice"{{ oobAttr }}>{{ .Data.Message }}</aside>`,
@@ -421,7 +486,7 @@ func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<main>{{ child "content" }}</main>`,
+			"templates/layout.html":  `<main>{{ slot "content" }}</main>`,
 			"templates/content.html": `<p>{{ label }}</p>`,
 		},
 	}
@@ -461,7 +526,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 	svc := NewService(nil)
 	svc.UseFuncs(template.FuncMap{
-		"child": func() string {
+		"slot": func() string {
 			return "blocked"
 		},
 		"label": func() string {
@@ -470,8 +535,8 @@ func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 	})
 
 	customFuncs := svc.getCustomFuncMap()
-	if _, ok := customFuncs["child"]; ok {
-		t.Fatal("protected child helper should not be stored as a custom function")
+	if _, ok := customFuncs["slot"]; ok {
+		t.Fatal("protected slot helper should not be stored as a custom function")
 	}
 	if _, ok := customFuncs["label"]; !ok {
 		t.Fatal("allowed label helper should be stored as a custom function")
@@ -484,7 +549,7 @@ func TestRequestOOB(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
+				"templates/index.html":   `<html><body>{{ slot "content" }}{{ slot "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Data.Text}}</div>",
 			},
@@ -547,7 +612,7 @@ func TestRequestOOBSwap(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ child "content" }}{{ child "footer" }}</body></html>`,
+				"templates/index.html":   `<html><body>{{ slot "content" }}{{ slot "footer" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Data.Text}}</div>",
 			},
@@ -610,7 +675,7 @@ func TestDeepNested(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ child "content" }}</body></html>`,
+				"templates/index.html":   `<html><body>{{ slot "content" }}</body></html>`,
 				"templates/content.html": "<div>{{.Data.Text}}</div>",
 				"templates/nested.html":  `<div>{{ upper .Data.Text }}</div>`,
 			},
@@ -661,7 +726,7 @@ func TestMissingPartial(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html": `<html><body>{{ child "content" }}</body></html>`,
+				"templates/index.html": `<html><body>{{ slot "content" }}</body></html>`,
 			},
 		}
 
@@ -702,7 +767,7 @@ func TestDataInTemplates(t *testing.T) {
 
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
+				"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ slot "content" }}</body></html>`,
 				"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
 			},
 		}
@@ -737,7 +802,7 @@ func TestDataInTemplates(t *testing.T) {
 func TestWithSelectMap(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
+			"index.gohtml":   `<html><body>{{ slot "content" }}</body></html>`,
 			"content.gohtml": `<div class="content">{{selection}}</div>`,
 			"tab1.gohtml":    "Tab 1 Content",
 			"tab2.gohtml":    "Tab 2 Content",
@@ -933,7 +998,7 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 		"tl": func(loc Localizer, key string) string {
 			return loc.GetLocale() + ":" + key
 		},
-		"child": func() string {
+		"slot": func() string {
 			return "should not overwrite protected helper"
 		},
 	})
@@ -951,15 +1016,15 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 		t.Fatalf("expected translation function output, got %q", out)
 	}
 
-	if _, ok := svc.getStaticFuncMap()["child"]; ok {
-		t.Fatal("translation functions should not overwrite protected child helper")
+	if _, ok := svc.getStaticFuncMap()["slot"]; ok {
+		t.Fatal("translation functions should not overwrite protected slot helper")
 	}
 }
 
 func BenchmarkWithSelectMap(b *testing.B) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"index.gohtml":   `<html><body>{{ child "content" }}</body></html>`,
+			"index.gohtml":   `<html><body>{{ slot "content" }}</body></html>`,
 			"content.gohtml": `<div class="content">{{selection}}</div>`,
 			"tab1.gohtml":    "Tab 1 Content",
 			"tab2.gohtml":    "Tab 2 Content",
@@ -1009,7 +1074,7 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ child "content" }}</body></html>`,
+			"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ slot "content" }}</body></html>`,
 			"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
 		},
 	}
@@ -1051,7 +1116,7 @@ func TestRenderTable(t *testing.T) {
 		// Define in-memory templates for the table and the row
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
+				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
 				"templates/row.html":   `<tr><td>Row {{ .Data.RowNumber }}</td></tr>`,
 			},
 		}
@@ -1087,12 +1152,96 @@ func TestRenderTable(t *testing.T) {
 	}
 }
 
+func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
+	type row struct {
+		ID   int
+		Name string
+	}
+	type page struct {
+		Rows []row
+	}
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/table.html": `{{/* @dot github.com/example/app.Page */}}<table>{{ range .Rows }}{{ template "/templates/row.html" . }}{{ end }}</table>`,
+			"templates/row.html":   `{{/* @dot github.com/example/app.Row */}}<tr id="row-{{ .ID }}"><td>{{ .Name }}</td><td>{{ ctx.Locale }}</td></tr>`,
+		},
+	}
+
+	table := NewID("table", "templates/table.html").
+		SetFileSystem(fsys).
+		SetDot(page{Rows: []row{
+			{ID: 1, Name: "Coffee"},
+			{ID: 2, Name: "Tea"},
+		}})
+	rowPartial := NewID("row", "templates/row.html").
+		SetFileSystem(fsys)
+	table.With(rowPartial)
+	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, map[string]any, bool) {
+		if target != "row-2" {
+			return nil, nil, false
+		}
+		return NewID(target, "templates/row.html").SetDot(row{ID: 2, Name: "Tea"}), nil, true
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	ctx := context.WithValue(context.Background(), LocalizerContextKey, &defaultLocalizer{locale: "nl_NL"})
+
+	full, err := table.RenderWithRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() full error = %v", err)
+	}
+	wantFull := `<table><tr id="row-1"><td>Coffee</td><td>nl_NL</td></tr><tr id="row-2"><td>Tea</td><td>nl_NL</td></tr></table>`
+	if strings.TrimSpace(string(full)) != wantFull {
+		t.Fatalf("full render = %s, want %s", full, wantFull)
+	}
+
+	req.Header.Set(connector.HeaderTarget.String(), "row-2")
+	target, err := table.RenderWithRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() target error = %v", err)
+	}
+	wantTarget := `<tr id="row-2"><td>Tea</td><td>nl_NL</td></tr>`
+	if strings.TrimSpace(string(target)) != wantTarget {
+		t.Fatalf("target render = %s, want %s", target, wantTarget)
+	}
+}
+
+func TestSetDotKeepsRequestHelpersAvailable(t *testing.T) {
+	type page struct {
+		Title string
+	}
+
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/page.html": `<h1>{{ .Title }}</h1><p>{{ locale }} {{ ctx.URL.Path }} {{ basePath }} {{ if request }}request{{ end }}</p>`,
+		},
+	}
+
+	p := NewID("page", "templates/page.html").
+		SetFileSystem(fsys).
+		SetBasePath("/app").
+		SetDot(page{Title: "Dashboard"})
+
+	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
+	ctx := context.WithValue(context.Background(), LocalizerContextKey, &defaultLocalizer{locale: "en_US"})
+	out, err := p.RenderWithRequest(ctx, req)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	want := `<h1>Dashboard</h1><p>en_US /dashboard /app request</p>`
+	if strings.TrimSpace(string(out)) != want {
+		t.Fatalf("render = %s, want %s", out, want)
+	}
+}
+
 func TestScopedReturnsCurrentPartialData(t *testing.T) {
 	svc := NewService(&Config{})
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "row" (dict "RowNumber" $i) }}{{ end }}</table>`,
 			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td></tr>`,
 		},
 	}
@@ -1122,7 +1271,7 @@ func TestChildAcceptsScopedKeyValuePairs(t *testing.T) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ child "row" "RowNumber" $i "Owner" $.Data.Owner }}{{ end }}</table>`,
+			"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "row" "RowNumber" $i "Owner" $.Data.Owner }}{{ end }}</table>`,
 			"templates/row.html":   `<tr><td>Row {{ scoped.RowNumber }}</td><td>{{ scoped.Owner }}</td></tr>`,
 		},
 	}
@@ -1237,7 +1386,7 @@ func TestUseFuncs(t *testing.T) {
 	svc.UseFuncs(template.FuncMap{
 		"existingFunc": func() string { return "existing" },
 		"newFunc":      func() string { return "new" },
-		"child":        func() string { return "should not overwrite" },
+		"slot":         func() string { return "should not overwrite" },
 		"dict":         func() string { return "should not overwrite" },
 		"partial":      func() string { return "should not overwrite" },
 		"scoped":       func() string { return "should not overwrite" },
@@ -1256,8 +1405,8 @@ func TestUseFuncs(t *testing.T) {
 		t.Error("existingFunc should return 'existing'")
 	}
 
-	if _, ok := funcs["child"]; ok {
-		t.Error("child should not be overwritten in FuncMap")
+	if _, ok := funcs["slot"]; ok {
+		t.Error("slot should not be overwritten in FuncMap")
 	}
 
 	if _, ok := funcs["dict"].(func() string); ok {

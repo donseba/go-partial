@@ -6,12 +6,12 @@ import (
 )
 
 func TestRequiredFuncsFindsTopLevelFunctions(t *testing.T) {
-	funcs, err := RequiredFuncs("page.gohtml", `{{ child "content" }}{{ if eq .Status "ok" }}{{ debug . }}{{ end }}`)
+	funcs, err := RequiredFuncs("page.gohtml", `{{ slot "content" }}{{ if eq .Status "ok" }}{{ debug . }}{{ end }}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := []string{"child", "debug"}
+	want := []string{"debug", "slot"}
 	if !reflect.DeepEqual(funcs, want) {
 		t.Fatalf("RequiredFuncs() = %#v, want %#v", funcs, want)
 	}

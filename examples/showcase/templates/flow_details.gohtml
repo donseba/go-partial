@@ -1,18 +1,21 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.FlowDetailsPage
+*/}}
 <form class="grid gap-4" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
     <div>
         <h2 class="text-lg font-bold text-stone-950">Details</h2>
         <p class="leading-7 text-stone-600">This step stores its own data and can read data collected by earlier steps on the confirmation screen.</p>
     </div>
-    {{ if .Data.Error }}<p class="leading-7 text-stone-600 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ .Data.Error }}</p>{{ end }}
+    {{ if .Error }}<p class="leading-7 text-stone-600 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ .Error }}</p>{{ end }}
     <label class="grid gap-1.5 font-bold text-stone-600">
         Project name
-        <input class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="name" value="{{ .Data.Name }}" placeholder="Static launch">
+        <input class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="name" value="{{ .Name }}" placeholder="Static launch">
     </label>
     <label class="grid gap-1.5 font-bold text-stone-600">
         Plan
         <select class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="plan">
-            <option value="static" {{ if eq .Data.Plan "static" }}selected{{ end }}>Static website</option>
-            <option value="dynamic" {{ if eq .Data.Plan "dynamic" }}selected{{ end }}>Dynamic app</option>
+            <option value="static" {{ if eq .Plan "static" }}selected{{ end }}>Static website</option>
+            <option value="dynamic" {{ if eq .Plan "dynamic" }}selected{{ end }}>Dynamic app</option>
         </select>
     </label>
     <div class="flex flex-wrap gap-2">

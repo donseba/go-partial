@@ -1,3 +1,4 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Documentation</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Server-rendered partials that stay useful with HTMX</h1>
@@ -11,11 +12,11 @@
     <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3.5">
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/rendering" hx-get="/docs/rendering" hx-target="#content" hx-push-url="true">
             <strong>Rendering model</strong>
-            <span>Layouts, content partials, children, and targeted requests.</span>
+            <span>Layouts, content partials, registered regions, and targeted requests.</span>
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">
             <strong>Target resolver</strong>
-            <span>Replace one dynamic row or card with fresh request-scoped data.</span>
+            <span>Replace one dynamic row or card with fresh request values.</span>
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/data-context" hx-get="/docs/data-context" hx-target="#content" hx-push-url="true">
             <strong>Data and context</strong>
@@ -27,11 +28,11 @@
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/template-functions" hx-get="/docs/template-functions" hx-target="#content" hx-push-url="true">
             <strong>Template functions</strong>
-            <span><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selection</code>, and friends.</span>
+            <span><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">slot</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selection</code>, and friends.</span>
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/selection-action" hx-get="/docs/selection-action" hx-target="#content" hx-push-url="true">
             <strong>Selection and action</strong>
-            <span>Use request intent to choose a child partial or let Go decide the next render.</span>
+            <span>Use request intent to choose a registered partial or let Go decide the next render.</span>
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/integrations" hx-get="/docs/integrations" hx-target="#content" hx-push-url="true">
             <strong>Integrations</strong>
@@ -68,3 +69,4 @@ _ = layout.WriteWithRequest(r.Context(), w, r)</code></pre>
     <h2 class="text-xl font-bold text-slate-50">Integrates with</h2>
     <p class="leading-7 text-slate-400">go-partial is designed to sit beside packages such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-translator</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-form</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-importmap</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-router</code>. The renderer stays focused on partial trees and response behavior while the application stack handles routing, assets, translation, and forms.</p>
 </article>
+

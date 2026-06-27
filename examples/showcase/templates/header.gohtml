@@ -1,11 +1,14 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.HeaderPage
+*/}}
 <aside id="app-header" class="sticky top-0 z-20 flex h-screen flex-col gap-5 overflow-y-auto border-r border-stone-300 bg-white px-4 py-5"{{ oobAttr }}>
     <div class="grid gap-1.5 text-sm text-stone-600">
-        <strong class="text-lg leading-tight text-stone-950">{{ .Service.AppName }}</strong>
-        <span class="text-[13px] text-stone-600">{{ .Service.Now }}</span>
+        <strong class="text-lg leading-tight text-stone-950">{{ .AppName }}</strong>
+        <span class="text-[13px] text-stone-600">{{ .Now }}</span>
     </div>
     <nav class="grid gap-1.5" aria-label="Showcase pages">
         {{ $group := "" }}
-        {{ range .Data.Nav }}
+        {{ range .Nav }}
             {{ if ne .Group $group }}
                 {{ $group = .Group }}
                 <span class="mt-3.5 px-0.5 pt-0.5 text-[11px] font-extrabold uppercase tracking-wider text-teal-900">{{ .Group }}</span>
@@ -20,6 +23,6 @@
 
     <div id="nav-joke" class="mt-auto grid gap-2 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-950" aria-live="polite">
         <span class="text-[11px] font-extrabold uppercase tracking-wider text-teal-900">Programmer joke</span>
-        <p class="leading-6">{{ .Data.Joke }}</p>
+        <p class="leading-6">{{ .Joke }}</p>
     </div>
 </aside>

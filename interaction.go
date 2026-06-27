@@ -49,10 +49,6 @@ func Prefetch(endpoint string) Interaction {
 	return newInteraction(connector.InteractionPrefetch, "", endpoint)
 }
 
-func Island(name string, endpoint string) Interaction {
-	return newInteraction(connector.InteractionIsland, name, endpoint)
-}
-
 func Refresh(endpoint string) Interaction {
 	return newInteraction(connector.InteractionRefresh, "", endpoint)
 }

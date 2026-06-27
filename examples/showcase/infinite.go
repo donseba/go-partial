@@ -42,9 +42,9 @@ func (app *App) infinitePartial(id string, start int, count int) *partial.Partia
 		end = 150
 	}
 
-	rows := make([]int, 0, max(0, end-start+1))
+	rows := make([]InfiniteRow, 0, max(0, end-start+1))
 	for i := start; i <= end; i++ {
-		rows = append(rows, i)
+		rows = append(rows, InfiniteRow{Number: i})
 	}
 
 	templateName := "templates/infinite_chunk.gohtml"
@@ -52,14 +52,14 @@ func (app *App) infinitePartial(id string, start int, count int) *partial.Partia
 		templateName = "templates/infinite.gohtml"
 	}
 
-	content := partial.NewID(id, templateName).SetData(map[string]any{
-		"Title":        "Infinite scroll with X-Action",
-		"Rows":         rows,
-		"Next":         end,
-		"Done":         end >= 150,
-		"Start":        start,
-		"Current":      start - 1,
-		"ActionHeader": connector.HeaderAction.String(),
+	content := partial.NewID(id, templateName).SetDot(InfinitePage{
+		Title:        "Infinite scroll with X-Action",
+		Rows:         rows,
+		Next:         end,
+		Done:         end >= 150,
+		Start:        start,
+		Current:      start - 1,
+		ActionHeader: connector.HeaderAction.String(),
 	})
 	content.With(partial.NewID("infinite-row", "templates/infinite_row.gohtml"))
 	content.With(partial.NewID("rickroll", "templates/rickroll.gohtml"))

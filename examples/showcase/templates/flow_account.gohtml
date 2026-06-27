@@ -1,12 +1,15 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.FlowAccountPage
+*/}}
 <form class="grid gap-4" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
     <div>
         <h2 class="text-lg font-bold text-stone-950">Account</h2>
         <p class="leading-7 text-stone-600">Start with an email address. Validation runs on the server before the next partial is rendered.</p>
     </div>
-    {{ if .Data.Error }}<p class="leading-7 text-stone-600 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ .Data.Error }}</p>{{ end }}
+    {{ if .Error }}<p class="leading-7 text-stone-600 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ .Error }}</p>{{ end }}
     <label class="grid gap-1.5 font-bold text-stone-600">
         Email
-        <input class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="email" type="email" value="{{ .Data.Email }}" placeholder="ada@example.com">
+        <input class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="email" type="email" value="{{ .Email }}" placeholder="ada@example.com">
     </label>
     <div class="flex flex-wrap gap-2">
         <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit">Continue</button>

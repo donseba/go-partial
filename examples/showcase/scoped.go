@@ -17,10 +17,9 @@ func (app *App) scoped(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) tablePartial() *partial.Partial {
 	rowPartial := partial.NewID("row", "templates/row.gohtml")
-	content := partial.NewID("content", "templates/scoped.gohtml").SetData(map[string]any{
-		"Title": "Scoped rows",
-		"Owner": "Ada",
-		"Rows":  app.rows,
+	content := partial.NewID("content", "templates/scoped.gohtml").SetDot(ScopedRowsPage{
+		Title: "Scoped rows",
+		Rows:  app.rows,
 	})
 	content.With(rowPartial)
 	content.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
@@ -34,7 +33,7 @@ func (app *App) tablePartial() *partial.Partial {
 		for _, row := range app.rows {
 			if row.ID == id {
 				row.Status = "Updated " + time.Now().Format("15:04:05")
-				return rowPartial, map[string]any{"Row": row, "Owner": "Ada"}, true
+				return partial.NewID(target, "templates/row.gohtml").SetDot(row), nil, true
 			}
 		}
 		return nil, nil, false

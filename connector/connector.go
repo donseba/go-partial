@@ -52,7 +52,6 @@ const (
 	InteractionPoll     InteractionKind = "poll"
 	InteractionStream   InteractionKind = "stream"
 	InteractionPrefetch InteractionKind = "prefetch"
-	InteractionIsland   InteractionKind = "island"
 	InteractionRefresh  InteractionKind = "refresh"
 	InteractionOn       InteractionKind = "on"
 

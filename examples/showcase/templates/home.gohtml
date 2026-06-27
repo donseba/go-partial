@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Overview</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">This application renders normal pages and htmx requests through the same partial tree.</p>
     </header>
 
@@ -12,7 +15,7 @@
         </article>
         <article>
             <h2 class="text-lg font-bold text-stone-950">Template helpers</h2>
-            <p class="leading-7 text-stone-600">Pages demonstrate child rendering, scoped data, selection, actions, OOB swaps, and context helpers.</p>
+            <p class="leading-7 text-stone-600">Pages demonstrate typed templates, registered regions, selection, actions, OOB swaps, and context helpers.</p>
         </article>
         <article>
             <h2 class="text-lg font-bold text-stone-950">Error fallback</h2>
@@ -36,7 +39,7 @@ layout.WriteWithRequest(ctx, w, r)</code></pre>
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;section class="grid gap-5"&gt;
     &lt;header class="grid max-w-3xl gap-2.5"&gt;
-        &lt;h1&gt;{{ "{{ .Data.Title }}" }}&lt;/h1&gt;
+        &lt;h1&gt;{{ "{{ .Title }}" }}&lt;/h1&gt;
     &lt;/header&gt;
 &lt;/section&gt;</code></pre>
     </article>

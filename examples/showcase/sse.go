@@ -9,8 +9,8 @@ import (
 )
 
 func (app *App) sse(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "content", "templates/sse.gohtml", map[string]any{
-		"Title": "Server-sent events",
+	app.render(w, r, "content", "templates/sse.gohtml", PageTitle{
+		Title: "Server-sent events",
 	})
 }
 
@@ -28,10 +28,10 @@ func (app *App) sseStream(w http.ResponseWriter, r *http.Request) {
 
 		status := partial.NewID("sse-status", "templates/sse_status.gohtml").
 			SetFileSystem(os.DirFS("examples/showcase")).
-			SetData(map[string]any{
-				"Step": i,
-				"Time": time.Now().Format("15:04:05"),
-				"Done": i == 5,
+			SetDot(SSEStatus{
+				Step: i,
+				Time: time.Now().Format("15:04:05"),
+				Done: i == 5,
 			})
 		if err := events.PatchPartial(app.requestContext(r), r, "#sse-status", status); err != nil {
 			_ = events.Error(err)

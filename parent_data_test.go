@@ -12,7 +12,7 @@ func TestParentDataInjection(t *testing.T) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/parent.html": `<div>Parent: {{ .Data.ParentName }} {{ child "child" }}</div>`,
+			"templates/parent.html": `<div>Parent: {{ .Data.ParentName }} {{ slot "child" }}</div>`,
 			"templates/child.html":  `<div>Child: {{ .Data.ChildName }}, Parent's Name: {{ .Parent.ParentName }}</div>`,
 		},
 	}
@@ -48,8 +48,8 @@ func TestParentDataWithNestedChildren(t *testing.T) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/grandparent.html": `<div>GP: {{ .Data.Name }} {{ child "parent" }}</div>`,
-			"templates/parent.html":      `<div>P: {{ .Data.Name }}, GP: {{ .Parent.Name }} {{ child "child" }}</div>`,
+			"templates/grandparent.html": `<div>GP: {{ .Data.Name }} {{ slot "parent" }}</div>`,
+			"templates/parent.html":      `<div>P: {{ .Data.Name }}, GP: {{ .Parent.Name }} {{ slot "child" }}</div>`,
 			"templates/child.html":       `<div>C: {{ .Data.Name }}, P: {{ .Parent.Name }}</div>`,
 		},
 	}
@@ -88,7 +88,7 @@ func TestParentDataWithChildFunc(t *testing.T) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/parent.html": `<div>{{ .Data.Title }} {{ child "item" (dict "ItemID" "123") }}</div>`,
+			"templates/parent.html": `<div>{{ .Data.Title }} {{ partial "item" (dict "ItemID" "123") }}</div>`,
 			"templates/item.html":   `<div>Item: {{ .Data.ItemID }}, Title: {{ .Parent.Title }}</div>`,
 		},
 	}

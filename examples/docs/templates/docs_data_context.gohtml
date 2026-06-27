@@ -1,43 +1,46 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Data and context</h1>
     <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">go-partial deliberately separates data by where it comes from. That keeps repeated rows, layout state, service settings, request values, and parent context from collapsing into one large bag.</p>
 
-    <h2 class="text-xl font-bold text-slate-50">The render data object</h2>
-    <p class="leading-7 text-slate-400">Every template receives a structured object. The most common field is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code>, but the surrounding fields are what make nested partials useful.</p>
+    <h2 class="text-xl font-bold text-slate-50">Two render modes</h2>
+    <p class="leading-7 text-slate-400">By default, a template receives go-partial's structured render object. When a partial uses <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code>, the template root becomes your app model instead. That is the preferred mode for pages and rows you want go-doc to understand.</p>
 
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Field</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Lifetime</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Current partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Local data for the partial currently being rendered.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Current partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Your app model when the partial uses <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code>.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Interact</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Current partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Client interaction declarations configured with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetInteractions</code>.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Parent</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Immediate parent</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Data from the partial that rendered this child.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Parent</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Immediate parent</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Data from the partial that rendered this region.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Global</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Ancestor tree</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Merged global data from parent partials.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Service</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application/service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Shared app data configured on <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Service</code>.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Layout</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">One layout render</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Data configured on the layout pipeline.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.URL</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Ctx</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">HTTP request</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request-aware helpers, links, and context integrations.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Loc</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Csrf</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.BasePath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request or tree</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Extension hooks for localization, CSRF, and URL generation.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">url</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">HTTP request</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request-aware helpers that remain available when <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code> changes <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">locale</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">csrf</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">basePath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request or tree</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Extension hooks for localization, CSRF, and URL generation.</td></tr>
         </tbody>
     </table>
 
-    <h2 class="text-xl font-bold text-slate-50">Local row data</h2>
-    <p class="leading-7 text-slate-400">When rendering repeated fragments, prefer explicit local data. The row partial gets only the row it needs, plus whatever parent context is intentionally available.</p>
+    <h2 class="text-xl font-bold text-slate-50">Typed row data</h2>
+    <p class="leading-7 text-slate-400">When rendering repeated fragments, let the parent own the loop and pass the row as dot through a native template call. The row template can also render alone for an HTMX target by using <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot(row)</code>.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ range .Data.Rows }}" }}
-    {{ "{{ partial \"users/row\" \"Row\" . }}" }}
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ range .Rows }}" }}
+    {{ "{{ template \"row.gohtml\" . }}" }}
 {{ "{{ end }}" }}</code></pre>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;tr id="row-{{ "{{ scoped.Row.ID }}" }}"&gt;
-    &lt;td&gt;{{ "{{ scoped.Row.Name }}" }}&lt;/td&gt;
-    &lt;td&gt;{{ "{{ .Parent.Owner }}" }}&lt;/td&gt;
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;tr id="row-{{ "{{ .ID }}" }}"&gt;
+    &lt;td&gt;{{ "{{ .Name }}" }}&lt;/td&gt;
+    &lt;td&gt;{{ "{{ locale }}" }}&lt;/td&gt;
 &lt;/tr&gt;</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Choosing a scope</h2>
     <ul class="grid list-disc gap-2 pl-6 text-slate-400">
-        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code> for the current template's direct model.</li>
+        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code> for the current template's typed app model.</li>
+        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data</code> when you intentionally want go-partial's wrapper object.</li>
         <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Interact</code> for configured client interaction declarations such as async, poll, and event-driven refresh.</li>
-        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code> when the data was passed by a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> call and you want that intent to be visible.</li>
-        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Parent</code> when a child needs information from the component that rendered it.</li>
+        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">scoped</code> when the data was passed by a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> call and you want that intent to be visible.</li>
+        <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Parent</code> when a nested render needs information from the component that rendered it.</li>
         <li>Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Service</code> for stable application values such as app name, version, or feature flags.</li>
         <li>Use request context for per-request concerns such as locale, authenticated user experiments, and tracing.</li>
     </ul>
@@ -45,3 +48,4 @@
     <h2 class="text-xl font-bold text-slate-50">Caching note</h2>
     <p class="leading-7 text-slate-400">Template caching caches parsed templates, not rendered HTML. Dynamic data should still be loaded per request and passed into the partial. Avoid caching rendered row output unless the data is truly immutable.</p>
 </article>
+

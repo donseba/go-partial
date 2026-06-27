@@ -11,81 +11,97 @@ import (
 )
 
 func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
+	interactions := InteractionSet{
+		Async:          partial.Async("/interactions/async"),
+		Poll:           partial.Poll("/interactions/poll").Every(3 * time.Second),
+		On:             partial.On("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
+		Refresh:        partial.Refresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
+		Profile:        partial.Async("/interactions/profile").ID("profile"),
+		ProfileRefresh: partial.Refresh("/interactions/profile").ID("profile-refresh").Target("#profile").Placeholder("Refresh profile"),
+		Stream:         partial.Stream("/interactions/stream").Placeholder("Waiting for stream..."),
+		Prefetch:       partial.Prefetch("/interactions/async"),
+		Reveal:         partial.Reveal("/interactions/reveal"),
+	}
 	content := partial.NewID("content", "templates/interactions.gohtml").
-		SetData(map[string]any{
-			"Title": "Interaction helpers",
+		SetDot(InteractionPage{
+			Title:    "Interaction helpers",
+			Interact: interactions,
 		}).
-		SetInteractions(map[string]any{
-			"Async":         partial.Async("/interactions/async"),
-			"Poll":          partial.Poll("/interactions/poll").Every(3 * time.Second),
-			"On":            partial.On("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
-			"Refresh":       partial.Refresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
-			"Island":        partial.Island("profile", "/interactions/island"),
-			"IslandRefresh": partial.Refresh("/interactions/island").ID("island-refresh").Target("#island-profile").Placeholder("Refresh island"),
-			"Stream":        partial.Stream("/interactions/stream").Placeholder("Waiting for stream..."),
-			"Prefetch":      partial.Prefetch("/interactions/async"),
-			"Reveal":        partial.Reveal("/interactions/reveal"),
-		})
+		SetInteractions(interactions.Map())
 	app.renderPartial(w, r, content)
 }
 
+func (set InteractionSet) Map() map[string]any {
+	return map[string]any{
+		"Async":          set.Async,
+		"Poll":           set.Poll,
+		"On":             set.On,
+		"Refresh":        set.Refresh,
+		"Profile":        set.Profile,
+		"ProfileRefresh": set.ProfileRefresh,
+		"Stream":         set.Stream,
+		"Prefetch":       set.Prefetch,
+		"Reveal":         set.Reveal,
+	}
+}
+
 func (app *App) interactionsAsync(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("interaction-async", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "async-interactions-async",
-		"Label":   "Async",
-		"Message": "Loaded after the page shell rendered.",
-		"Time":    time.Now().Format("15:04:05"),
+	content := partial.NewID("interaction-async", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "async-interactions-async",
+		Label:   "Async",
+		Message: "Loaded after the page shell rendered.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
 
 func (app *App) interactionsReveal(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(2 * time.Second)
-	content := partial.NewID("interaction-reveal", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "reveal-interactions-reveal",
-		"Label":   "Reveal",
-		"Message": "Loaded when the placeholder entered the viewport.",
-		"Time":    time.Now().Format("15:04:05"),
+	content := partial.NewID("interaction-reveal", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "reveal-interactions-reveal",
+		Label:   "Reveal",
+		Message: "Loaded when the placeholder entered the viewport.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
 
 func (app *App) interactionsPoll(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("interaction-poll", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "poll-interactions-poll",
-		"Label":   "Poll",
-		"Message": "Refreshed by a polling trigger.",
-		"Time":    time.Now().Format("15:04:05"),
+	content := partial.NewID("interaction-poll", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "poll-interactions-poll",
+		Label:   "Poll",
+		Message: "Refreshed by a polling trigger.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
 
 func (app *App) interactionsOn(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("interaction-on", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "on-target",
-		"Label":   "Event",
-		"Message": "Updated after a custom browser event.",
-		"Time":    time.Now().Format("15:04:05"),
+	content := partial.NewID("interaction-on", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "on-target",
+		Label:   "Event",
+		Message: "Updated after a custom browser event.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
 
-func (app *App) interactionsIsland(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("interaction-island", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "island-profile",
-		"Label":   "Island",
-		"Message": "A named lazy island rendered by the server.",
-		"Time":    time.Now().Format("15:04:05"),
+func (app *App) interactionsProfile(w http.ResponseWriter, r *http.Request) {
+	content := partial.NewID("interaction-profile", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "profile",
+		Label:   "Async",
+		Message: "A named async region rendered by the server.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
 
 func (app *App) interactionsRefresh(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("interaction-refresh", "templates/interaction_result_inner.gohtml").SetData(map[string]any{
-		"ID":      "refresh-interactions-refresh",
-		"Label":   "Refresh",
-		"Message": "Rendered by an explicit refresh interaction.",
-		"Time":    time.Now().Format("15:04:05"),
+	content := partial.NewID("interaction-refresh", "templates/interaction_result_inner.gohtml").SetDot(InteractionResult{
+		ID:      "refresh-interactions-refresh",
+		Label:   "Refresh",
+		Message: "Rendered by an explicit refresh interaction.",
+		Time:    time.Now().Format("15:04:05"),
 	})
 	app.writeStandalone(w, r, content)
 }
@@ -114,11 +130,11 @@ func (app *App) interactionsStream(w http.ResponseWriter, r *http.Request) {
 
 	content := partial.NewID("interaction-stream", "templates/interaction_result_inner.gohtml").
 		SetFileSystem(os.DirFS("examples/showcase")).
-		SetData(map[string]any{
-			"ID":      "stream-interactions-stream",
-			"Label":   "Stream",
-			"Message": "Received over an SSE message.",
-			"Time":    time.Now().Format("15:04:05"),
+		SetDot(InteractionResult{
+			ID:      "stream-interactions-stream",
+			Label:   "Stream",
+			Message: "Received over an SSE message.",
+			Time:    time.Now().Format("15:04:05"),
 		})
 	out, err := content.Render(app.requestContext(r))
 	if err != nil {

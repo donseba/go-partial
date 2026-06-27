@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/docs.DocsNavPage
+*/}}
 <aside id="docs-sidebar" class="sticky top-16 grid h-[calc(100vh-4rem)] content-start gap-6 overflow-auto border-r border-slate-800 bg-slate-950/80 px-4 py-7"{{ oobAttr }}>
     <section class="grid gap-1.5">
         <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Guide</h2>
-        {{ range .Data.Nav }}
+        {{ range .Nav }}
             {{ if eq .Group "Guide" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"
@@ -13,7 +16,7 @@
     </section>
     <section class="grid gap-1.5">
         <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Integration</h2>
-        {{ range .Data.Nav }}
+        {{ range .Nav }}
             {{ if eq .Group "Integration" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"
@@ -25,7 +28,7 @@
     </section>
     <section class="grid gap-1.5">
         <h2 class="mb-1 text-xs font-extrabold uppercase tracking-wide text-slate-500">Reference</h2>
-        {{ range .Data.Nav }}
+        {{ range .Nav }}
             {{ if eq .Group "Reference" }}
                 <a href="{{ .Path }}"
                    hx-get="{{ .Path }}"

@@ -1,8 +1,11 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.ScopedRowsPage
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Template composition</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
-        <p class="leading-7 text-stone-600">Rows are rendered by a child partial using <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">partial</code> with scoped key/value pairs.</p>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">Rows are rendered with native <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">template</code> calls and the row partial keeps an ID for HTMX target requests.</p>
     </header>
 
     <table class="w-full overflow-hidden rounded-lg border border-stone-300 bg-white text-left">
@@ -17,28 +20,32 @@
             </tr>
         </thead>
         <tbody>
-            {{ range .Data.Rows }}
-                {{ partial "row" "Row" . "Owner" $.Data.Owner }}
+            {{ range .Rows }}
+                {{ template "row.gohtml" . }}
             {{ end }}
         </tbody>
     </table>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
-        <h2 class="text-lg font-bold text-stone-950">Scoped row data</h2>
-        <p class="leading-7 text-stone-600">The table owns the loop, while each row receives explicit local data. That keeps row templates reusable without relying on hidden parent fields.</p>
+        <h2 class="text-lg font-bold text-stone-950">Dot row data</h2>
+        <p class="leading-7 text-stone-600">The table owns the loop, while each row receives the row itself as dot. The same row template can render inside the table or as a standalone HTMX target.</p>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">row := partial.NewID("row", "templates/row.gohtml")
-table := partial.NewID("content", "templates/scoped.gohtml")
-table.With(row)</code></pre>
+table := partial.NewID("content", "templates/scoped.gohtml").SetDot(page)
+table.With(row)
+table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+    row := findRow(target)
+    return partial.NewID(target, "templates/row.gohtml").SetDot(row), nil, true
+})</code></pre>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ range .Data.Rows }}" }}
-    {{ "{{ partial \"row\" \"Row\" . \"Owner\" $.Data.Owner }}" }}
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ range .Rows }}" }}
+    {{ "{{ template \"row.gohtml\" . }}" }}
 {{ "{{ end }}" }}</code></pre>
     </article>
 </section>

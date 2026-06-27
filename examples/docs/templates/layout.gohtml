@@ -1,18 +1,21 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/docs.DocsLayoutPage
+*/}}
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ .Service.AppName }} documentation</title>
+    <title>{{ .AppName }} documentation</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link rel="stylesheet" href="/static/site.css">
 </head>
 <body class="m-0 bg-slate-950 font-sans text-slate-50 [background:linear-gradient(180deg,rgba(27,38,53,.58),transparent_360px),#0d1117]">
-    {{ child "header" }}
+    {{ slot "header" }}
     <div class="mx-auto grid max-w-[1480px] grid-cols-[292px_minmax(0,1fr)]">
-        {{ child "sidebar" }}
+        {{ slot "sidebar" }}
         <main id="content" class="min-w-0 px-11 py-12 pb-28">
-            {{ child "content" }}
+            {{ slot "content" }}
         </main>
     </div>
 </body>

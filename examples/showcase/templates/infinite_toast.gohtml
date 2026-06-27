@@ -1,3 +1,6 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.InfinitePage
+*/}}
 <aside id="toast" class="fixed bottom-5 left-[268px] z-40 max-w-[min(360px,calc(100vw-288px))] rounded-lg border-l-4 border-l-teal-700 bg-stone-900 px-3.5 py-3 text-white shadow-xl" hx-swap-oob="true" aria-live="polite">
-    Loaded rows {{ .Data.Start }}-{{ .Data.Next }} with {{ .Data.ActionHeader }}: current-{{ .Data.Current }}.
+    Loaded rows {{ .Start }}-{{ .Next }} with {{ .ActionHeader }}: current-{{ .Current }}.
 </aside>

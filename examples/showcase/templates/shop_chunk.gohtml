@@ -1,8 +1,11 @@
-{{ range .Data.Items }}
-    {{ partial "shop-item" "Item" . }}
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.ShopPage
+*/}}
+{{ range .Items }}
+    {{ template "shop_item.gohtml" . }}
 {{ end }}
 
-{{ if .Data.Done }}
+{{ if .Done }}
     <div class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600">All products loaded.</div>
 {{ else }}
     <div class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600"
@@ -10,7 +13,7 @@
          hx-trigger="revealed"
          hx-target="this"
          hx-swap="outerHTML"
-         hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ .Data.Next }}"}'>
+         hx-headers='{"{{ .ActionHeader }}":"current-{{ .Next }}"}'>
         Loading more products...
     </div>
 {{ end }}

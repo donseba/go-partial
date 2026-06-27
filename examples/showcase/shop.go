@@ -85,8 +85,8 @@ func (app *App) shopCartOpen(w http.ResponseWriter, r *http.Request) {
 func (app *App) writeCartUpdate(w http.ResponseWriter, r *http.Request, sessionID string, message string) {
 	wrapper := app.wrapper()
 	wrapper.WithOOB(app.shopCartButtonPartial(sessionID))
-	wrapper.WithOOB(partial.NewID("toast", "templates/toast.gohtml").SetData(map[string]any{
-		"Message": message,
+	wrapper.WithOOB(partial.NewID("toast", "templates/toast.gohtml").SetDot(NoticePage{
+		Message: message,
 	}).SetAlwaysSwapOOB(true))
 
 	content := app.shopCartPopupPartial(sessionID, true)
@@ -111,14 +111,14 @@ func (app *App) shopPartial(w http.ResponseWriter, r *http.Request, id string, s
 	}
 
 	sessionID := app.cartSessionID(w, r)
-	content := partial.NewID(id, templateName).SetData(map[string]any{
-		"Title":        "Webshop",
-		"Items":        items,
-		"Start":        start,
-		"Next":         end,
-		"Done":         end >= len(app.products),
-		"Current":      start - 1,
-		"ActionHeader": connector.HeaderAction.String(),
+	content := partial.NewID(id, templateName).SetDot(ShopPage{
+		Title:        "Webshop",
+		Items:        items,
+		Start:        start,
+		Next:         end,
+		Done:         end >= len(app.products),
+		Current:      start - 1,
+		ActionHeader: connector.HeaderAction.String(),
 	})
 	content.With(partial.NewID("shop-item", "templates/shop_item.gohtml"))
 	content.With(app.shopCartButtonPartial(sessionID))
@@ -127,13 +127,13 @@ func (app *App) shopPartial(w http.ResponseWriter, r *http.Request, id string, s
 
 func (app *App) shopCartButtonPartial(sessionID string) *partial.Partial {
 	return partial.NewID("shop-cart-button", "templates/shop_cart_button.gohtml").
-		SetData(map[string]any{"Cart": app.cartSummary(sessionID, false)}).
+		SetDot(app.cartSummary(sessionID, false)).
 		SetAlwaysSwapOOB(true)
 }
 
 func (app *App) shopCartPopupPartial(sessionID string, opened bool) *partial.Partial {
 	return partial.NewID("cart-popup", "templates/shop_cart_popup.gohtml").
-		SetData(map[string]any{"Cart": app.cartSummary(sessionID, opened)}).
+		SetDot(app.cartSummary(sessionID, opened)).
 		SetAlwaysSwapOOB(true)
 }
 

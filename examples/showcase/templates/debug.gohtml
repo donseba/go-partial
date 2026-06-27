@@ -1,20 +1,23 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.DebugPage
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Diagnostics</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">The <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">debug</code> helper renders a styled diagnostic box by default. Applications can replace the renderer to match their own interface.</p>
     </header>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Default debug renderer</h2>
         <p class="leading-7 text-stone-600">This output comes from the embedded go-partial debug template.</p>
-        {{ debug .Data.Payload }}
+        {{ debug .Payload }}
     </article>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Custom debug renderer</h2>
-        <p class="leading-7 text-stone-600">This child partial uses <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">SetDebugRenderer</code> to render the same helper with application-specific markup.</p>
-        {{ child "custom-debug" }}
+        <p class="leading-7 text-stone-600">This registered region uses <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">SetDebugRenderer</code> to render the same helper with application-specific markup.</p>
+        {{ slot "custom-debug" }}
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
@@ -27,6 +30,6 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ debug .Data.Payload }}" }}</code></pre>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ debug .Payload }}" }}</code></pre>
     </article>
 </section>

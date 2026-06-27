@@ -1,16 +1,18 @@
-{{ $item := scoped.Item }}
-<article class="grid overflow-hidden rounded-lg border border-stone-300 bg-white" id="product-{{ $item.ID }}">
-    <div class="flex min-h-28 items-end p-3.5" style="background: {{ $item.Accent }}">
-        <span class="inline-flex rounded-full border border-black/10 bg-white/80 px-2.5 py-1 text-xs font-extrabold text-teal-900">{{ $item.Category }}</span>
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.Product
+*/}}
+<article class="grid overflow-hidden rounded-lg border border-stone-300 bg-white" id="product-{{ .ID }}">
+    <div class="flex min-h-28 items-end p-3.5" style="background: {{ .Accent }}">
+        <span class="inline-flex rounded-full border border-black/10 bg-white/80 px-2.5 py-1 text-xs font-extrabold text-teal-900">{{ .Category }}</span>
     </div>
     <div class="grid gap-2 px-3.5 py-3">
-        <h2 class="text-lg font-bold text-stone-950">{{ $item.Name }}</h2>
-        <p class="leading-7 text-stone-600">{{ $item.Description }}</p>
+        <h2 class="text-lg font-bold text-stone-950">{{ .Name }}</h2>
+        <p class="leading-7 text-stone-600">{{ .Description }}</p>
     </div>
     <footer class="flex items-center justify-between gap-2.5 border-t border-stone-300 px-3.5 py-3">
-        <strong class="text-teal-900">{{ $item.Price }}</strong>
+        <strong class="text-teal-900">{{ .Price }}</strong>
         <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button"
-                hx-post="/shop/cart/add?id={{ $item.ID }}"
+                hx-post="/shop/cart/add?id={{ .ID }}"
                 hx-target="#cart-popup"
                 hx-swap="outerHTML">
             Add to cart

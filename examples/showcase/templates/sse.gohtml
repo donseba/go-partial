@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Streaming partials</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">This page opens an <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">EventSource</code> stream. The server renders normal go-partial templates and sends them as <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">partial:patch</code> events.</p>
     </header>
 

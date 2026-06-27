@@ -1,3 +1,4 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Deferred partials</h1>
@@ -62,5 +63,6 @@
     </table>
 
     <h2 class="text-xl font-bold text-slate-50">Not await</h2>
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code> does not run a goroutine and does not block template execution. If a template needs blocking server-side composition, use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">child</code>. If a section can load after the shell is visible, use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code>.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code> does not run a goroutine and does not block template execution. If a template needs blocking server-side composition, use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">slot</code>, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>. If a section can load after the shell is visible, use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code>.</p>
 </article>
+

@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.AsyncPage
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Deferred loading</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">The <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">async</code> helper renders connector-aware loading markup. HTMX fetches each endpoint after the page shell is already visible.</p>
     </header>
 
@@ -12,7 +15,7 @@
         </article>
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">Route parameter</h2>
-            {{ range .Data.Rows }}
+            {{ range .Rows }}
                 {{ async "/async/row/:row" "row" .ID }}
             {{ end }}
         </article>

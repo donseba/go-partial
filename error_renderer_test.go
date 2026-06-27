@@ -184,7 +184,7 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 
 func TestChildTemplateErrorRendersSectionFallbackInFullPage(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ child "content" }}</main><footer>Footer</footer></body></html>`)
+	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ slot "content" }}</main><footer>Footer</footer></body></html>`)
 	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
 
 	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)

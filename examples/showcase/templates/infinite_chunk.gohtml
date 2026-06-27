@@ -1,19 +1,22 @@
-{{ range .Data.Rows }}
-    {{ partial "infinite-row" "Number" . }}
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.InfinitePage
+*/}}
+{{ range .Rows }}
+    {{ template "infinite_row.gohtml" . }}
 {{ end }}
 
-{{ if .Data.Done }}
-    {{ child "rickroll" }}
+{{ if .Done }}
+    {{ template "rickroll.gohtml" . }}
 {{ else }}
-    <div id="infinite-sentinel-{{ .Data.Next }}"
+    <div id="infinite-sentinel-{{ .Next }}"
          class="rounded-lg border border-dashed border-stone-300 p-4 text-center text-stone-600"
          hx-get="/infinite/load"
-         hx-target="#infinite-sentinel-{{ .Data.Next }}"
+         hx-target="#infinite-sentinel-{{ .Next }}"
          hx-swap="outerHTML"
          hx-trigger="revealed"
-         hx-headers='{"{{ .Data.ActionHeader }}":"current-{{ .Data.Next }}"}'>
-        Loading more rows after {{ .Data.Next }}...
+         hx-headers='{"{{ .ActionHeader }}":"current-{{ .Next }}"}'>
+        Loading more rows after {{ .Next }}...
     </div>
 {{ end }}
 
-{{ child "infinite-toast" "Start" .Data.Start "Next" .Data.Next "Current" .Data.Current "ActionHeader" .Data.ActionHeader }}
+{{ template "infinite_toast.gohtml" . }}

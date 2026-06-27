@@ -4,6 +4,7 @@ This package provides a flexible and efficient way to manage and render partial 
 ## Features
 
 - **Partial Templates**: Define and render partial templates with their own data and functions.
+- **Native Template Composition**: Use `{{ template "row.gohtml" . }}` with `SetDot` so reusable sections can render inside a page or as HTMX targets.
 - **Layouts**: Use layouts to wrap content and share data across multiple partials.
 - **Global Data**: Set global data accessible to all partials.
 - **Template Caching**: Enable caching of parsed templates for improved performance.
@@ -186,12 +187,14 @@ layout.SetData(map[string]any{
 Create `Partial` instances for the content and any other components.
 
 ```go 
+type ContentPage struct {
+    Message string
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
     // Create the main content partial
-    content := partial.NewID("content", "templates/content.html")
-    content.SetData(map[string]any{
-        "Message": "Welcome to our website!",
-    })
+    content := partial.NewID("content", "templates/content.html").
+        SetDot(ContentPage{Message: "Welcome to our website!"})
     
     // Optionally, create a wrapper partial (layout)
     wrapper := partial.NewID("wrapper", "templates/layout.html")
@@ -217,30 +220,61 @@ templates/layout.html
     <title>{{.Layout.PageTitle}} - {{.Service.AppName}}</title>
 </head>
 <body>
-    {{ child "content" }}
+    {{ slot "content" }}
 </body>
 </html>
 ```
 templates/content.html
 ```html 
-<h1>{{.Data.Message}}</h1>
+<h1>{{.Message}}</h1>
 ```
 
-Note: In the layout template, we use {{ child "content" }} to render the content partial on demand.
+Note: In the layout template, we use `{{ slot "content" }}` to render a registered region on demand.
 
 
 ### Using Global and Layout Data
 - **Global Data (ServiceData)**: Set on the Service, accessible via {{.Service}} in templates.
 - **Layout Data (LayoutData)**: Set on the Layout, accessible via {{.Layout}} in templates.
 - **Partial Data (Data)**: Set on individual Partial instances, accessible via {{.Data}} in templates.
+- **Dot Data**: Set with `SetDot`, accessible as the template root `.`.
 
 ### Accessing Data in Templates
 
 You can access data in your templates using dot notation:
 
 - **Partial Data**: `{{ .Data.Key }}`
+- **Dot Data**: `{{ .Key }}`
 - **Layout Data**: `{{ .Layout.Key }}`
 - **Global Data**: `{{ .Service.Key }}`
+
+When `SetDot` is used, request-specific values are available through helpers instead of fields on dot:
+
+```gotemplate
+{{ ctx.Locale }}
+{{ ctx.URL.Path }}
+{{ request.Method }}
+{{ locale }}
+{{ csrf.Key }}
+{{ basePath }}
+```
+
+## Contract Models
+go-partial can register go-doc `@model` declarations before parsing templates. The declaration owns the template name, while the controller only supplies typed values:
+
+```gotemplate
+{{/*
+@model Page github.com/example/app.DashboardPage
+*/}}
+
+<h1>{{ Page.Title }}</h1>
+```
+
+```go
+content := partial.NewID("content", "templates/dashboard.gohtml").
+    UseModels(page)
+```
+
+`UseModels` appends values inherited through the partial tree. `SetModels` replaces them for a specific render or cloned partial. Model names cannot collide with go-partial helpers such as `slot`, `locale`, `ctx`, or `url`.
 
 
 ### Wrapping Partials
@@ -254,61 +288,43 @@ layout := partial.New("templates/layout.html").ID("layout")
 content.Wrap(layout)
 ```
 
-## Rendering Child Partials on Demand
-Use the child function to render child partials within your templates.
+## Template Composition
+For repeated sections that should be understood by go-doc and also render as HTMX targets, prefer native templates plus `SetDot`. The parent owns the loop, and the nested template receives the row as normal dot data:
 
-### Syntax
-```html
-{{ child "partial_id" }}
-```
-You can also pass scoped data to the child partial using key/value pairs:
-
-```html
-{{ child "sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
-```
-Child Partial (sidebar):
-```html 
-<div>
-    <p>User: {{ .Data.UserName }}</p>
-    <p>Notifications: {{ .Data.Notifications }}</p>
-</div>
-```
-
-The same child-local data is also available through the `scoped` helper. This can make repeated fragments easier to read:
-
-```html
-{{ child "sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
+```gotemplate
+{{/*
+@dot github.com/example/app.TablePage
+*/}}
+{{ range .Rows }}
+    {{ template "row.html" . }}
+    {{/* or: {{ template "/templates/row.html" . }} */}}
+{{ end }}
 ```
 
 ```html
-<div>
-    <p>User: {{ scoped.UserName }}</p>
-    <p>Notifications: {{ scoped.Notifications }}</p>
-</div>
+<tr id="row-{{ .ID }}">
+    <td>{{ .Name }}</td>
+</tr>
 ```
 
-For reusable named partials, use `partial` with the same scoped data style:
-
-```html
-{{ partial "partials/sidebar" "UserName" .Data.UserName "Notifications" .Data.Notifications }}
-```
-
-```html
-<div>
-    <p>User: {{ scoped.UserName }}</p>
-    <p>Notifications: {{ scoped.Notifications }}</p>
-</div>
-```
-
-For dynamic DOM targets such as table rows, use `WithTargetResolver` to map a target like `row-2` to a reusable row partial and fresh scoped data:
+Register the row partial on the parent so the parent parse can see the row template and so an HTMX request can still target a row by ID:
 
 ```go
+rowPartial := partial.NewID("row", "templates/row.html")
 table.With(rowPartial)
 table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
     row := findRowForTarget(target)
-    return rowPartial, map[string]any{"Row": row}, true
+    return partial.NewID(target, "templates/row.html").SetDot(row), nil, true
 })
 ```
+
+`slot` renders registered regions such as layouts, selected regions, OOB regions, and error boundaries:
+
+```gotemplate
+<main>{{ slot "content" }}</main>
+```
+
+Avoid using `partial` as a general row-composition helper in new code. Native `template` calls keep the template idiomatic and give go-doc the strongest type information. Use `slot` for named regions that should be addressable through the partial tree.
 
 ## Using Out-of-Band (OOB) Partials
 Out-of-Band partials allow you to update parts of the page without reloading:
@@ -382,50 +398,61 @@ p.SetFileSystem(content)
 If you do not use a custom file system, the package will use the default file system and look for templates relative to the current working directory.
 
 ## Rendering Tables and Dynamic Content
-You can render dynamic content like tables by rendering child partials within loops.
+For tables and repeated fragments, prefer native Go templates plus `SetDot`. The parent receives a typed page model, ranges over rows, and calls the row template with `{{ template "row.html" . }}`. That keeps the template readable for go-doc while go-partial still knows the row partial ID for HTMX target requests.
 
 Example: Rendering a Table with Dynamic Rows
 
 templates/table.html
 ```html
 <table>
-    {{ range $i := .Data.Rows }}
-    {{ partial "users/row" "RowNumber" $i }}
+    {{ range .Rows }}
+        {{ template "row.html" . }}
     {{ end }}
 </table>
 ```
 
 templates/row.html
 ```html
-<tr>
-    <td>{{ scoped.RowNumber }}</td>
+<tr id="row-{{ .ID }}">
+    <td>{{ .Name }}</td>
 </tr>
 ```
 
 Go Code:
 ```go
-// Create the row partial
-rowPartial := partial.New("templates/row.html").ID("users/row")
+type Row struct {
+    ID   int
+    Name string
+}
 
-// Create the table partial and set data
-tablePartial := partial.New("templates/table.html").ID("table")
-tablePartial.SetData(map[string]any{
-"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
-})
+type TablePage struct {
+    Rows []Row
+}
+
+rowPartial := partial.NewID("row", "templates/row.html")
+tablePartial := partial.NewID("table", "templates/table.html").
+    SetDot(TablePage{Rows: rows})
 tablePartial.With(rowPartial)
 
-// Render the table partial
+tablePartial.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+    row, ok := findRowForTarget(target)
+    if !ok {
+        return nil, nil, false
+    }
+    return partial.NewID(target, "templates/row.html").SetDot(row), nil, true
+})
+
 out, err := layout.Set(tablePartial).RenderWithRequest(r.Context(), r)
 ```
 
 ## Template Data
 In your templates, you can access the following data:
 
-- **{{.Ctx}}**: The context of the request.
-- **{{.URL}}**: The URL of the request.
-- **{{.Data}}**: Data specific to this partial.
+- **{{.}}**: Your app model when the partial uses `SetDot`.
+- **{{.Data}}**: Data specific to this partial when no custom dot is set.
 - **{{.Service}}**: Global data available to all partials.
 - **{{.Layout}}**: Data specific to the layout.
+- **{{ctx}}**, **{{request}}**, **{{url}}**, **{{locale}}**, **{{csrf}}**, **{{basePath}}**: request-aware helpers that stay available when `SetDot` changes `.`.
 
 ## Concurrency and Template Caching
 The package includes concurrency safety measures for template caching:

@@ -1,7 +1,10 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Out-of-band swaps</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Data.Title }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">Every htmx navigation replaces the main page normally and also swaps the sidebar out-of-band. The cheesy programmer joke at the bottom of the navbar is the live OOB example.</p>
     </header>
 
@@ -35,7 +38,7 @@
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;aside id="app-header"{{ "{{ oobAttr }}" }}&gt;
     ...
     &lt;div id="nav-joke" aria-live="polite"&gt;
-        {{ "{{ .Data.Joke }}" }}
+        {{ "{{ .Joke }}" }}
     &lt;/div&gt;
 &lt;/aside&gt;</code></pre>
     </article>

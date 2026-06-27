@@ -43,7 +43,7 @@ func (t *Turbo) InteractionAttrs(interaction Interaction) map[string]string {
 	default:
 		attrs[TurboAttrFrameID] = interaction.ID
 		attrs[TurboAttrSource] = interaction.URL
-		if interaction.Kind == InteractionAsync || interaction.Kind == InteractionReveal || interaction.Kind == InteractionIsland {
+		if interaction.Kind == InteractionAsync || interaction.Kind == InteractionReveal {
 			attrs[TurboAttrLoading] = "lazy"
 		}
 	}

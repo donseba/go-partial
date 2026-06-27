@@ -10,16 +10,22 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
 )
 
-func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data map[string]any) {
-	if data == nil {
-		data = make(map[string]any)
+func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
+	content := partial.NewID(id, tmpl)
+	if data != nil {
+		if values, ok := data.(map[string]any); ok {
+			content.SetData(values)
+		} else {
+			content.SetDot(data)
+		}
 	}
-	app.renderPartial(w, r, partial.NewID(id, tmpl).SetData(data))
+	app.renderPartial(w, r, content)
 }
 
 func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
@@ -57,9 +63,11 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 
 func (app *App) wrapper() *partial.Partial {
 	wrapper := partial.NewID("layout", "templates/layout.gohtml")
-	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetData(map[string]any{
-		"Nav":  app.navItems(),
-		"Joke": app.programmerJoke(),
+	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(HeaderPage{
+		AppName: "go-partial showcase",
+		Now:     time.Now().Format("02 Jan 06 15:04 MST"),
+		Nav:     app.navItems(),
+		Joke:    app.programmerJoke(),
 	}).SetAlwaysSwapOOB(true))
 	return wrapper
 }

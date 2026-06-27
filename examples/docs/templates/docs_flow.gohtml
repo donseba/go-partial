@@ -1,3 +1,4 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Page flows</h1>
@@ -34,7 +35,7 @@ session.SetStepValidated("account", true)
 session.Current = "details"</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Render the current step</h2>
-    <p class="leading-7 text-slate-400">Register each step partial as a child of the flow content partial. The template can render the current child by name.</p>
+    <p class="leading-7 text-slate-400">Register each step partial as a named region of the flow content partial. The template can render the current step by name.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content := partial.NewID("content", "flow.gohtml").SetData(map[string]any{
     "Steps":       flow.Steps,
@@ -54,7 +55,7 @@ for _, step := range flow.Steps {
 {{ "{{ end }}" }}
 &lt;/aside&gt;
 
-{{ "{{ child .Data.CurrentStep }}" }}</code></pre>
+{{ "{{ slot .Data.CurrentStep }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Validation and navigation</h2>
     <p class="leading-7 text-slate-400">Validation lives on the step because each step usually has different form rules. Navigation is explicit: after validation succeeds, set the session state and advance the flow.</p>

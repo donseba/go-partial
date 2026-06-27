@@ -9,14 +9,14 @@ import (
 )
 
 func (app *App) headers(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "content", "templates/headers.gohtml", map[string]any{
-		"Title": "HTMX response helpers",
+	app.render(w, r, "content", "templates/headers.gohtml", PageTitle{
+		Title: "HTMX response helpers",
 	})
 }
 
 func (app *App) headersNotify(w http.ResponseWriter, r *http.Request) {
-	content := partial.NewID("notice", "templates/notice.gohtml").SetData(map[string]any{
-		"Message": "Response headers changed this element at " + time.Now().Format("15:04:05") + ".",
+	content := partial.NewID("notice", "templates/notice.gohtml").SetDot(NoticePage{
+		Message: "Response headers changed this element at " + time.Now().Format("15:04:05") + ".",
 	})
 	content.Response().
 		Retarget("#notice").

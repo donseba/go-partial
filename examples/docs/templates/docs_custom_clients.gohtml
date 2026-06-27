@@ -1,3 +1,4 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Integration</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Custom clients</h1>
@@ -10,7 +11,7 @@
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Header</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">DOM target or partial target ID.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Select</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Selected child key for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Select</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Selected partial key for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code>.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Action</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Server action name or cursor value.</td></tr>
         </tbody>
     </table>
@@ -44,3 +45,4 @@ document.querySelector("#profile-card").outerHTML = await response.text()</code>
     ResponseHeaders(response connector.Response) map[string]string
 }</code></pre>
 </article>
+

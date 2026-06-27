@@ -1,9 +1,12 @@
-<article id="sse-status" class="{{ if .Data.Done }}grid min-h-56 content-center gap-4 rounded-lg bg-teal-50 p-4{{ else }}grid min-h-56 content-center gap-4 bg-transparent p-0{{ end }}">
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.SSEStatus
+*/}}
+<article id="sse-status" class="{{ if .Done }}grid min-h-56 content-center gap-4 rounded-lg bg-teal-50 p-4{{ else }}grid min-h-56 content-center gap-4 bg-transparent p-0{{ end }}">
     <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-stone-600">
-        <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ if .Data.Done }}Complete{{ else }}Streaming{{ end }}</span>
-        <span>{{ if .Data.Done }}Stream finished{{ else }}Patch received{{ end }}</span>
-        <time>{{ .Data.Time }}</time>
+        <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ if .Done }}Complete{{ else }}Streaming{{ end }}</span>
+        <span>{{ if .Done }}Stream finished{{ else }}Patch received{{ end }}</span>
+        <time>{{ .Time }}</time>
     </div>
-    <h2 class="text-lg font-bold text-stone-950">Patch {{ .Data.Step }}</h2>
-    <p class="leading-7 text-stone-600">{{ if .Data.Done }}The stream sent its final patch and the client closed the EventSource.{{ else }}This section was rendered on the server and patched into the page over SSE.{{ end }}</p>
+    <h2 class="text-lg font-bold text-stone-950">Patch {{ .Step }}</h2>
+    <p class="leading-7 text-stone-600">{{ if .Done }}The stream sent its final patch and the client closed the EventSource.{{ else }}This section was rendered on the server and patched into the page over SSE.{{ end }}</p>
 </article>

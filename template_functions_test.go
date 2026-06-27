@@ -309,7 +309,7 @@ func TestDebugUsesCustomDebugRenderer(t *testing.T) {
 
 func TestChildDebugRendererSurvivesClone(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("parent.gohtml", `{{ child "child" }}`)
+	fsys.AddFile("parent.gohtml", `{{ slot "child" }}`)
 	fsys.AddFile("child.gohtml", `{{ debug .Data.Name }}`)
 
 	child := NewID("child", "child.gohtml").
