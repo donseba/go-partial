@@ -52,8 +52,14 @@ func (r *Runtime) Localizer() Localizer {
 }
 
 func (r *Runtime) Locale() string {
-	if loc := r.Localizer(); loc != nil {
-		return loc.GetLocale()
+	if r == nil || r.state == nil {
+		return ""
+	}
+	if r.state.Locale != "" {
+		return r.state.Locale
+	}
+	if r.state.Loc != nil {
+		return r.state.Loc.GetLocale()
 	}
 	return ""
 }

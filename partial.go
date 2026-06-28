@@ -29,34 +29,39 @@ var (
 	// for its own layout, request, connector, and runtime behavior. Optional
 	// helper providers must not overwrite these names.
 	coreFunctionNames = map[string]struct{}{
-		"action":          {},
-		"content":         {},
-		"ctx":             {},
-		"debug":           {},
-		"joinPath":        {},
-		"basePath":        {},
-		"oob":             {},
-		"oobAttr":         {},
-		"partial":         {},
-		"request":         {},
-		"runtime":         {},
-		"actionHeader":    {},
-		"actionIs":        {},
-		"actionValue":     {},
+		"action":       {},
+		"actionHeader": {},
+		"actionIs":     {},
+		"actionValue":  {},
+
+		"selection":       {},
 		"selectionHeader": {},
 		"selectionIs":     {},
 		"selectionValue":  {},
-		"targetHeader":    {},
-		"targetIs":        {},
-		"targetValue":     {},
-		"csrf":            {},
-		"locale":          {},
-		"selection":       {},
-		"url":             {},
-		"urlContains":     {},
-		"urlIs":           {},
-		"urlPath":         {},
-		"urlStarts":       {},
+
+		"targetHeader": {},
+		"targetIs":     {},
+		"targetValue":  {},
+
+		"csrf":   {},
+		"locale": {},
+
+		"url":         {},
+		"urlContains": {},
+		"urlIs":       {},
+		"urlPath":     {},
+		"urlStarts":   {},
+
+		"content":  {},
+		"ctx":      {},
+		"debug":    {},
+		"partial":  {},
+		"request":  {},
+		"runtime":  {},
+		"oob":      {},
+		"oobAttr":  {},
+		"basePath": {},
+		"joinPath": {},
 	}
 )
 
@@ -507,11 +512,17 @@ func (p *Partial) SetModel(values ...any) *Partial {
 }
 
 func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
+	if p == nil {
+		return nil
+	}
 	if p.parent != nil {
 		p.parent.SetResponseHeaders(headers)
 	}
 
-	p.responseHeaders = headers
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.responseHeaders = maps.Clone(headers)
 	return p
 }
 
@@ -520,14 +531,19 @@ func (p *Partial) GetResponseHeaders() map[string]string {
 		return nil
 	}
 
-	if p.responseHeaders == nil {
-		if p.parent != nil {
-			return maps.Clone(p.parent.GetResponseHeaders())
-		}
-		return nil
+	p.mu.RLock()
+	headers := maps.Clone(p.responseHeaders)
+	parent := p.parent
+	p.mu.RUnlock()
+
+	if headers != nil {
+		return headers
 	}
 
-	return maps.Clone(p.responseHeaders)
+	if parent != nil {
+		return parent.GetResponseHeaders()
+	}
+	return nil
 }
 
 func (p *Partial) Response() *connector.ResponseBuilder {
@@ -535,6 +551,12 @@ func (p *Partial) Response() *connector.ResponseBuilder {
 }
 
 func (p *Partial) SetResponse(response connector.Response) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.response = response
 	return p
 }
@@ -557,11 +579,23 @@ func (p *Partial) GetBasePath() string {
 
 // SetConnector sets the connector for the partial.
 func (p *Partial) SetConnector(connector connector.Connector) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.connector = connector
 	return p
 }
 
 func (p *Partial) SetAlwaysSwapOOB(alwaysSwapOOB bool) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.alwaysSwapOOB = alwaysSwapOOB
 	return p
 }
@@ -582,18 +616,36 @@ func (p *Partial) SetFunc(funcMaps ...template.FuncMap) *Partial {
 
 // SetLogger sets the logger for the partial.
 func (p *Partial) SetLogger(logger Logger) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.logger = logger
 	return p
 }
 
 // SetFileSystem sets the file system for the partial.
 func (p *Partial) SetFileSystem(fs fs.FS) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.fs = fs
 	return p
 }
 
 // UseTemplateCache sets the parsed template cache usage flag for the partial.
 func (p *Partial) UseTemplateCache(useCache bool) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.useCache = useCache
 	return p
 }
@@ -642,6 +694,12 @@ func inferTemplateID(templatePath string) string {
 // The resolver runs before this partial renders. It can inspect request data,
 // perform application work, and return a different partial to render.
 func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.action = action
 	return p
 }
@@ -650,6 +708,12 @@ func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, runtim
 //
 // Use this when the template decides where the action result should appear.
 func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.templateAction = templateAction
 	return p
 }
@@ -1108,15 +1172,6 @@ func mergeFuncMaps(staticFuncs, requestFuncs template.FuncMap) template.FuncMap 
 	return funcs
 }
 
-func addMissingFuncs(funcs template.FuncMap, defaults template.FuncMap) {
-	for name, fn := range defaults {
-		if _, ok := funcs[name]; ok {
-			continue
-		}
-		funcs[name] = fn
-	}
-}
-
 func isProtectedFunctionName(name string) bool {
 	if _, ok := coreFunctionNames[name]; ok {
 		return true
@@ -1149,6 +1204,9 @@ func (p *Partial) getBasePath() string {
 }
 
 func (p *Partial) getConnector() connector.Connector {
+	if p == nil {
+		return nil
+	}
 	if p.connector != nil {
 		return p.connector
 	}
@@ -1203,10 +1261,7 @@ func (p *Partial) getLogger() Logger {
 		return p.parent.getLogger()
 	}
 
-	// Cache the default logger in p.logger
-	p.logger = slog.Default().WithGroup("partial")
-
-	return p.logger
+	return slog.Default().WithGroup("partial")
 }
 
 func (p *Partial) getErrorRenderer() ErrorRenderer {
@@ -1274,9 +1329,13 @@ func (p *Partial) getTargetResolver() TargetResolver {
 }
 
 func (p *Partial) GetRequestTargetValue() string {
-	th := p.getConnector().GetTargetValue(p.GetRequest())
-	if th != "" {
-		return th
+	if p == nil {
+		return ""
+	}
+	if conn := p.getConnector(); conn != nil {
+		if target := conn.GetTargetValue(p.GetRequest()); target != "" {
+			return target
+		}
 	}
 	if p.parent != nil {
 		return p.parent.GetRequestTargetValue()
@@ -1285,9 +1344,13 @@ func (p *Partial) GetRequestTargetValue() string {
 }
 
 func (p *Partial) GetRequestActionValue() string {
-	ah := p.getConnector().GetActionValue(p.GetRequest())
-	if ah != "" {
-		return ah
+	if p == nil {
+		return ""
+	}
+	if conn := p.getConnector(); conn != nil {
+		if action := conn.GetActionValue(p.GetRequest()); action != "" {
+			return action
+		}
 	}
 	if p.parent != nil {
 		return p.parent.GetRequestActionValue()
@@ -1296,9 +1359,13 @@ func (p *Partial) GetRequestActionValue() string {
 }
 
 func (p *Partial) GetRequestSelectionValue() string {
-	as := p.getConnector().GetSelectValue(p.GetRequest())
-	if as != "" {
-		return as
+	if p == nil {
+		return ""
+	}
+	if conn := p.getConnector(); conn != nil {
+		if selection := conn.GetSelectValue(p.GetRequest()); selection != "" {
+			return selection
+		}
 	}
 	if p.parent != nil {
 		return p.parent.GetRequestSelectionValue()
@@ -1432,7 +1499,7 @@ func (p *Partial) renderErrorFragment(ctx context.Context, r *http.Request, rend
 	return out, nil
 }
 
-// renderNamed renders the partial with the given name and templates.
+// renderSelf renders this partial and its referenced template tree.
 func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTML, error) {
 	if len(p.templates) == 0 {
 		p.getLogger().Error("no templates provided for rendering")
@@ -1936,7 +2003,6 @@ func (p *Partial) clone() *Partial {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	// Create a new Partial instance
 	clone := &Partial{
 		id:              p.id,
 		parent:          p.parent,
@@ -1954,6 +2020,7 @@ func (p *Partial) clone() *Partial {
 		staticFuncs:     maps.Clone(p.staticFuncs),
 		basePath:        p.basePath,
 		contracts:       slices.Clone(p.contracts),
+		responseHeaders: maps.Clone(p.responseHeaders),
 		response:        p.response,
 		errorRenderer:   p.errorRenderer,
 		debugRenderer:   p.debugRenderer,
@@ -1962,6 +2029,8 @@ func (p *Partial) clone() *Partial {
 		errorModeSet:    p.errorModeSet,
 		children:        maps.Clone(p.children),
 		oobChildren:     maps.Clone(p.oobChildren),
+		templateAction:  p.templateAction,
+		action:          p.action,
 	}
 
 	return clone

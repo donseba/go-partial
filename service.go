@@ -26,7 +26,6 @@ type (
 		ErrorRenderer    ErrorRenderer
 		DebugRenderer    DebugRenderer
 		ErrorMode        ErrorMode
-		fs               fs.FS
 	}
 
 	Service struct {
@@ -36,7 +35,7 @@ type (
 		hasCustomFunctions bool
 		connector          connector.Connector
 		templateCache      *templateStore
-		funcsLock          sync.RWMutex // Add a read-write mutex
+		funcsLock          sync.RWMutex
 	}
 
 	Layout struct {
@@ -49,7 +48,7 @@ type (
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
 		connector          connector.Connector
-		funcsLock          sync.RWMutex // Add a read-write mutex
+		funcsLock          sync.RWMutex
 	}
 )
 
@@ -81,9 +80,6 @@ func NewService(cfg *Config) *Service {
 // NewLayout returns a new layout.
 func (svc *Service) NewLayout() *Layout {
 	fsys := svc.config.FS
-	if fsys == nil {
-		fsys = svc.config.fs
-	}
 	functions := svc.getStaticFuncMap()
 	customFuncs := svc.getCustomFuncMap()
 	return &Layout{
@@ -324,7 +320,6 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		return
 	}
 
-	// Combine functions only once
 	staticFuncs := l.getStaticFuncMap()
 	customFuncs := l.getCustomFuncMap()
 

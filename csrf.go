@@ -18,14 +18,14 @@ type CsrfToken interface {
 }
 
 func getCsrfToken(ctx context.Context) CsrfToken {
-	if csrfer, ok := ctx.Value(CsrfContextKey).(CsrfToken); ok {
-		return csrfer
+	if ctx != nil {
+		if csrfer, ok := ctx.Value(CsrfContextKey).(CsrfToken); ok {
+			return csrfer
+		}
 	}
 
-	timeToken := time.Now().UnixNano()
-
 	return &defaultCsrf{
-		token: fmt.Sprintf("invalid-token-%d", timeToken),
+		token: fmt.Sprintf("invalid-token-%d", time.Now().UnixNano()),
 		key:   DefaultCsrfToken,
 	}
 }
@@ -36,10 +36,11 @@ type defaultCsrf struct {
 }
 
 func (d *defaultCsrf) Token(ctx context.Context) string {
-	if token, ok := ctx.Value(CsrfContextKey).(string); ok {
-		return token
+	if ctx != nil {
+		if token, ok := ctx.Value(CsrfContextKey).(string); ok {
+			return token
+		}
 	}
-
 	return d.token
 }
 

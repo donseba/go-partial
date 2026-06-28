@@ -950,7 +950,7 @@ func TestWithSelectMap(t *testing.T) {
 
 	// Set up the service and layout
 	svc := NewService(&Config{
-		fs: fsys, // Set the file system in the service config
+		FS: fsys,
 	})
 	layout := svc.NewLayout().
 		Set(contentPartial).

@@ -14,6 +14,9 @@ type Localizer interface {
 }
 
 func getLocalizer(ctx context.Context) Localizer {
+	if ctx == nil {
+		return LocalizerDefault
+	}
 	if loc, ok := ctx.Value(LocalizerContextKey).(Localizer); ok {
 		return loc
 	}

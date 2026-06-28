@@ -10,10 +10,17 @@ type Node struct {
 
 // Tree returns the tree of partials.
 func Tree(p *Partial) *Node {
+	if p == nil {
+		return nil
+	}
 	return tree(p, 0)
 }
 
 func tree(p *Partial, depth int) *Node {
+	if p == nil {
+		return nil
+	}
+
 	var out = &Node{ID: p.id, Depth: depth}
 
 	childIDs := make([]string, 0, len(p.children))
