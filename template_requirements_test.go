@@ -6,24 +6,24 @@ import (
 )
 
 func TestRequiredFuncsFindsTopLevelFunctions(t *testing.T) {
-	funcs, err := RequiredFuncs("page.gohtml", `{{ slot "content" }}{{ if eq .Status "ok" }}{{ debug . }}{{ end }}`)
+	funcs, err := RequiredFuncs("page.gohtml", `{{ partial "templates/content.gohtml" }}{{ if eq .Status "ok" }}{{ debug . }}{{ end }}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := []string{"debug", "slot"}
+	want := []string{"debug", "partial"}
 	if !reflect.DeepEqual(funcs, want) {
 		t.Fatalf("RequiredFuncs() = %#v, want %#v", funcs, want)
 	}
 }
 
 func TestRequiredFuncsFindsDefinedTemplateFunctions(t *testing.T) {
-	funcs, err := RequiredFuncs("page.gohtml", `{{ define "row" }}{{ partial "row" "Row" . }}{{ scoped.Row.ID }}{{ end }}`)
+	funcs, err := RequiredFuncs("page.gohtml", `{{ define "row" }}{{ partial "templates/row.gohtml" . }}{{ end }}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := []string{"partial", "scoped"}
+	want := []string{"partial"}
 	if !reflect.DeepEqual(funcs, want) {
 		t.Fatalf("RequiredFuncs() = %#v, want %#v", funcs, want)
 	}

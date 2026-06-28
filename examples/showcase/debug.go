@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 
@@ -13,10 +14,16 @@ import (
 
 func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 	custom := partial.NewID("custom-debug", "templates/debug_custom.gohtml").
+		SetFileSystem(os.DirFS("examples/showcase")).
 		SetDot(DebugCustomPage{Name: "Ada", Role: "Editor"}).
 		SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
 			return template.HTML(customDebugHTML(value)), nil
 		})
+	customHTML, err := custom.Render(app.requestContext(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	content := partial.NewID("content", "templates/debug.gohtml").SetDot(DebugPage{
 		Title: "Debug helper",
@@ -25,8 +32,8 @@ func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 			"Role":  "Editor",
 			"Flags": []string{"beta", "preview"},
 		},
+		CustomDebug: customHTML,
 	})
-	content.With(custom)
 	app.renderPartial(w, r, content)
 }
 

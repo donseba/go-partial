@@ -1,12 +1,11 @@
 # Go Partial - Partial Page Rendering for Go
 
-This package provides a flexible and efficient way to manage and render partial templates in Go (Golang). It allows you to create reusable, hierarchical templates with support for layouts, global data, caching, and more.
+This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with layout wrapping, connector headers, OOB output, caching, and typed template-friendly data flow.
 ## Features
 
-- **Partial Templates**: Define and render partial templates with their own data and functions.
+- **Partial Templates**: Define and render partial templates with typed dot data and functions.
 - **Native Template Composition**: Use `{{ template "row.gohtml" . }}` with `SetDot` so reusable sections can render inside a page or as HTMX targets.
-- **Layouts**: Use layouts to wrap content and share data across multiple partials.
-- **Global Data**: Set global data accessible to all partials.
+- **Layouts**: Use layouts to wrap content while keeping page data explicit.
 - **Template Caching**: Enable caching of parsed templates for improved performance.
 - **Out-of-Band Rendering**: Support for rendering out-of-band (OOB) partials.
 - **File System Support**: Use custom fs.FS implementations for template file access.
@@ -36,7 +35,7 @@ An htmx-backed feature showcase with real template files is available in [exampl
 go run ./examples/showcase
 ```
 
-Open http://localhost:8090 to see pages for scoped rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, infinite scroll with cursor-style `X-Action` values, and the embedded error page.
+Open http://localhost:8090 to see pages for typed rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, infinite scroll with cursor-style `X-Action` values, and the embedded error page.
 
 ## Integrations
 Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file.
@@ -123,7 +122,7 @@ With the HTMX connector, these become `HX-Retarget`, `HX-Reswap`, and `HX-Trigge
 The `debug` template helper renders a styled diagnostic box using an embedded template:
 
 ```gotemplate
-{{ debug .Data }}
+{{ debug . }}
 ```
 
 Override debug output globally, per layout, or per partial:
@@ -141,7 +140,7 @@ SSE is a writer layer, not a connector. Use it after deciding which partials cha
 events := partial.NewSSEWriter(w)
 
 notice := partial.NewID("notice", "notice.gohtml").
-    SetData(map[string]any{"Message": "Saved"})
+    SetDot(Notice{Message: "Saved"})
 
 _ = events.PatchPartial(r.Context(), r, "#notice", notice)
 _ = events.Signal("saved", true)
@@ -151,10 +150,10 @@ events.Flush()
 The writer declares constants for expected headers and event names, such as `SSEHeaderContentType`, `SSEContentTypeEventStream`, `SSEEventPatch`, `SSEEventSignal`, and `SSEEventError`.
 
 ## Basic Usage
-Here's a simple example of how to use the package to render a template.
+Here's a simple typed example. The template owns the contract, the handler supplies the model.
 
 ### 1. Create a Service
-The `Service` holds global configurations and data.
+The `Service` holds shared render configuration.
 
 ```go 
 cfg := &partial.Config{
@@ -168,9 +167,6 @@ service := partial.NewService(cfg)
 service.UseFuncs(template.FuncMap{
     "money": formatMoney,
 })
-service.SetData(map[string]any{
-    "AppName": "My Application",
-})
 
 ```
 
@@ -178,9 +174,6 @@ service.SetData(map[string]any{
 The `Layout` manages the overall structure of your templates.
 ```go
 layout := service.NewLayout()
-layout.SetData(map[string]any{
-    "PageTitle": "Home Page",
-})
 ```
 
 ### 3. Define Partials
@@ -188,16 +181,25 @@ Create `Partial` instances for the content and any other components.
 
 ```go 
 type ContentPage struct {
+    PageTitle string
     Message string
+}
+
+type LayoutPage struct {
+    AppName string
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
     // Create the main content partial
     content := partial.NewID("content", "templates/content.html").
-        SetDot(ContentPage{Message: "Welcome to our website!"})
+        SetDot(ContentPage{
+            PageTitle: "Home Page",
+            Message:   "Welcome to our website!",
+        })
     
     // Optionally, create a wrapper partial (layout)
-    wrapper := partial.NewID("wrapper", "templates/layout.html")
+    wrapper := partial.NewID("wrapper", "templates/layout.html").
+        SetDot(LayoutPage{AppName: "My Application"})
     
     layout.Set(content)
     layout.Wrap(wrapper)
@@ -217,35 +219,44 @@ templates/layout.html
 <!DOCTYPE html>
 <html>
 <head>
-    <title>{{.Layout.PageTitle}} - {{.Service.AppName}}</title>
+    <title>{{.AppName}}</title>
 </head>
 <body>
-    {{ slot "content" }}
+    {{ content }}
 </body>
 </html>
 ```
 templates/content.html
 ```html 
-<h1>{{.Message}}</h1>
+<h1>{{ .PageTitle }}</h1>
+<p>{{ .Message }}</p>
 ```
 
-Note: In the layout template, we use `{{ slot "content" }}` to render a registered region on demand.
+Note: When a layout wraps content, the wrapper renders the configured route partial by calling `{{ content }}`.
 
-
-### Using Global and Layout Data
-- **Global Data (ServiceData)**: Set on the Service, accessible via {{.Service}} in templates.
-- **Layout Data (LayoutData)**: Set on the Layout, accessible via {{.Layout}} in templates.
-- **Partial Data (Data)**: Set on individual Partial instances, accessible via {{.Data}} in templates.
-- **Dot Data**: Set with `SetDot`, accessible as the template root `.`.
 
 ### Accessing Data in Templates
 
-You can access data in your templates using dot notation:
+Use `SetDot` for application data:
 
-- **Partial Data**: `{{ .Data.Key }}`
-- **Dot Data**: `{{ .Key }}`
-- **Layout Data**: `{{ .Layout.Key }}`
-- **Global Data**: `{{ .Service.Key }}`
+```gotemplate
+{{ .PageTitle }}
+{{ .Message }}
+```
+
+For shared application values, put them on a typed model and declare them with go-doc `@model`:
+
+```gotemplate
+{{/*
+@model Service github.com/example/app.ServiceInfo
+*/}}
+
+{{ Service.AppName }}
+```
+
+```go
+wrapper.UseModels(serviceInfo)
+```
 
 When `SetDot` is used, request-specific values are available through helpers instead of fields on dot:
 
@@ -274,19 +285,9 @@ content := partial.NewID("content", "templates/dashboard.gohtml").
     UseModels(page)
 ```
 
-`UseModels` appends values inherited through the partial tree. `SetModels` replaces them for a specific render or cloned partial. Model names cannot collide with go-partial helpers such as `slot`, `locale`, `ctx`, or `url`.
+`UseModels` appends values to the models already inherited through the partial tree. Use it when a partial adds local models on top of parent models.
 
-
-### Wrapping Partials
-You can wrap a partial with another partial, such as wrapping content with a layout:
-
-```go
-// Create the wrapper partial (e.g., layout)
-layout := partial.New("templates/layout.html").ID("layout")
-
-// Wrap the content partial with the layout
-content.Wrap(layout)
-```
+Model names cannot collide with go-partial helpers such as `partial`, `locale`, `ctx`, or `url`.
 
 ## Template Composition
 For repeated sections that should be understood by go-doc and also render as HTMX targets, prefer native templates plus `SetDot`. The parent owns the loop, and the nested template receives the row as normal dot data:
@@ -318,23 +319,33 @@ table.WithTargetResolver(func(ctx context.Context, r *http.Request, target strin
 })
 ```
 
-`slot` renders registered regions such as layouts, selected regions, OOB regions, and error boundaries:
+For layout wrappers, render the route content through `content`:
 
 ```gotemplate
-<main>{{ slot "content" }}</main>
+<main>{{ content }}</main>
 ```
 
-Avoid using `partial` as a general row-composition helper in new code. Native `template` calls keep the template idiomatic and give go-doc the strongest type information. Use `slot` for named regions that should be addressable through the partial tree.
+Avoid using `partial` as a general row-composition helper in new code. Native `template` calls keep the template idiomatic and give go-doc the strongest type information. Use `partial` when you intentionally want to render a template path through go-partial's render path:
+
+```gotemplate
+{{ partial "templates/notice.gohtml" .Notice }}
+```
+
+Keep registered partials for HTMX targets, OOB output, selection/action rendering, and places where the browser can request a stable partial ID.
 
 ## Using Out-of-Band (OOB) Partials
 Out-of-Band partials allow you to update parts of the page without reloading:
 
 ### Defining an OOB Partial
 ```go
+type Footer struct {
+    Text string
+}
+
 // Create the OOB partial
 footer := partial.New("templates/footer.html").ID("footer")
-footer.SetData(map[string]any{
-    "Text": "This is the footer",
+footer.SetDot(Footer{
+    Text: "This is the footer",
 })
 
 // Add the OOB partial
@@ -346,19 +357,7 @@ In your templates, you can use the `oobAttr` function to conditionally render OO
 
 templates/footer.html
 ```html
-<div{{ oobAttr }} id="footer">{{ .Data.Text }}</div>
-```
-
-## Wrapping Partials
-You can wrap a partial with another partial, such as wrapping content with a layout.
-
-```go
-// Create the wrapper partial (e.g., layout)
-layoutPartial := partial.New("templates/layout.html").ID("layout")
-
-// Wrap the content partial with the layout
-content.Wrap(layoutPartial)
-
+<div{{ oobAttr }} id="footer">{{ .Text }}</div>
 ```
 
 ## Template Functions
@@ -372,13 +371,15 @@ funcs := template.FuncMap{
     "upper": strings.ToUpper,
 }
 
-// Add the functions for this partial tree
+// Merge the functions into this partial tree
 p.UseFuncs(funcs)
 ```
 
+`UseFuncs` merges helpers into the current scope. Function names inherited from the service or layout remain available, and protected go-partial helper names cannot be overwritten.
+
 ### Usage in Template:
 ```html
-{{ upper .Data.Message }}
+{{ upper .Message }}
 ```
 
 ### Using a Custom File System
@@ -445,14 +446,24 @@ tablePartial.WithTargetResolver(func(ctx context.Context, r *http.Request, targe
 out, err := layout.Set(tablePartial).RenderWithRequest(r.Context(), r)
 ```
 
+If the child does not need custom configuration, use `WithTemplate` as shorthand:
+
+```go
+tablePartial := partial.NewID("table", "templates/table.html").
+    WithTemplate("templates/row.html").
+    SetDot(TablePage{Rows: rows})
+```
+
+This is equivalent to `tablePartial.With(partial.NewID("row", "templates/row.html"))`.
+
 ## Template Data
-In your templates, you can access the following data:
+In your templates, prefer this model:
 
 - **{{.}}**: Your app model when the partial uses `SetDot`.
-- **{{.Data}}**: Data specific to this partial when no custom dot is set.
-- **{{.Service}}**: Global data available to all partials.
-- **{{.Layout}}**: Data specific to the layout.
+- **@model values**: Additional typed values registered with `UseModels`.
 - **{{ctx}}**, **{{request}}**, **{{url}}**, **{{locale}}**, **{{csrf}}**, **{{basePath}}**: request-aware helpers that stay available when `SetDot` changes `.`.
+
+The older map-wrapper APIs (`SetData`, `AddData`, and `MergeData`) are still available for tests and compatibility, but they are not the recommended v1 data model. They expose values through `.Data`, which go-doc cannot type as precisely as a real model.
 
 ## Concurrency and Template Caching
 The package includes concurrency safety measures for template caching:

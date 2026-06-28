@@ -6,12 +6,13 @@ The current model is intentionally close to normal Go templates:
 
 - Use native `{{ template "row.gohtml" . }}` for typed composition.
 - Use go-doc annotations such as `@model` and `@dot` so editors understand the values.
-- Use `slot` for named regions that are registered on a partial tree and can also be addressed by an HTMX-style target.
+- Use `content` inside layout wrappers to output the route content partial.
+- Use `partial` only when you intentionally want to render a template path through go-partial's render path.
 - Use interaction helpers such as `async`, `poll`, and `refresh` for client-side delivery behavior.
 
 ## Naming Rules
 
-Avoid user-defined helper or model names that collide with Go template actions or go-partial helpers, such as `range`, `if`, `len`, `ctx`, `request`, `url`, `locale`, `csrf`, `slot`, `partial`, `scoped`, `selection`, and `action`.
+Avoid user-defined helper or model names that collide with Go template actions or go-partial helpers, such as `range`, `if`, `len`, `ctx`, `request`, `url`, `locale`, `csrf`, `content`, `partial`, `selection`, and `action`.
 
 When a template uses `SetDot`, request-specific values are still available through helper functions instead of fields on dot.
 
@@ -19,16 +20,15 @@ When a template uses `SetDot`, request-specific values are still available throu
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
-| `slot` | Composition helper | Render a registered region by ID without passing ad-hoc values. |
-| `partial` | Composition helper | Render a registered partial with local scope values. Prefer native `template` for typed rows. |
-| `scoped` | Accessor | Read the local scope passed by `partial`. |
+| `content` | Layout helper | Render the content partial configured with `layout.Set(content).Wrap(wrapper)`. |
+| `partial` | Composition helper | Render a template path through go-partial's render path. Prefer native `template` for typed rows. |
 | `selection` | Helper | Render the selected partial from a `WithSelectMap` registration. |
 | `action` | Helper | Render the partial returned by an action callback. |
 | `async` | Interaction helper | Render connector-aware deferred loading markup for an endpoint. |
-| `reveal` | Interaction helper | Load an endpoint when the region enters the viewport. |
+| `reveal` | Interaction helper | Load an endpoint when the generated area enters the viewport. |
 | `poll` | Interaction helper | Refresh an endpoint on an interval. |
 | `on` | Interaction helper | Refresh an endpoint when a named browser event is dispatched. |
-| `stream` | Interaction helper | Declare a stream-backed region for clients that support it. |
+| `stream` | Interaction helper | Declare a stream-backed listener for clients that support it. |
 | `prefetch` | Interaction helper | Emit a prefetch hint. |
 | `refresh` | Interaction helper | Render a refresh control for an endpoint or target. |
 | `dict` | Data helper | Build a map when a template needs map-style values. |
@@ -85,17 +85,17 @@ table.WithTargetResolver(func(ctx context.Context, r *http.Request, target strin
 
 That gives you one template for three modes: inside a parent render, as a standalone render, and as an HTMX target response.
 
-## `slot`
+## Layout Content
 
-`slot` renders a registered region by ID:
+When a layout wraps a content partial, the wrapper renders that configured route partial with `content`:
 
 ```gotemplate
 <main>
-    {{ slot "content" }}
+    {{ content }}
 </main>
 ```
 
-Use it for layout regions, selected regions, out-of-band regions, and error-boundary sections where the ID is part of the partial tree. `slot` does not accept local key/value data. If a fragment needs local typed data, use native `template` instead.
+Use native `template` for typed composition inside the content partial. Register partials in Go when they also need to be renderable as HTMX targets or OOB output.
 
 ## go-doc `@model` Contracts With `UseModels`
 
@@ -133,33 +133,36 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 
 `ctx` returns a `partial.RenderContext` containing `Context`, `Request`, `URL`, `Loc`, `Locale`, `Csrf`, and `BasePath`.
 
-## `partial` And `scoped`
+## `partial`
 
-`partial` renders a registered partial and passes a small local scope into it. The callee reads that scope through `scoped`.
+`partial` renders a template path through go-partial's render path. This is useful when you want to render another template with request helpers, model registration, error fallback, and the configured filesystem/cache behavior, but you do not want to make that template part of the native parse tree.
 
 ```gotemplate
-{{ partial "notice" "Message" .FlashMessage }}
+{{ partial "templates/notice.gohtml" .Notice }}
 ```
 
 ```gotemplate
-<aside>{{ scoped.Message }}</aside>
+{{/*
+@dot github.com/example/app.Notice
+*/}}
+
+<aside>{{ .Message }}</aside>
 ```
 
-Use this for small component-style fragments where a map handoff is acceptable. For rows and larger fragments, prefer native `template` plus `@dot`, because that gives go-doc a real type contract.
+Arguments:
 
-Rules:
+- `{{ partial "templates/card.gohtml" }}` renders the path with the current partial context.
+- `{{ partial "templates/card.gohtml" .Card }}` renders the path with `.Card` as dot.
+- `{{ partial "templates/card.gohtml" "Title" "Hello" }}` renders the path with a small dot map, so the callee reads `{{ .Title }}`.
 
-- `scoped` is local to the current `partial` call.
-- `scoped` returns a shallow copy of the local data map.
-- `scoped` should not be used as application-wide data storage.
-- `partial` identifies registered partials by full partial ID.
+For rows and larger fragments, prefer native `template` plus `@dot`, because that gives go-doc the strongest type information. Use `partial` when the nested render should go through go-partial itself.
 
 ## `dict`
 
 `dict` builds a map for templates that need one.
 
 ```gotemplate
-{{ partial "notice" (dict "Message" .FlashMessage "Tone" "success") }}
+{{ partial "templates/notice.gohtml" (dict "Message" .FlashMessage "Tone" "success") }}
 ```
 
 Rules:
@@ -167,7 +170,7 @@ Rules:
 - arguments come in key/value pairs
 - keys must be strings
 - odd argument counts are errors
-- values are scoped to the callee
+- when passed as one argument to `partial`, the map becomes the callee's dot value
 
 ## Interaction Helpers
 
@@ -183,30 +186,30 @@ Interaction helpers render connector-aware loading or request markup for endpoin
 {{ refresh "/cart/summary" }}
 ```
 
-For configured interactions, build the value in Go and pass it through the partial's interaction context:
+For configured interactions, put the values on your typed page model:
 
 ```go
-content.SetInteractions(map[string]any{
-    "Stats": partial.Async("/stats").
-        ID("stats-loader").
-        Target("#stats").
-        Placeholder(""),
+type Page struct {
+    Interact PageInteractions
+}
 
-    "Notifications": partial.Poll("/notifications").
-        Every(10 * time.Second),
+type PageInteractions struct {
+    Stats         partial.Interaction
+    Notifications partial.Interaction
+    CartChanged   partial.Interaction
+    CartRefresh   partial.Interaction
+}
 
-    "CartChanged": partial.On("cart:changed", "/cart/summary").
-        Target("#cart"),
+page := Page{
+    Interact: PageInteractions{
+        Stats:         partial.Async("/stats").ID("stats-loader").Target("#stats"),
+        Notifications: partial.Poll("/notifications").Every(10 * time.Second),
+        CartChanged:   partial.On("cart:changed", "/cart/summary").Target("#cart"),
+        CartRefresh:   partial.Refresh("/cart/summary").Target("#cart").Swap(partial.SwapOuterHTML),
+    },
+}
 
-    "Cart": partial.Async("/cart/summary").
-        ID("cart").
-        Target("#cart"),
-
-    "CartRefresh": partial.Refresh("/cart/summary").
-        Target("#cart").
-        Swap(partial.SwapOuterHTML).
-        Placeholder("Refresh cart"),
-})
+content.SetDot(page)
 ```
 
 ```gotemplate
@@ -239,7 +242,7 @@ row := partial.Async("/table/row/:row").Param("row", row.ID)
 {{ async "/table/row/:row" "row" .ID }}
 ```
 
-Interaction helpers are deferred client-side loading, not blocking server-side execution. Use native `template`, `slot`, or `partial` when the current server render should include the markup immediately.
+Interaction helpers are deferred client-side loading, not blocking server-side execution. Use native `template` or `partial` when the current server render should include the markup immediately.
 
 ## `selection`
 
@@ -335,7 +338,6 @@ Safe to cache:
 Not safe to cache by default:
 
 - rendered HTML
-- `scoped` values
 - request data and application values
 - dynamic target lookup results
 

@@ -10,7 +10,7 @@
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">events := partial.NewSSEWriter(w)
 
 notice := partial.NewID("notice", "templates/notice.gohtml").
-    SetData(map[string]any{"Message": "Saved"})
+    SetDot(Notice{Message: "Saved"})
 
 _ = events.PatchPartial(r.Context(), r, "#notice", notice)
 _ = events.Signal("saved", true)

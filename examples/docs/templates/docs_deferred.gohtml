@@ -19,22 +19,26 @@
 &lt;/div&gt;</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Configured in Go</h2>
-    <p class="leading-7 text-slate-400">When configuration gets more specific, build the interaction in the controller and expose it through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Interact</code>.</p>
+    <p class="leading-7 text-slate-400">When configuration gets more specific, build the interaction in the controller and expose it on your typed page model.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetInteractions(map[string]any{
-    "Stats": partial.Async("/stats").
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Page struct {
+    Stats partial.Interaction
+}
+
+content.SetDot(Page{
+    Stats: partial.Async("/stats").
         ID("stats").
         Placeholder(""),
 })</code></pre>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async .Interact.Stats }}" }}</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async .Stats }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Route parameters</h2>
     <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">:name</code> placeholders in the endpoint and pass matching key/value pairs. Values are path-escaped before they are inserted into the URL.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async \"/table/row/:row\" \"row\" .Data.Row.ID }}" }}</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async \"/table/row/:row\" \"row\" .Row.ID }}" }}</code></pre>
 
-    <p class="leading-7 text-slate-400">For <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Data.Row.ID == 42</code>, the helper asks the connector to render deferred markup for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">/table/row/42</code>.</p>
+    <p class="leading-7 text-slate-400">For <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Row.ID == 42</code>, the helper asks the connector to render deferred markup for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">/table/row/42</code>.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Server endpoint</h2>
     <p class="leading-7 text-slate-400">The endpoint returns normal HTML. With the default <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">innerHTML</code> swap, return the content that should live inside the generated interaction element.</p>
@@ -42,14 +46,12 @@
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">func row(w http.ResponseWriter, r *http.Request) {
     row := loadRow(r.PathValue("row"))
 
-    content := partial.NewID("async-row", "templates/row.gohtml").SetData(map[string]any{
-        "Row": row,
-    })
+    content := partial.NewID("async-row", "templates/row.gohtml").SetDot(row)
 
     _ = content.WriteWithRequest(r.Context(), w, r)
 }</code></pre>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;strong&gt;{{ "{{ .Data.Row.Name }}" }}&lt;/strong&gt;</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;strong&gt;{{ "{{ .Name }}" }}&lt;/strong&gt;</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Connector behavior</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
@@ -63,6 +65,6 @@
     </table>
 
     <h2 class="text-xl font-bold text-slate-50">Not await</h2>
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code> does not run a goroutine and does not block template execution. If a template needs blocking server-side composition, use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">slot</code>, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>. If a section can load after the shell is visible, use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code>.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code> does not run a goroutine and does not block template execution. If a template needs blocking server-side composition, use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> or an intentional <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code> render. If a section can load after the shell is visible, use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code>.</p>
 </article>
 

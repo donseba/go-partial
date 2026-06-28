@@ -157,9 +157,9 @@ func benchmarkRows(count int) []benchmarkRow {
 
 func benchmarkFS() *inMemoryFS {
 	return &inMemoryFS{Files: map[string]string{
-		"templates/layout.gohtml":  `<!doctype html><html><body><header>{{ .Service.App }}</header>{{ slot "content" }}{{ slot "notice" }}</body></html>`,
-		"templates/content.gohtml": `<section><h1>{{ .Data.Title }}</h1><table>{{ range .Data.Rows }}{{ partial "row" "Row" . "Owner" $.Data.Owner }}{{ end }}</table></section>`,
-		"templates/row.gohtml":     `<tr id="row-{{ scoped.Row.ID }}"><td>{{ scoped.Row.Name }}</td><td>{{ scoped.Row.Price }}</td><td>{{ scoped.Row.Status }}</td><td>{{ scoped.Owner }}</td></tr>`,
+		"templates/layout.gohtml":  `<!doctype html><html><body><header>{{ .Service.App }}</header>{{ content }}</body></html>`,
+		"templates/content.gohtml": `<section><h1>{{ .Data.Title }}</h1><table>{{ range .Data.Rows }}{{ template "row.gohtml" (dict "Row" . "Owner" $.Data.Owner) }}{{ end }}</table></section>`,
+		"templates/row.gohtml":     `<tr id="row-{{ .Row.ID }}"><td>{{ .Row.Name }}</td><td>{{ .Row.Price }}</td><td>{{ .Row.Status }}</td><td>{{ .Owner }}</td></tr>`,
 		"templates/notice.gohtml":  `<aside id="notice"{{ oobAttr }}>{{ .Data.Message }}</aside>`,
 		"templates/simple.gohtml":  `<article><h1>{{ .Data.Title }}</h1><p>{{ .Data.Body }}</p></article>`,
 	}}

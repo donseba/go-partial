@@ -28,25 +28,39 @@
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async \"/stats\" }}" }}</code></pre>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetInteractions(map[string]any{
-    "Stats": partial.Async("/stats").
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Page struct {
+    Interact Interactions
+}
+
+type Interactions struct {
+    Stats         partial.Interaction
+    Notifications partial.Interaction
+    CartChanged   partial.Interaction
+    Cart          partial.Interaction
+    CartRefresh   partial.Interaction
+}
+
+content.SetDot(Page{
+    Interact: Interactions{
+        Stats: partial.Async("/stats").
         ID("stats-loader").
         Target("#stats").
         Placeholder(""),
 
-    "Notifications": partial.Poll("/notifications").
+        Notifications: partial.Poll("/notifications").
         Every(10 * time.Second),
 
-    "CartChanged": partial.On("cart:changed", "/cart/summary").
+        CartChanged: partial.On("cart:changed", "/cart/summary").
         Target("#cart").
         Placeholder(""),
 
-    "Cart": partial.Async("/cart/summary").ID("cart"),
+        Cart: partial.Async("/cart/summary").ID("cart"),
 
-    "CartRefresh": partial.Refresh("/cart/summary").
+        CartRefresh: partial.Refresh("/cart/summary").
         Target("#cart").
         Swap(partial.SwapOuterHTML).
         Placeholder("Refresh cart"),
+    },
 })</code></pre>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async .Interact.Stats }}" }}
@@ -61,7 +75,7 @@
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">row := partial.Async("/table/row/:row").Param("row", row.ID)</code></pre>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async .Interact.RowLoader }}" }}
-{{ "{{ async \"/table/row/:row\" \"row\" .Data.Row.ID }}" }}</code></pre>
+{{ "{{ async \"/table/row/:row\" \"row\" .Row.ID }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Custom markup</h2>
     <p class="leading-7 text-slate-400">The default renderer is intentionally simple. Applications can replace it globally, per layout, or per partial. The connector still supplies the protocol attributes, so your renderer owns the element, classes, loading state, and accessibility text.</p>
@@ -84,9 +98,11 @@
     <h2 class="text-xl font-bold text-slate-50">Event-driven refresh</h2>
     <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">on</code> listens for a named browser event and requests a server-rendered partial when that event occurs. With HTMX, custom events default to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">from:body</code>, which works well when application code dispatches events globally.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetInteractions(map[string]any{
-    "CartChanged": partial.On("cart:changed", "/cart/summary").
-        Target("#cart"),
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetDot(Page{
+    Interact: Interactions{
+        CartChanged: partial.On("cart:changed", "/cart/summary").
+            Target("#cart"),
+    },
 })</code></pre>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button onclick="document.body.dispatchEvent(new CustomEvent('cart:changed'))"&gt;

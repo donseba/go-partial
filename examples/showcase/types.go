@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"sync"
 
 	partial "github.com/donseba/go-partial"
@@ -14,7 +15,7 @@ type Row struct {
 	Owner  string
 }
 
-type ScopedRowsPage struct {
+type RowsPage struct {
 	Title string
 	Rows  []Row
 }
@@ -45,8 +46,9 @@ type AsyncRow struct {
 }
 
 type DebugPage struct {
-	Title   string
-	Payload map[string]any
+	Title       string
+	Payload     map[string]any
+	CustomDebug template.HTML
 }
 
 type DebugCustomPage struct {
@@ -60,6 +62,9 @@ type FlowPage struct {
 	CurrentStep string
 	Validated   map[string]bool
 	Error       string
+	Account     FlowAccountPage
+	Details     FlowDetailsPage
+	Confirm     FlowConfirmPage
 }
 
 type FlowAccountPage struct {
@@ -167,6 +172,7 @@ type Product struct {
 type ShopPage struct {
 	Title        string
 	Items        []Product
+	Cart         CartSummary
 	Start        int
 	Next         int
 	Done         bool
@@ -201,6 +207,11 @@ type HeaderPage struct {
 	Now     string
 	Nav     []NavItem
 	Joke    string
+}
+
+type ShellPage struct {
+	AppName string
+	Header  HeaderPage
 }
 
 type App struct {

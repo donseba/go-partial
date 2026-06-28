@@ -10,15 +10,15 @@ import (
 	partial "github.com/donseba/go-partial"
 )
 
-func (app *App) scoped(w http.ResponseWriter, r *http.Request) {
+func (app *App) rowsPage(w http.ResponseWriter, r *http.Request) {
 	content := app.tablePartial()
 	app.renderPartial(w, r, content)
 }
 
 func (app *App) tablePartial() *partial.Partial {
 	rowPartial := partial.NewID("row", "templates/row.gohtml")
-	content := partial.NewID("content", "templates/scoped.gohtml").SetDot(ScopedRowsPage{
-		Title: "Scoped rows",
+	content := partial.NewID("content", "templates/rows.gohtml").SetDot(RowsPage{
+		Title: "Typed rows",
 		Rows:  app.rows,
 	})
 	content.With(rowPartial)

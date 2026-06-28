@@ -114,6 +114,7 @@ func (app *App) shopPartial(w http.ResponseWriter, r *http.Request, id string, s
 	content := partial.NewID(id, templateName).SetDot(ShopPage{
 		Title:        "Webshop",
 		Items:        items,
+		Cart:         app.cartSummary(sessionID, false),
 		Start:        start,
 		Next:         end,
 		Done:         end >= len(app.products),

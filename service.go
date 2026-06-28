@@ -138,8 +138,11 @@ func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
 	return svc
 }
 
-// UseFuncs adds template functions to the Service.
-func (svc *Service) UseFuncs(funcMap template.FuncMap) {
+// UseFuncs merges template functions into the Service.
+func (svc *Service) UseFuncs(funcMap template.FuncMap) *Service {
+	if svc == nil {
+		return nil
+	}
 	svc.funcsLock.Lock()
 	defer svc.funcsLock.Unlock()
 
@@ -148,6 +151,7 @@ func (svc *Service) UseFuncs(funcMap template.FuncMap) {
 		maps.Copy(svc.customFuncs, customFuncs)
 		svc.hasCustomFunctions = true
 	}
+	return svc
 }
 
 func (svc *Service) getStaticFuncMap() template.FuncMap {
@@ -241,6 +245,7 @@ func (l *Layout) SetErrorMode(mode ErrorMode) *Layout {
 func (l *Layout) Set(p *Partial) *Layout {
 	l.content = p
 	l.applyConfigToPartial(l.content)
+	l.attachContentToWrapper()
 	return l
 }
 
@@ -248,7 +253,16 @@ func (l *Layout) Set(p *Partial) *Layout {
 func (l *Layout) Wrap(p *Partial) *Layout {
 	l.wrapper = p
 	l.applyConfigToPartial(l.wrapper)
+	l.attachContentToWrapper()
 	return l
+}
+
+func (l *Layout) attachContentToWrapper() {
+	if l.wrapper == nil || l.content == nil {
+		return
+	}
+	l.wrapper.With(l.content)
+	l.wrapper.layoutContentID = l.content.id
 }
 
 // SetData sets the data for the layout.
@@ -263,8 +277,11 @@ func (l *Layout) AddData(key string, value any) *Layout {
 	return l
 }
 
-// UseFuncs adds template functions to the Layout.
-func (l *Layout) UseFuncs(funcMap template.FuncMap) {
+// UseFuncs merges template functions into the Layout.
+func (l *Layout) UseFuncs(funcMap template.FuncMap) *Layout {
+	if l == nil {
+		return nil
+	}
 	l.funcsLock.Lock()
 	defer l.funcsLock.Unlock()
 
@@ -273,6 +290,7 @@ func (l *Layout) UseFuncs(funcMap template.FuncMap) {
 		maps.Copy(l.customFuncs, customFuncs)
 		l.hasCustomFunctions = true
 	}
+	return l
 }
 
 func (l *Layout) getStaticFuncMap() template.FuncMap {
@@ -297,11 +315,8 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 	}
 
 	if l.wrapper != nil {
-		l.wrapper.With(l.content)
-		// Render the wrapper
 		return l.wrapper.RenderWithRequest(ctx, r)
 	} else {
-		// Render the content directly
 		return l.content.RenderWithRequest(ctx, r)
 	}
 }
@@ -328,8 +343,6 @@ func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if l.wrapper != nil {
-		l.wrapper.With(l.content)
-
 		err := l.wrapper.WriteWithRequest(ctx, w, r)
 		if err != nil {
 			if l.service.config.Logger != nil {

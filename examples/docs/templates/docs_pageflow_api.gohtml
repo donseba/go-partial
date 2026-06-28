@@ -73,10 +73,16 @@ saveFlowSession(w, session)</code></pre>
     <h2 class="text-xl font-bold text-slate-50">Rendering shape</h2>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">current := flow.CurrentStep(session)
 
-content := partial.NewID("content", "flow.gohtml").SetData(map[string]any{
-    "Steps":       flow.Steps,
-    "CurrentStep": current.Name,
-    "Validated":   session.Validated,
+type FlowPage struct {
+    Steps       []partial.FlowStep
+    CurrentStep string
+    Validated   map[string]bool
+}
+
+content := partial.NewID("content", "flow.gohtml").SetDot(FlowPage{
+    Steps:       flow.Steps,
+    CurrentStep: current.Name,
+    Validated:   session.Validated,
 })
 
 for _, step := range flow.Steps {

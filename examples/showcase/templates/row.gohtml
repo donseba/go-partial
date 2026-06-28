@@ -8,6 +8,6 @@
     <td class="border-b border-stone-300 px-3 py-2.5 align-middle"><span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ .Status }}</span></td>
     <td class="border-b border-stone-300 px-3 py-2.5 align-middle">{{ .Owner }}</td>
     <td class="border-b border-stone-300 px-3 py-2.5 align-middle w-px whitespace-nowrap">
-        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" hx-get="/scoped/refresh-row?id={{ .ID }}" hx-target="#row-{{ .ID }}" hx-swap="outerHTML">Refresh row</button>
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" hx-get="/rows/refresh-row?id={{ .ID }}" hx-target="#row-{{ .ID }}" hx-swap="outerHTML">Refresh row</button>
     </td>
 </tr>

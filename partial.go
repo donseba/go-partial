@@ -31,6 +31,7 @@ var (
 		"async":           {},
 		"and":             {},
 		"context":         {},
+		"content":         {},
 		"ctx":             {},
 		"dict":            {},
 		"debug":           {},
@@ -61,7 +62,6 @@ var (
 		"request":         {},
 		"reveal":          {},
 		"slice":           {},
-		"slot":            {},
 		"stream":          {},
 		"urlquery":        {},
 		"actionHeader":    {},
@@ -75,7 +75,6 @@ var (
 		"targetValue":     {},
 		"csrf":            {},
 		"locale":          {},
-		"scoped":          {},
 		"selection":       {},
 		"url":             {},
 		"urlContains":     {},
@@ -91,6 +90,7 @@ var (
 		"actionValue",
 		"async",
 		"context",
+		"content",
 		"ctx",
 		"debug",
 		"joinPath",
@@ -104,12 +104,10 @@ var (
 		"refresh",
 		"request",
 		"reveal",
-		"scoped",
 		"selection",
 		"selectionHeader",
 		"selectionIs",
 		"selectionValue",
-		"slot",
 		"stream",
 		"targetHeader",
 		"targetIs",
@@ -138,11 +136,12 @@ type (
 
 	errorFragmentContextKey struct{}
 
-	// Partial represents a renderable component with optional registered regions and data.
+	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
 		id                    string
 		parent                *Partial
 		request               *http.Request
+		layoutContentID       string
 		renderOOB             bool
 		alwaysSwapOOB         bool
 		fs                    fs.FS
@@ -160,9 +159,7 @@ type (
 		dotSet                bool
 		models                []any
 		layoutData            map[string]any
-		globalData            map[string]any
 		serviceData           map[string]any
-		interact              map[string]any
 		responseHeaders       map[string]string
 		response              connector.Response
 		errorRenderer         ErrorRenderer
@@ -197,16 +194,12 @@ type (
 		Data map[string]any
 		// Dot contains the explicit root value used when the template is executed with SetDot.
 		Dot any
-		// Interact contains client interaction declarations for the current partial.
-		Interact map[string]any
 		// Service contains data configured on the Service.
 		Service map[string]any
 		// Layout contains data configured on the current Layout.
 		Layout map[string]any
-		// Global contains data inherited through the partial tree.
+		// Global contains data inherited from ancestor partials.
 		Global map[string]any
-		// Parent contains the immediate parent partial's data.
-		Parent map[string]any
 		// Loc contains the request localizer.
 		Loc Localizer
 		// Csrf contains the request CSRF token.
@@ -225,9 +218,6 @@ type (
 		Csrf     CsrfToken
 		BasePath string
 	}
-
-	// GlobalData represents the global data available to all partials.
-	GlobalData map[string]any
 
 	TargetResolver func(ctx context.Context, r *http.Request, target string) (*Partial, map[string]any, bool)
 
@@ -338,9 +328,7 @@ func New(templates ...string) *Partial {
 		templateFuncSignature: templateFuncSignature(functions),
 		data:                  make(map[string]any),
 		layoutData:            make(map[string]any),
-		globalData:            make(map[string]any),
 		serviceData:           make(map[string]any),
-		interact:              make(map[string]any),
 		children:              make(map[string]*Partial),
 		oobChildren:           make(map[string]struct{}),
 		fs:                    os.DirFS("./"),
@@ -470,12 +458,6 @@ func (p *Partial) ID(id string) *Partial {
 	return p
 }
 
-// Templates sets the templates for the partial.
-func (p *Partial) Templates(templates ...string) *Partial {
-	p.templates = templates
-	return p
-}
-
 // Reset resets the partial to its initial state.
 func (p *Partial) Reset() *Partial {
 	p.data = make(map[string]any)
@@ -483,9 +465,7 @@ func (p *Partial) Reset() *Partial {
 	p.dotSet = false
 	p.models = nil
 	p.layoutData = make(map[string]any)
-	p.globalData = make(map[string]any)
 	p.serviceData = make(map[string]any)
-	p.interact = make(map[string]any)
 	p.children = make(map[string]*Partial)
 	p.oobChildren = make(map[string]struct{})
 
@@ -601,44 +581,9 @@ func (p *Partial) UseModels(values ...any) *Partial {
 	return p
 }
 
-// SetModels replaces the model values used for @model declarations.
-func (p *Partial) SetModels(values ...any) *Partial {
-	if p == nil {
-		return nil
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.models = slices.Clone(values)
-	return p
-}
-
 // AddData adds data to the partial.
 func (p *Partial) AddData(key string, value any) *Partial {
 	p.data[key] = value
-	return p
-}
-
-// SetInteractions sets client interaction declarations for the partial.
-func (p *Partial) SetInteractions(interactions map[string]any) *Partial {
-	if p == nil {
-		return nil
-	}
-	p.interact = interactions
-	if p.interact == nil {
-		p.interact = make(map[string]any)
-	}
-	return p
-}
-
-// AddInteraction adds one client interaction declaration for the partial.
-func (p *Partial) AddInteraction(name string, interaction any) *Partial {
-	if p == nil {
-		return nil
-	}
-	if p.interact == nil {
-		p.interact = make(map[string]any)
-	}
-	p.interact[name] = interaction
 	return p
 }
 
@@ -721,8 +666,11 @@ func (p *Partial) SetAlwaysSwapOOB(alwaysSwapOOB bool) *Partial {
 	return p
 }
 
-// UseFuncs adds template functions to the Partial.
-func (p *Partial) UseFuncs(funcMap template.FuncMap) {
+// UseFuncs merges template functions into the Partial.
+func (p *Partial) UseFuncs(funcMap template.FuncMap) *Partial {
+	if p == nil {
+		return nil
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -744,6 +692,7 @@ func (p *Partial) UseFuncs(funcMap template.FuncMap) {
 	}
 	maps.Copy(p.customFuncs, customFuncs)
 	p.templateFuncSignature = templateFuncSignature(p.staticFuncs)
+	return p
 }
 
 // SetLogger sets the logger for the partial.
@@ -764,43 +713,58 @@ func (p *Partial) UseTemplateCache(useCache bool) *Partial {
 	return p
 }
 
-// SetGlobalData sets the global data for the partial.
-func (p *Partial) SetGlobalData(data map[string]any) *Partial {
-	p.globalData = data
-	return p
-}
+// With registers a child partial on the partial tree.
+//
+// Registered children are addressable by ID for partial requests. During a
+// full render, go-partial also includes child templates that are referenced by
+// native Go template calls, such as {{ template "row.gohtml" . }}.
+func (p *Partial) With(child *Partial) *Partial {
+	if p == nil || child == nil {
+		return p
+	}
 
-// SetLayoutData sets the layout data for the partial.
-func (p *Partial) SetLayoutData(data map[string]any) *Partial {
-	p.layoutData = data
-	return p
-}
-
-// AddTemplate adds a template to the partial.
-func (p *Partial) AddTemplate(template string) *Partial {
-	p.templates = append(p.templates, template)
-	return p
-}
-
-// With registers a named region partial on the partial tree.
-func (p *Partial) With(region *Partial) *Partial {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.children[region.id] = region
-	p.children[region.id].globalData = p.globalData
-	p.children[region.id].serviceData = p.serviceData
-	p.children[region.id].parent = p
+	p.children[child.id] = child
+	p.children[child.id].serviceData = p.serviceData
+	p.children[child.id].parent = p
 
 	return p
 }
 
-// WithAction adds callback action to the partial, which can do some logic and return a partial to render.
+// WithTemplate creates a child partial from a template path and registers it
+// on the partial tree. The child ID is inferred from the file name without its
+// extension: "templates/sidebar.gohtml" becomes "sidebar".
+func (p *Partial) WithTemplate(templatePath string) *Partial {
+	return p.With(NewID(inferTemplateID(templatePath), templatePath))
+}
+
+func inferTemplateID(templatePath string) string {
+	normalized := strings.ReplaceAll(templatePath, `\`, `/`)
+	base := path.Base(strings.Trim(normalized, `/`))
+	if base == "." || base == "/" || base == "" {
+		return strings.Trim(templatePath, `/\`)
+	}
+	ext := path.Ext(base)
+	if ext == "" {
+		return base
+	}
+	return strings.TrimSuffix(base, ext)
+}
+
+// WithAction registers a pre-render resolver.
+//
+// The resolver runs before this partial renders. It can inspect request data,
+// perform application work, and return a different partial to render.
 func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
 	p.action = action
 	return p
 }
 
+// WithTemplateAction registers the callback used by the {{ action }} helper.
+//
+// Use this when the template decides where the action result should appear.
 func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
 	p.templateAction = templateAction
 	return p
@@ -829,17 +793,15 @@ func (p *Partial) WithTargetResolver(resolver TargetResolver) *Partial {
 	return p
 }
 
-// SetParent sets the parent of the partial.
-func (p *Partial) SetParent(parent *Partial) *Partial {
-	p.parent = parent
-	return p
-}
+// WithOOB registers an out-of-band child partial on the partial tree.
+func (p *Partial) WithOOB(child *Partial) *Partial {
+	if p == nil || child == nil {
+		return p
+	}
 
-// WithOOB registers an out-of-band region partial on the partial tree.
-func (p *Partial) WithOOB(region *Partial) *Partial {
-	p.With(region)
+	p.With(child)
 	p.mu.Lock()
-	p.oobChildren[region.id] = struct{}{}
+	p.oobChildren[child.id] = struct{}{}
 	p.mu.Unlock()
 
 	return p
@@ -1049,7 +1011,7 @@ func (p *Partial) getRequestFuncMap(data *Data) template.FuncMap {
 
 func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 	funcs["partial"] = partialFunc(p, data)
-	funcs["slot"] = slotFunc(p, data)
+	funcs["content"] = contentFunc(p, data)
 	funcs["async"] = interactionFunc(p, data, connector.InteractionAsync)
 	funcs["reveal"] = interactionFunc(p, data, connector.InteractionReveal)
 	funcs["poll"] = interactionFunc(p, data, connector.InteractionPoll)
@@ -1133,10 +1095,6 @@ func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 		return data.Ctx
 	}
 
-	funcs["scoped"] = func() map[string]any {
-		return copyDataMap(data.Data)
-	}
-
 	funcs["targetHeader"] = func() string {
 		return p.getConnector().GetTargetHeader()
 	}
@@ -1204,7 +1162,7 @@ func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 func placeholderRequestFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"partial":         func(string, ...any) template.HTML { return "" },
-		"slot":            func(string) template.HTML { return "" },
+		"content":         func() template.HTML { return "" },
 		"async":           func(any, ...any) template.HTML { return "" },
 		"reveal":          func(any, ...any) template.HTML { return "" },
 		"poll":            func(any, ...any) template.HTML { return "" },
@@ -1227,7 +1185,6 @@ func placeholderRequestFuncMap() template.FuncMap {
 		"joinPath":        func(...string) string { return "" },
 		"urlPath":         func(string, ...string) template.URL { return "" },
 		"context":         func() context.Context { return nil },
-		"scoped":          func() map[string]any { return nil },
 		"targetHeader":    func() string { return "" },
 		"targetValue":     func() string { return "" },
 		"targetIs":        func(...string) bool { return false },
@@ -1290,7 +1247,7 @@ func (p *Partial) getGlobalData() map[string]any {
 	if p.parent != nil {
 		return p.parent.getGlobalDataMergedWithOwn()
 	}
-	return p.globalData
+	return map[string]any{}
 }
 
 func (p *Partial) getGlobalDataMergedWithOwn() map[string]any {
@@ -1321,13 +1278,6 @@ func (p *Partial) getServiceData() map[string]any {
 		return merged
 	}
 	return p.serviceData
-}
-
-func (p *Partial) getParentData() map[string]any {
-	if p.parent != nil {
-		return maps.Clone(p.parent.data)
-	}
-	return nil
 }
 
 func (p *Partial) getBasePath() string {
@@ -1578,7 +1528,7 @@ func (p *Partial) renderResolvedTarget(ctx context.Context, r *http.Request, tar
 	return out, true, nil
 }
 
-// recursiveChildLookup looks up a registered region recursively.
+// recursiveChildLookup looks up a registered child recursively.
 func (p *Partial) recursiveChildLookup(id string, visited map[string]bool) *Partial {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -1601,29 +1551,24 @@ func (p *Partial) recursiveChildLookup(id string, visited map[string]bool) *Part
 	return nil
 }
 
-func (p *Partial) renderChildPartial(ctx context.Context, id string, data map[string]any) (template.HTML, error) {
+func (p *Partial) renderChildPartial(ctx context.Context, id string) (template.HTML, error) {
 	p.mu.RLock()
 	child, ok := p.children[id]
 	p.mu.RUnlock()
 	if !ok {
-		p.getLogger().Warn("region partial not found", "id", id)
+		p.getLogger().Warn("child partial not found", "id", id)
 		return "", nil
 	}
 
-	// Clone the region partial to avoid modifying the original and prevent data races.
+	// Clone the child partial to avoid modifying the original and prevent data races.
 	childClone := child.clone()
 
-	// Set the parent of the cloned region to the current partial.
+	// Set the parent of the cloned child to the current partial.
 	childClone.parent = p
-
-	// If additional data is provided, set it on the cloned region partial.
-	if data != nil {
-		childClone.MergeData(data, true)
-	}
 
 	out, err := childClone.renderSelf(ctx, p.GetRequest())
 	if err != nil {
-		childClone.getLogger().Error("error rendering region partial", "id", id, "error", err)
+		childClone.getLogger().Error("error rendering child partial", "id", id, "error", err)
 		fallback, fallbackErr := childClone.renderErrorFragment(ctx, p.GetRequest(), err)
 		if fallbackErr != nil {
 			return "", fallbackErr
@@ -1667,11 +1612,9 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		Ctx:      ctx,
 		Data:     p.data,
 		Dot:      p.dot,
-		Interact: p.interact,
 		Global:   p.getGlobalData(),
 		Service:  p.getServiceData(),
 		Layout:   p.getLayoutData(),
-		Parent:   p.getParentData(),
 		Loc:      getLocalizer(ctx),
 		Csrf:     getCsrfToken(ctx),
 	}
@@ -2054,6 +1997,7 @@ func (p *Partial) clone() *Partial {
 		id:                    p.id,
 		parent:                p.parent,
 		request:               p.request,
+		layoutContentID:       p.layoutContentID,
 		renderOOB:             p.renderOOB,
 		alwaysSwapOOB:         p.alwaysSwapOOB,
 		fs:                    p.fs,
@@ -2073,9 +2017,7 @@ func (p *Partial) clone() *Partial {
 		dotSet:                p.dotSet,
 		models:                slices.Clone(p.models),
 		layoutData:            maps.Clone(p.layoutData),
-		globalData:            maps.Clone(p.globalData),
 		serviceData:           maps.Clone(p.serviceData),
-		interact:              maps.Clone(p.interact),
 		response:              p.response,
 		errorRenderer:         p.errorRenderer,
 		debugRenderer:         p.debugRenderer,

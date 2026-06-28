@@ -5,7 +5,7 @@
     <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">A page is a partial tree. A layout wraps content, registered regions keep stable IDs, and HTMX can request one target without losing the surrounding model.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Layout plus content</h2>
-    <p class="leading-7 text-slate-400">The layout owns the page shell. The content partial owns the route-specific body. For a normal request, the wrapper renders pre-registered regions through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ slot \"content\" }}" }}</code>. For an HTMX request, the connector can render only the requested target.</p>
+    <p class="leading-7 text-slate-400">The layout owns the page shell. The content partial owns the route-specific body. For a normal request, the wrapper renders the configured route partial with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ content }}" }}</code>. For an HTMX request, the connector can render only the requested target.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">wrapper := partial.NewID("layout", "layout.gohtml")
 content := partial.NewID("content", "pages/dashboard.gohtml")
@@ -15,15 +15,15 @@ layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
     <h2 class="text-xl font-bold text-slate-50">Registered regions</h2>
     <p class="leading-7 text-slate-400">Register regions in Go when they need a stable ID for layouts, out-of-band rendering, or HTMX target requests.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.With(partial.NewID("stats", "partials/stats.gohtml"))</code></pre>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ slot \"stats\" }}" }}</code></pre>
-    <p class="leading-7 text-slate-400">For typed row and component composition, prefer Go's native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> action with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">@dot</code>. Keep <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">slot</code> for named regions rather than arbitrary data handoffs.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ template \"stats.gohtml\" .Stats }}" }}</code></pre>
+    <p class="leading-7 text-slate-400">For typed row and component composition, prefer Go's native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> action with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">@dot</code>. Register partials in Go when those templates also need stable HTMX target IDs.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Request rendering flow</h2>
     <ol>
         <li>The route creates the content partial and any registered regions needed for that request.</li>
         <li>The layout applies service configuration: filesystem, connector, function map, logger, cache, service data, and error renderer.</li>
         <li>The connector decides whether this is a full render or a partial render.</li>
-        <li>For a full render, the wrapper renders the page shell and named slots.</li>
+        <li>For a full render, the wrapper renders the page shell and calls the configured content partial.</li>
         <li>For a partial render, go-partial renders the requested target and appends any out-of-band ancestors that should update too.</li>
     </ol>
 

@@ -25,9 +25,9 @@
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">wrapper.WithOOB(
     partial.NewID("header", "templates/header.gohtml").
-        SetData(map[string]any{
-            "Nav": app.navItems(),
-            "Joke": app.programmerJoke(),
+        SetDot(HeaderPage{
+            Nav: app.navItems(),
+            Joke: app.programmerJoke(),
         }).
         SetAlwaysSwapOOB(true),
 )</code></pre>

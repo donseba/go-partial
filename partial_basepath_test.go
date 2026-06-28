@@ -13,7 +13,8 @@ func TestGetBasePathSimple(t *testing.T) {
 func TestGetBasePathParentFallback(t *testing.T) {
 	parent := New()
 	parent.SetBasePath("/parent")
-	child := New().SetParent(parent)
+	child := NewID("child")
+	parent.With(child)
 	if got := child.GetBasePath(); got != "/parent" {
 		t.Errorf("expected /parent, got %q", got)
 	}
@@ -22,8 +23,10 @@ func TestGetBasePathParentFallback(t *testing.T) {
 func TestGetBasePathParentChain(t *testing.T) {
 	grandparent := New()
 	grandparent.SetBasePath("/grand")
-	parent := New().SetParent(grandparent)
-	child := New().SetParent(parent)
+	parent := NewID("parent")
+	child := NewID("child")
+	grandparent.With(parent)
+	parent.With(child)
 	if got := child.GetBasePath(); got != "/grand" {
 		t.Errorf("expected /grand, got %q", got)
 	}
@@ -32,7 +35,8 @@ func TestGetBasePathParentChain(t *testing.T) {
 func TestGetBasePathOverride(t *testing.T) {
 	parent := New()
 	parent.SetBasePath("/parent")
-	child := New().SetParent(parent)
+	child := NewID("child")
+	parent.With(child)
 	child.SetBasePath("/child")
 	if got := child.GetBasePath(); got != "/child" {
 		t.Errorf("expected /child, got %q", got)

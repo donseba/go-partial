@@ -3,7 +3,7 @@ package main
 func (app *App) navItems() []NavItem {
 	return []NavItem{
 		{Path: "/", Label: "Home", Group: "Start"},
-		{Path: "/scoped", Label: "Scoped rows", Group: "Core rendering"},
+		{Path: "/rows", Label: "Typed rows", Group: "Core rendering"},
 		{Path: "/context", Label: "Context", Group: "Core rendering"},
 		{Path: "/localization", Label: "Localization", Group: "Core rendering"},
 		{Path: "/selection", Label: "Selection", Group: "Interactions"},

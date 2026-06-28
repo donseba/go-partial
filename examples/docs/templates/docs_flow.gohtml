@@ -35,12 +35,21 @@ session.SetStepValidated("account", true)
 session.Current = "details"</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Render the current step</h2>
-    <p class="leading-7 text-slate-400">Register each step partial as a named region of the flow content partial. The template can render the current step by name.</p>
+    <p class="leading-7 text-slate-400">Register each step as a partial on the flow content partial when it needs its own ID for partial-request routing. The template can still render the current step with native Go template calls.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content := partial.NewID("content", "flow.gohtml").SetData(map[string]any{
-    "Steps":       flow.Steps,
-    "CurrentStep": flow.CurrentStep(session).Name,
-    "Validated":   session.Validated,
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type FlowPage struct {
+    Steps       []partial.FlowStep
+    CurrentStep string
+    Validated   map[string]bool
+    Account     AccountStep
+    Details     DetailsStep
+    Confirm     ConfirmStep
+}
+
+content := partial.NewID("content", "flow.gohtml").SetDot(FlowPage{
+    Steps:       flow.Steps,
+    CurrentStep: flow.CurrentStep(session).Name,
+    Validated:   session.Validated,
 })
 
 for _, step := range flow.Steps {
@@ -48,14 +57,20 @@ for _, step := range flow.Steps {
 }</code></pre>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;aside&gt;
-{{ "{{ range .Data.Steps }}" }}
-    &lt;span class="{{"{{ if eq $.Data.CurrentStep .Name }}" }}active{{ "{{ end }}" }}"&gt;
+{{ "{{ range .Steps }}" }}
+    &lt;span class="{{"{{ if eq $.CurrentStep .Name }}" }}active{{ "{{ end }}" }}"&gt;
         {{ "{{ .Name }}" }}
     &lt;/span&gt;
 {{ "{{ end }}" }}
 &lt;/aside&gt;
 
-{{ "{{ slot .Data.CurrentStep }}" }}</code></pre>
+{{ "{{ if eq .CurrentStep \"account\" }}" }}
+    {{ "{{ template \"flow_account.gohtml\" .Account }}" }}
+{{ "{{ else if eq .CurrentStep \"details\" }}" }}
+    {{ "{{ template \"flow_details.gohtml\" .Details }}" }}
+{{ "{{ else if eq .CurrentStep \"confirm\" }}" }}
+    {{ "{{ template \"flow_confirm.gohtml\" .Confirm }}" }}
+{{ "{{ end }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Validation and navigation</h2>
     <p class="leading-7 text-slate-400">Validation lives on the step because each step usually has different form rules. Navigation is explicit: after validation succeeds, set the session state and advance the flow.</p>

@@ -22,27 +22,16 @@ func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
 		Prefetch:       partial.Prefetch("/interactions/async"),
 		Reveal:         partial.Reveal("/interactions/reveal"),
 	}
+
+	asyncPartial := partial.NewID("async-interactions", "templates/interaction_result_inner.gohtml")
+
 	content := partial.NewID("content", "templates/interactions.gohtml").
 		SetDot(InteractionPage{
 			Title:    "Interaction helpers",
 			Interact: interactions,
-		}).
-		SetInteractions(interactions.Map())
-	app.renderPartial(w, r, content)
-}
+		}).With(asyncPartial)
 
-func (set InteractionSet) Map() map[string]any {
-	return map[string]any{
-		"Async":          set.Async,
-		"Poll":           set.Poll,
-		"On":             set.On,
-		"Refresh":        set.Refresh,
-		"Profile":        set.Profile,
-		"ProfileRefresh": set.ProfileRefresh,
-		"Stream":         set.Stream,
-		"Prefetch":       set.Prefetch,
-		"Reveal":         set.Reveal,
-	}
+	app.renderPartial(w, r, content)
 }
 
 func (app *App) interactionsAsync(w http.ResponseWriter, r *http.Request) {

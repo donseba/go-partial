@@ -63,12 +63,17 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 
 func (app *App) wrapper() *partial.Partial {
 	wrapper := partial.NewID("layout", "templates/layout.gohtml")
-	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(HeaderPage{
+	header := HeaderPage{
 		AppName: "go-partial showcase",
 		Now:     time.Now().Format("02 Jan 06 15:04 MST"),
 		Nav:     app.navItems(),
 		Joke:    app.programmerJoke(),
-	}).SetAlwaysSwapOOB(true))
+	}
+	wrapper.SetDot(ShellPage{
+		AppName: "go-partial showcase",
+		Header:  header,
+	})
+	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true))
 	return wrapper
 }
 

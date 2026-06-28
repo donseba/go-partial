@@ -307,21 +307,17 @@ func TestDebugUsesCustomDebugRenderer(t *testing.T) {
 	}
 }
 
-func TestChildDebugRendererSurvivesClone(t *testing.T) {
+func TestTemplatePathPartialDebugRendererSurvivesClone(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("parent.gohtml", `{{ slot "child" }}`)
+	fsys.AddFile("parent.gohtml", `{{ partial "child.gohtml" }}`)
 	fsys.AddFile("child.gohtml", `{{ debug .Data.Name }}`)
 
-	child := NewID("child", "child.gohtml").
+	parent := NewID("parent", "parent.gohtml").
 		SetFileSystem(fsys).
 		SetData(map[string]any{"Name": "Ada"}).
 		SetDebugRenderer(func(ctx context.Context, p *Partial, data *Data, value any) (template.HTML, error) {
 			return template.HTML(`<aside class="child-debug">` + value.(string) + `</aside>`), nil
 		})
-
-	parent := NewID("parent", "parent.gohtml").
-		SetFileSystem(fsys).
-		With(child)
 
 	out, err := parent.Render(context.Background())
 	if err != nil {
@@ -376,19 +372,25 @@ func TestAsyncRendersHTMXDeferredMarkup(t *testing.T) {
 }
 
 func TestAsyncAcceptsInteractionConfig(t *testing.T) {
+	type pageData struct {
+		Interact struct {
+			Stats Interaction
+		}
+	}
+	page := pageData{}
+	page.Interact.Stats = Async("/stats").
+		ID("stats-loader").
+		Target("#stats").
+		Swap(SwapOuterHTML).
+		Placeholder("")
+
 	fsys := &inMemoryFS{}
 	fsys.AddFile("async.gohtml", `{{ async .Interact.Stats }}`)
 
 	p := NewID("async", "async.gohtml").
 		SetConnector(connector.NewHTMX(nil)).
 		SetFileSystem(fsys).
-		SetInteractions(map[string]any{
-			"Stats": Async("/stats").
-				ID("stats-loader").
-				Target("#stats").
-				Swap(SwapOuterHTML).
-				Placeholder(""),
-		})
+		SetDot(page)
 
 	out, err := p.Render(context.Background())
 	if err != nil {
@@ -465,18 +467,24 @@ func TestOnRendersHTMXEventMarkup(t *testing.T) {
 }
 
 func TestOnAcceptsInteractionConfig(t *testing.T) {
+	type pageData struct {
+		Interact struct {
+			CartChanged Interaction
+		}
+	}
+	page := pageData{}
+	page.Interact.CartChanged = On("cart:changed", "/cart/summary").
+		ID("cart-listener").
+		Target("#cart").
+		From("window")
+
 	fsys := &inMemoryFS{}
 	fsys.AddFile("on.gohtml", `{{ on .Interact.CartChanged }}`)
 
 	p := NewID("on", "on.gohtml").
 		SetConnector(connector.NewHTMX(nil)).
 		SetFileSystem(fsys).
-		SetInteractions(map[string]any{
-			"CartChanged": On("cart:changed", "/cart/summary").
-				ID("cart-listener").
-				Target("#cart").
-				From("window"),
-		})
+		SetDot(page)
 
 	out, err := p.Render(context.Background())
 	if err != nil {

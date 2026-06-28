@@ -18,7 +18,13 @@
             {{ end }}
         </aside>
         <section class="min-w-0">
-            {{ slot .CurrentStep }}
+            {{ if eq .CurrentStep "account" }}
+                {{ template "flow_account.gohtml" .Account }}
+            {{ else if eq .CurrentStep "details" }}
+                {{ template "flow_details.gohtml" .Details }}
+            {{ else if eq .CurrentStep "confirm" }}
+                {{ template "flow_confirm.gohtml" .Confirm }}
+            {{ end }}
         </section>
     </div>
 
@@ -49,6 +55,12 @@ flow.Next(session)</code></pre>
     &lt;/div&gt;
 {{ "{{ end }}" }}
 
-{{ "{{ slot .CurrentStep }}" }}</code></pre>
+{{ "{{ if eq .CurrentStep \"account\" }}" }}
+    {{ "{{ template \"flow_account.gohtml\" .Account }}" }}
+{{ "{{ else if eq .CurrentStep \"details\" }}" }}
+    {{ "{{ template \"flow_details.gohtml\" .Details }}" }}
+{{ "{{ else if eq .CurrentStep \"confirm\" }}" }}
+    {{ "{{ template \"flow_confirm.gohtml\" .Confirm }}" }}
+{{ "{{ end }}" }}</code></pre>
     </article>
 </section>

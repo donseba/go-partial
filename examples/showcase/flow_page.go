@@ -104,12 +104,18 @@ func (app *App) flowPartial(flow *partial.PageFlow, session *partial.FlowSession
 	if current != nil {
 		currentName = current.Name
 	}
+	email, _ := session.GetStepData("account")["email"].(string)
+	name, _ := session.GetStepData("details")["name"].(string)
+	plan, _ := session.GetStepData("details")["plan"].(string)
 	content := partial.NewID("content", "templates/flow.gohtml").SetDot(FlowPage{
 		Title:       "Page flow",
 		Steps:       flow.Steps,
 		CurrentStep: currentName,
 		Validated:   session.Validated,
 		Error:       errorMessage,
+		Account:     FlowAccountPage{Email: email, Error: errorMessage},
+		Details:     FlowDetailsPage{Name: name, Plan: plan, Error: errorMessage},
+		Confirm:     FlowConfirmPage{AllData: session.GetAllData()},
 	})
 	for _, step := range flow.Steps {
 		content.With(step.Partial)

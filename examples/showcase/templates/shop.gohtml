@@ -6,7 +6,7 @@
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Composable commerce</span>
         <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
         <p class="leading-7 text-stone-600">Fifty server-rendered products, endless loading, cart actions, and out-of-band cart updates.</p>
-        {{ slot "shop-cart-button" }}
+        {{ template "shop_cart_button.gohtml" .Cart }}
     </header>
 
     <section class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5" id="shop-grid">
@@ -36,7 +36,7 @@
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content := partial.NewID("content", "templates/shop.gohtml").
-    SetDot(ShopPage{Title: "Webshop", Items: items})
+    SetDot(ShopPage{Title: "Webshop", Items: items, Cart: cart})
 
 content.With(partial.NewID("shop-item", "templates/shop_item.gohtml"))
 content.With(app.shopCartButtonPartial(sessionID))</code></pre>

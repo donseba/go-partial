@@ -23,8 +23,8 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 	}
 
 	fsys := &inMemoryFS{}
-	fsys.AddFile("table.gohtml", `<table><tbody>{{ range .Data.Rows }}{{ partial "row" (dict "Row" .) }}{{ end }}</tbody></table>`)
-	fsys.AddFile("row.gohtml", `<tr id="row-{{ scoped.Row.ID }}"><td>{{ scoped.Row.Name }}</td></tr>`)
+	fsys.AddFile("table.gohtml", `<table><tbody>{{ range .Data.Rows }}{{ template "row.gohtml" . }}{{ end }}</tbody></table>`)
+	fsys.AddFile("row.gohtml", `<tr id="row-{{ .ID }}"><td>{{ .Name }}</td></tr>`)
 
 	table := NewID("content", "table.gohtml").
 		SetFileSystem(fsys).
@@ -41,7 +41,7 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 		}
 		for _, candidate := range rows {
 			if candidate.ID == id {
-				return rowPartial, map[string]any{"Row": candidate}, true
+				return NewID(target, "row.gohtml").SetFileSystem(fsys).SetDot(candidate), nil, true
 			}
 		}
 		return nil, nil, false

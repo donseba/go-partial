@@ -1,5 +1,5 @@
 {{/*
-@dot github.com/donseba/go-partial/examples/showcase.ScopedRowsPage
+@dot github.com/donseba/go-partial/examples/showcase.RowsPage
 */}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
@@ -34,7 +34,7 @@
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">row := partial.NewID("row", "templates/row.gohtml")
-table := partial.NewID("content", "templates/scoped.gohtml").SetDot(page)
+table := partial.NewID("content", "templates/rows.gohtml").SetDot(page)
 table.With(row)
 table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
     row := findRow(target)

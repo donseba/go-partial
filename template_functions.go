@@ -3,6 +3,7 @@ package partial
 import (
 	"fmt"
 	"html/template"
+	"io/fs"
 	"maps"
 	"net/url"
 	"strings"
@@ -321,27 +322,77 @@ func selectionFunc(p *Partial, data *Data) func() template.HTML {
 
 func partialFunc(p *Partial, data *Data) func(id string, args ...any) template.HTML {
 	return func(id string, args ...any) template.HTML {
-		d, ok := scopedDataArg(p, id, args...)
-		if !ok {
-			return template.HTML(fmt.Sprintf("invalid scoped data for partial '%s'", id))
+		if templatePath, ok := partialTemplatePath(p, id); ok {
+			child := p.clone()
+			child.id = templatePath
+			child.parent = p
+			child.templates = []string{templatePath}
+
+			if ok := applyPartialTemplateArgs(child, id, args...); !ok {
+				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
+			}
+
+			html, err := child.renderSelf(data.Ctx, p.GetRequest())
+			if err != nil {
+				child.getLogger().Error("error rendering template partial", "path", templatePath, "error", err)
+				fallback, fallbackErr := child.renderErrorFragment(data.Ctx, p.GetRequest(), err)
+				if fallbackErr != nil {
+					return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, fallbackErr))
+				}
+				return fallback
+			}
+
+			return html
 		}
 
-		html, err := p.renderChildPartial(data.Ctx, id, d)
-		if err != nil {
-			p.getLogger().Error("error rendering partial", "id", id, "error", err)
-			return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, err))
-		}
-
-		return html
+		p.getLogger().Warn("partial template path not found", "path", id)
+		return template.HTML(template.HTMLEscapeString(fmt.Sprintf("partial template '%s' not found", id)))
 	}
 }
 
-func slotFunc(p *Partial, data *Data) func(id string) template.HTML {
-	return func(id string) template.HTML {
-		html, err := p.renderChildPartial(data.Ctx, id, nil)
+func partialTemplatePath(p *Partial, name string) (string, bool) {
+	templatePath := strings.TrimSpace(strings.ReplaceAll(name, `\`, `/`))
+	templatePath = strings.TrimLeft(templatePath, "/")
+	if templatePath == "" {
+		return "", false
+	}
+
+	info, err := fs.Stat(p.getFS(), templatePath)
+	if err != nil || info.IsDir() {
+		return "", false
+	}
+
+	return templatePath, true
+}
+
+func applyPartialTemplateArgs(p *Partial, id string, args ...any) bool {
+	switch len(args) {
+	case 0:
+		return true
+	case 1:
+		p.SetDot(args[0])
+		return true
+	}
+
+	dot, ok := partialDotMapArg(p, id, args...)
+	if !ok {
+		return false
+	}
+	p.SetDot(dot)
+	return true
+}
+
+func contentFunc(p *Partial, data *Data) func() template.HTML {
+	return func() template.HTML {
+		if p.layoutContentID == "" {
+			p.getLogger().Warn("content helper used outside layout wrapper", "id", p.id)
+			return template.HTML("content is only available on layout wrappers")
+		}
+
+		html, err := p.renderChildPartial(data.Ctx, p.layoutContentID)
 		if err != nil {
-			p.getLogger().Error("error rendering slot", "id", id, "error", err)
-			return template.HTML(fmt.Sprintf("error rendering slot '%s': %v", id, err))
+			p.getLogger().Error("error rendering layout content", "id", p.layoutContentID, "error", err)
+			return template.HTML(fmt.Sprintf("error rendering content: %v", err))
 		}
 
 		return html
@@ -560,32 +611,22 @@ func sanitizeInteractionID(value string) string {
 	return out
 }
 
-func scopedDataArg(p *Partial, id string, args ...any) (map[string]any, bool) {
-	if len(args) == 0 {
-		return nil, true
-	}
-	if len(args) == 1 {
-		if scoped, ok := args[0].(map[string]any); ok {
-			return scoped, true
-		}
-		p.getLogger().Warn("invalid scoped data for partial, pass a map or key/value pairs", "id", id, "type", fmt.Sprintf("%T", args[0]))
-		return nil, false
-	}
+func partialDotMapArg(p *Partial, id string, args ...any) (map[string]any, bool) {
 	if len(args)%2 != 0 {
-		p.getLogger().Warn("invalid scoped data for partial, pass key/value pairs", "id", id)
+		p.getLogger().Warn("invalid dot data for partial, pass key/value pairs", "id", id)
 		return nil, false
 	}
 
-	scoped := make(map[string]any, len(args)/2)
+	dot := make(map[string]any, len(args)/2)
 	for i := 0; i < len(args); i += 2 {
 		key, ok := args[i].(string)
 		if !ok {
-			p.getLogger().Warn("invalid scoped data key for partial", "id", id, "type", fmt.Sprintf("%T", args[i]))
+			p.getLogger().Warn("invalid dot data key for partial", "id", id, "type", fmt.Sprintf("%T", args[i]))
 			return nil, false
 		}
-		scoped[key] = args[i+1]
+		dot[key] = args[i+1]
 	}
-	return scoped, true
+	return dot, true
 }
 
 func debugFunc(p *Partial, data *Data) func(value any) template.HTML {

@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
@@ -30,15 +29,10 @@ func main() {
 	app.service.UseFuncs(showcaseTranslationFunctions())
 	app.service.SetInteractionRenderer(showcaseInteractionRenderer())
 
-	app.service.SetData(map[string]any{
-		"AppName": "go-partial showcase",
-		"Now":     time.Now().Format(time.RFC822),
-	})
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)
-	mux.HandleFunc("/scoped", app.scoped)
-	mux.HandleFunc("/scoped/refresh-row", app.refreshRow)
+	mux.HandleFunc("/rows", app.rowsPage)
+	mux.HandleFunc("/rows/refresh-row", app.refreshRow)
 	mux.HandleFunc("/selection", app.selection)
 	mux.HandleFunc("/tabs", app.tabs)
 	mux.HandleFunc("/action", app.action)
@@ -71,6 +65,7 @@ func main() {
 	mux.HandleFunc("/shop/cart/remove", app.shopCartRemove)
 	mux.HandleFunc("/shop/cart/open", app.shopCartOpen)
 	mux.HandleFunc("/error", app.errorPage)
+	mux.HandleFunc("/error/section", app.errorSection)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("examples/showcase/static"))))
 
 	log.Println("showcase running on http://localhost:8090")

@@ -1,22 +1,22 @@
 {{/*
-@dot github.com/donseba/go-partial.Data
+@dot github.com/donseba/go-partial/examples/showcase.ShellPage
 */}}
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ .Service.AppName }}</title>
+    <title>{{ .AppName }}</title>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
     <link rel="stylesheet" href="/static/site.css">
 </head>
 <body class="m-0 bg-[#f5f5f1] font-sans text-stone-900">
     <div class="grid min-h-screen grid-cols-[248px_minmax(0,1fr)] bg-[#f5f5f1] text-stone-900">
-        {{ slot "header" }}
+        {{ template "header.gohtml" .Header }}
 
         <main id="content" class="w-full max-w-6xl px-8 py-9 pb-24">
-            {{ slot "content" }}
+            {{ content }}
         </main>
     </div>
 

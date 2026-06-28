@@ -182,32 +182,33 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	}
 }
 
-func TestChildTemplateErrorRendersSectionFallbackInFullPage(t *testing.T) {
+func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ slot "content" }}</main><footer>Footer</footer></body></html>`)
+	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ content }}</main><footer>Footer</footer></body></html>`)
 	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
 
 	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
-	content := NewID("content", "broken.gohtml").SetFileSystem(fsys)
+	content := NewID("content", "broken.gohtml").
+		SetFileSystem(fsys).
+		SetConnector(connector.NewHTMX(nil))
 	wrapper.With(content)
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
+	req.Header.Set(connector.HTMXHeaderRequest.String(), "true")
+	req.Header.Set(connector.HeaderTarget.String(), "content")
 	rec := httptest.NewRecorder()
 
-	err := wrapper.WriteWithRequest(context.Background(), rec, req)
-	if err != nil {
-		t.Fatalf("expected layout to survive child error, got %v", err)
+	err := content.WriteWithRequest(context.Background(), rec, req)
+	if err == nil {
+		t.Fatal("expected original render error")
 	}
 
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected surviving page status 200, got %d", rec.Code)
-	}
-	if !strings.Contains(body, "<header>Header</header>") || !strings.Contains(body, "<footer>Footer</footer>") {
-		t.Fatalf("expected surrounding layout to render, got %q", body)
+		t.Fatalf("expected swappable fragment status 200, got %d", rec.Code)
 	}
 	if !strings.Contains(body, `class="go-partial-error"`) {
-		t.Fatalf("expected child error fragment, got %q", body)
+		t.Fatalf("expected target error fragment, got %q", body)
 	}
 	if strings.Contains(body, "<!doctype html>") {
 		t.Fatalf("expected section fallback, got full error document: %q", body)
