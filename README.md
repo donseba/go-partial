@@ -1,4 +1,7 @@
-# Go Partial - Partial Page Rendering for Go
+<p align="center">
+    <img src="./assets/go-partial-logo.png" alt="go-partial" width="420">
+</p>
+
 
 This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with layout wrapping, connector headers, OOB output, caching, and typed template-friendly data flow.
 ## Features
@@ -72,10 +75,10 @@ content.SetErrorRenderer(partial.DefaultErrorRenderer())
 `RenderWithRequest` still returns the render error directly. The fallback page is written by `WriteWithRequest`.
 
 ## Localization
-Templates receive a request localizer as `.Loc`. The core interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.UseFuncs`:
+Templates receive a request localizer as `.Loc`. The core interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:
 
 ```go
-service.UseFuncs(translator.FuncMap())
+service.SetFunc(translator.FuncMap())
 ```
 
 ```go
@@ -164,7 +167,7 @@ cfg := &partial.Config{
 }
 
 service := partial.NewService(cfg)
-service.UseFuncs(template.FuncMap{
+service.SetFunc(template.FuncMap{
     "money": formatMoney,
 })
 
@@ -255,7 +258,7 @@ For shared application values, put them on a typed model and declare them with g
 ```
 
 ```go
-wrapper.UseModels(serviceInfo)
+wrapper.SetModel(serviceInfo)
 ```
 
 When `SetDot` is used, request-specific values are available through helpers instead of fields on dot:
@@ -269,8 +272,8 @@ When `SetDot` is used, request-specific values are available through helpers ins
 {{ basePath }}
 ```
 
-## Contract Models
-go-partial can register go-doc `@model` declarations before parsing templates. The declaration owns the template name, while the controller only supplies typed values:
+## Typed Contracts
+go-partial can register go-doc typed root declarations before parsing templates. The declaration owns the template name, while the controller supplies the matching Go value:
 
 ```gotemplate
 {{/*
@@ -282,12 +285,33 @@ go-partial can register go-doc `@model` declarations before parsing templates. T
 
 ```go
 content := partial.NewID("content", "templates/dashboard.gohtml").
-    UseModels(page)
+    SetModel(page)
 ```
 
-`UseModels` appends values to the models already inherited through the partial tree. Use it when a partial adds local models on top of parent models.
+`SetModel` appends values to the typed roots already inherited through the partial tree. Use it when a partial adds local models on top of parent models. `SetContract(annotation, values...)` does the same thing for custom annotation names.
 
-Model names cannot collide with go-partial helpers such as `partial`, `locale`, `ctx`, or `url`.
+When more than one root has the same Go type, bind by name:
+
+```gotemplate
+{{/*
+@interaction LikesPoll github.com/donseba/go-partial.Interaction
+@interaction LikeButton github.com/donseba/go-partial.Interaction
+*/}}
+
+{{ poll LikesPoll }}
+{{ refresh LikeButton }}
+```
+
+```go
+content.SetInteraction(
+    partial.Poll("/posts/42/likes").As("LikesPoll").Every(5*time.Second),
+    partial.Refresh("/posts/42/likes").As("LikeButton").Target("#likes"),
+)
+```
+
+`SetInteraction` is the shorthand for `@interaction` roots. Use `As(name)` when the endpoint does not naturally produce the contract name; otherwise the last endpoint segment is capitalized, so `/stats` becomes `Stats`. `SetContract(annotation, values...)` handles custom typed root annotations by type.
+
+Contract names cannot collide with go-partial helpers such as `partial`, `locale`, `ctx`, or `url`.
 
 ## Template Composition
 For repeated sections that should be understood by go-doc and also render as HTMX targets, prefer native templates plus `SetDot`. The parent owns the loop, and the nested template receives the row as normal dot data:
@@ -372,10 +396,10 @@ funcs := template.FuncMap{
 }
 
 // Merge the functions into this partial tree
-p.UseFuncs(funcs)
+p.SetFunc(funcs)
 ```
 
-`UseFuncs` merges helpers into the current scope. Function names inherited from the service or layout remain available, and protected go-partial helper names cannot be overwritten.
+`SetFunc` registers helpers in the current scope. Function names inherited from the service or layout remain available, and protected go-partial helper names cannot be overwritten.
 
 ### Usage in Template:
 ```html
@@ -460,7 +484,7 @@ This is equivalent to `tablePartial.With(partial.NewID("row", "templates/row.htm
 In your templates, prefer this model:
 
 - **{{.}}**: Your app model when the partial uses `SetDot`.
-- **@model values**: Additional typed values registered with `UseModels`.
+- **Typed roots**: Additional typed values registered with `SetModel`, `SetInteraction`, or `SetContract`.
 - **{{ctx}}**, **{{request}}**, **{{url}}**, **{{locale}}**, **{{csrf}}**, **{{basePath}}**: request-aware helpers that stay available when `SetDot` changes `.`.
 
 The older map-wrapper APIs (`SetData`, `AddData`, and `MergeData`) are still available for tests and compatibility, but they are not the recommended v1 data model. They expose values through `.Data`, which go-doc cannot type as precisely as a real model.

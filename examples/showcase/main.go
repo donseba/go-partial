@@ -26,7 +26,7 @@ func main() {
 		carts:        make(map[string]map[int]int),
 		flowSessions: make(map[string]*partial.FlowSessionData),
 	}
-	app.service.UseFuncs(showcaseTranslationFunctions())
+	app.service.SetFunc(showcaseTranslationFunctions())
 	app.service.SetInteractionRenderer(showcaseInteractionRenderer())
 
 	mux := http.NewServeMux()

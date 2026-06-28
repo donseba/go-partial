@@ -11,25 +11,24 @@ import (
 )
 
 func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
-	interactions := InteractionSet{
-		Async:          partial.Async("/interactions/async"),
-		Poll:           partial.Poll("/interactions/poll").Every(3 * time.Second),
-		On:             partial.On("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
-		Refresh:        partial.Refresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
-		Profile:        partial.Async("/interactions/profile").ID("profile"),
-		ProfileRefresh: partial.Refresh("/interactions/profile").ID("profile-refresh").Target("#profile").Placeholder("Refresh profile"),
-		Stream:         partial.Stream("/interactions/stream").Placeholder("Waiting for stream..."),
-		Prefetch:       partial.Prefetch("/interactions/async"),
-		Reveal:         partial.Reveal("/interactions/reveal"),
-	}
-
 	asyncPartial := partial.NewID("async-interactions", "templates/interaction_result_inner.gohtml")
 
 	content := partial.NewID("content", "templates/interactions.gohtml").
 		SetDot(InteractionPage{
-			Title:    "Interaction helpers",
-			Interact: interactions,
-		}).With(asyncPartial)
+			Title: "Interaction helpers",
+		}).
+		SetInteraction(
+			partial.Async("/interactions/async"),
+			partial.Poll("/interactions/poll").Every(3*time.Second),
+			partial.On("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
+			partial.Refresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
+			partial.Async("/interactions/profile").ID("profile"),
+			partial.Refresh("/interactions/profile").As("ProfileRefresh").ID("profile-refresh").Target("#profile").Placeholder("Refresh profile"),
+			partial.Stream("/interactions/stream").Placeholder("Waiting for stream..."),
+			partial.Prefetch("/interactions/async").As("Prefetch"),
+			partial.Reveal("/interactions/reveal"),
+		).
+		With(asyncPartial)
 
 	app.renderPartial(w, r, content)
 }

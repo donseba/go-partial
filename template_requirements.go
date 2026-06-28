@@ -20,9 +20,14 @@ var builtinFuncs = map[string]bool{
 }
 
 var (
-	modelContractPattern   = regexp.MustCompile(`(?m)@model\s+([A-Za-z_][A-Za-z0-9_]*)\s+([^\s]+)`)
+	typedRootPattern       = regexp.MustCompile(`(?m)^\s*@([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s+([^\s]+)`)
 	templateCommentPattern = regexp.MustCompile(`(?s)\{\{/\*(.*?)\*/\}\}`)
 )
+
+type typedRootContract struct {
+	Annotation string
+	Type       string
+}
 
 func RequiredFuncs(name, src string) ([]string, error) {
 	tree := parse.New(name)
@@ -158,23 +163,39 @@ func definedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 	return found
 }
 
-func modelContractsFromFS(fsys fs.FS, names []string) (map[string]string, error) {
-	contracts := make(map[string]string)
+func typedRootContractsFromFS(fsys fs.FS, names []string) (map[string]typedRootContract, error) {
+	contracts := make(map[string]typedRootContract)
 	for _, name := range names {
 		content, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return nil, err
 		}
-		for _, match := range modelContractPattern.FindAllStringSubmatch(contractScanText(string(content)), -1) {
-			modelName := strings.TrimSpace(match[1])
-			typeName := normalizeContractType(strings.TrimSpace(match[2]))
-			if previous, exists := contracts[modelName]; exists && previous != typeName {
-				return nil, fmt.Errorf("@model %s is declared as both %s and %s", modelName, previous, typeName)
+		for _, match := range typedRootPattern.FindAllStringSubmatch(contractScanText(string(content)), -1) {
+			annotation := strings.TrimSpace(match[1])
+			if reservedContractAnnotation(annotation) {
+				continue
 			}
-			contracts[modelName] = typeName
+			rootName := strings.TrimSpace(match[2])
+			typeName := normalizeContractType(strings.TrimSpace(match[3]))
+			if previous, exists := contracts[rootName]; exists && previous.Type != typeName {
+				return nil, fmt.Errorf("@%s %s is declared as both %s and %s", annotation, rootName, previous.Type, typeName)
+			}
+			contracts[rootName] = typedRootContract{
+				Annotation: annotation,
+				Type:       typeName,
+			}
 		}
 	}
 	return contracts, nil
+}
+
+func reservedContractAnnotation(name string) bool {
+	switch name {
+	case "dot", "func", "gen":
+		return true
+	default:
+		return false
+	}
 }
 
 func contractScanText(src string) string {

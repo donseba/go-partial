@@ -24,13 +24,13 @@ ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
 _ = content.WriteWithRequest(ctx, w, r)</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Register translation functions</h2>
-    <p class="leading-7 text-slate-400">The translation behavior should live in the service template function map. go-partial does not own a translation API; add the functions your application wants with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Service.UseFuncs</code>.</p>
+    <p class="leading-7 text-slate-400">The translation behavior should live in the service template function map. go-partial does not own a translation API; add the functions your application wants with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Service.SetFunc</code>.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
     Connector:   connector.NewHTMX(nil),
     FS:          os.DirFS("web"),
 })
-svc.UseFuncs(myTranslations.FuncMap())</code></pre>
+svc.SetFunc(myTranslations.FuncMap())</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Use it in templates</h2>
     <p class="leading-7 text-slate-400">This keeps the localizer interface small. The functions receive <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Loc</code>, read its locale, and resolve the translation however the provider wants.</p>
@@ -52,7 +52,7 @@ _ = tr.AddLanguage("nl_NL")
 svc := partial.NewService(&partial.Config{
     Connector:   connector.NewHTMX(nil),
 })
-svc.UseFuncs(tr.FuncMap())</code></pre>
+svc.SetFunc(tr.FuncMap())</code></pre>
 
     <p class="leading-7 text-slate-400">This keeps the core package out of translation semantics. Your translation package owns pluralization, context, fallback language, catalog loading, and missing-key behavior.</p>
 

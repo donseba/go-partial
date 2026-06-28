@@ -14,13 +14,13 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"reflect"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
 	"sync"
 
-	godocrenderer "github.com/donseba/go-doc/renderer"
 	"github.com/donseba/go-partial/connector"
 )
 
@@ -138,43 +138,38 @@ type (
 
 	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
-		id                    string
-		parent                *Partial
-		request               *http.Request
-		layoutContentID       string
-		renderOOB             bool
-		alwaysSwapOOB         bool
-		fs                    fs.FS
-		logger                Logger
-		connector             connector.Connector
-		useCache              bool
-		templates             []string
-		staticFuncs           template.FuncMap
-		customFuncs           template.FuncMap
-		templateFuncSignature string
-		hasCustomFunctions    bool
-		basePath              string
-		data                  map[string]any
-		dot                   any
-		dotSet                bool
-		models                []any
-		layoutData            map[string]any
-		serviceData           map[string]any
-		responseHeaders       map[string]string
-		response              connector.Response
-		errorRenderer         ErrorRenderer
-		debugRenderer         DebugRenderer
-		interactionRenderer   InteractionRenderer
-		templateCache         *templateStore
-		errorMode             ErrorMode
-		errorModeSet          bool
-		targetResolver        TargetResolver
-		mu                    sync.RWMutex
-		children              map[string]*Partial
-		oobChildren           map[string]struct{}
-		selection             *Selection
-		templateAction        func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
-		action                func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		id                  string
+		parent              *Partial
+		request             *http.Request
+		layoutContentID     string
+		renderOOB           bool
+		alwaysSwapOOB       bool
+		fs                  fs.FS
+		logger              Logger
+		connector           connector.Connector
+		useCache            bool
+		templates           []string
+		staticFuncs         template.FuncMap
+		basePath            string
+		data                map[string]any
+		contracts           []ContractInformation
+		layoutData          map[string]any
+		serviceData         map[string]any
+		responseHeaders     map[string]string
+		response            connector.Response
+		errorRenderer       ErrorRenderer
+		debugRenderer       DebugRenderer
+		interactionRenderer InteractionRenderer
+		templateCache       *templateStore
+		errorMode           ErrorMode
+		errorModeSet        bool
+		targetResolver      TargetResolver
+		mu                  sync.RWMutex
+		children            map[string]*Partial
+		oobChildren         map[string]struct{}
+		selection           *Selection
+		templateAction      func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		action              func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
 	}
 
 	Selection struct {
@@ -182,7 +177,11 @@ type (
 		Default  string
 	}
 
-	// Data represents the data available to the partial.
+	// Data is the internal and fallback render envelope.
+	//
+	// Prefer SetDot and typed go-doc contracts for application templates. Data is
+	// still used when no explicit dot is set, by request helper closures, and by
+	// low-level hooks such as error, debug, action, and interaction renderers.
 	Data struct {
 		// Ctx is the render context.
 		Ctx context.Context
@@ -247,11 +246,29 @@ type (
 		Request   *http.Request
 		URL       *url.URL
 	}
+
+	ContractKind string
+
+	// ContractInformation binds a Go value to a typed go-doc root declaration.
+	//
+	// Annotation is the declaration family, such as "model", "interaction", or
+	// "component". Name is optional for type-matched values and required when
+	// more than one declaration has the same Go type.
+	ContractInformation struct {
+		Kind       ContractKind
+		Annotation string
+		Name       string
+		Value      any
+	}
 )
 
 const (
 	ErrorModeSafe ErrorMode = iota
 	ErrorModeDetailed
+
+	ContractRoot ContractKind = "root"
+	ContractDot  ContractKind = "dot"
+	ContractFunc ContractKind = "func"
 )
 
 var templateErrorLocationPattern = regexp.MustCompile(`template:\s+([^:]+:\d+(?::\d+)?)`)
@@ -321,21 +338,19 @@ const HeaderGoPartialError = "X-Go-Partial-Error"
 func New(templates ...string) *Partial {
 	functions := copyFuncMap()
 	return &Partial{
-		id:                    "root",
-		templates:             templates,
-		staticFuncs:           functions,
-		customFuncs:           make(template.FuncMap),
-		templateFuncSignature: templateFuncSignature(functions),
-		data:                  make(map[string]any),
-		layoutData:            make(map[string]any),
-		serviceData:           make(map[string]any),
-		children:              make(map[string]*Partial),
-		oobChildren:           make(map[string]struct{}),
-		fs:                    os.DirFS("./"),
-		errorRenderer:         DefaultErrorRenderer(),
-		debugRenderer:         DefaultDebugRenderer(),
-		interactionRenderer:   DefaultInteractionRenderer(),
-		templateCache:         newTemplateStore(),
+		id:                  "root",
+		templates:           templates,
+		staticFuncs:         functions,
+		data:                make(map[string]any),
+		layoutData:          make(map[string]any),
+		serviceData:         make(map[string]any),
+		children:            make(map[string]*Partial),
+		oobChildren:         make(map[string]struct{}),
+		fs:                  os.DirFS("./"),
+		errorRenderer:       DefaultErrorRenderer(),
+		debugRenderer:       DefaultDebugRenderer(),
+		interactionRenderer: DefaultInteractionRenderer(),
+		templateCache:       newTemplateStore(),
 	}
 }
 
@@ -461,9 +476,7 @@ func (p *Partial) ID(id string) *Partial {
 // Reset resets the partial to its initial state.
 func (p *Partial) Reset() *Partial {
 	p.data = make(map[string]any)
-	p.dot = nil
-	p.dotSet = false
-	p.models = nil
+	p.contracts = nil
 	p.layoutData = make(map[string]any)
 	p.serviceData = make(map[string]any)
 	p.children = make(map[string]*Partial)
@@ -553,8 +566,11 @@ func (p *Partial) SetDot(value any) *Partial {
 	if p == nil {
 		return nil
 	}
-	p.dot = value
-	p.dotSet = true
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.upsertContractLocked(ContractInformation{Kind: ContractDot, Value: value}, func(existing ContractInformation) bool {
+		return existing.Kind == ContractDot
+	})
 	return p
 }
 
@@ -563,21 +579,71 @@ func (p *Partial) ClearDot() *Partial {
 	if p == nil {
 		return nil
 	}
-	p.dot = nil
-	p.dotSet = false
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.removeContractsLocked(func(existing ContractInformation) bool {
+		return existing.Kind == ContractDot
+	})
 	return p
 }
 
-// UseModels registers values for @model declarations in this partial's
-// templates. The declaration name in the template becomes the template
-// function name; the Go value is matched by type through go-doc/renderer.
-func (p *Partial) UseModels(values ...any) *Partial {
+// SetContract registers a typed value for a go-doc root declaration.
+//
+// Values are matched to declarations by type. Use SetInteraction for named
+// interaction contracts.
+func (p *Partial) SetContract(annotation string, values ...any) *Partial {
+	if p == nil {
+		return nil
+	}
+	annotation = strings.TrimSpace(annotation)
+	if annotation == "" {
+		p.getLogger().Warn("contract annotation cannot be empty")
+		return p
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, value := range values {
+		p.contracts = append(p.contracts, ContractInformation{
+			Kind:       ContractRoot,
+			Annotation: annotation,
+			Value:      value,
+		})
+	}
+	return p
+}
+
+// SetModel registers values for typed model declarations.
+func (p *Partial) SetModel(values ...any) *Partial {
+	return p.SetContract("model", values...)
+}
+
+// SetInteraction registers one or more @interaction contracts.
+//
+// Use Interaction.As when the contract name should be explicit. Without As,
+// go-partial derives a name from the endpoint tail, so "/stats" becomes
+// "Stats" and "/interactions/async" becomes "Async".
+func (p *Partial) SetInteraction(interactions ...Interaction) *Partial {
 	if p == nil {
 		return nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.models = append(p.models, values...)
+	for _, interaction := range interactions {
+		name := interaction.contractRootName()
+		if name == "" {
+			p.getLogger().Warn("interaction contract name cannot be derived")
+			continue
+		}
+		p.upsertContractLocked(ContractInformation{
+			Kind:       ContractRoot,
+			Annotation: "interaction",
+			Name:       name,
+			Value:      interaction,
+		}, func(existing ContractInformation) bool {
+			return existing.Kind == ContractRoot && existing.Annotation == "interaction" && existing.Name == name
+		})
+	}
 	return p
 }
 
@@ -666,32 +732,17 @@ func (p *Partial) SetAlwaysSwapOOB(alwaysSwapOOB bool) *Partial {
 	return p
 }
 
-// UseFuncs merges template functions into the Partial.
-func (p *Partial) UseFuncs(funcMap template.FuncMap) *Partial {
+// SetFunc registers template functions in the Partial scope.
+func (p *Partial) SetFunc(funcMaps ...template.FuncMap) *Partial {
 	if p == nil {
 		return nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	customFuncs := make(template.FuncMap, len(funcMap))
-	for k, v := range funcMap {
-		if isProtectedFunctionName(k) {
-			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", k)
-			continue
-		}
-
-		p.staticFuncs[k] = v
-		customFuncs[k] = v
+	for _, funcMap := range funcMaps {
+		p.setFuncMapLocked(funcMap)
 	}
-	if len(customFuncs) > 0 {
-		p.hasCustomFunctions = true
-	}
-	if p.customFuncs == nil {
-		p.customFuncs = make(template.FuncMap)
-	}
-	maps.Copy(p.customFuncs, customFuncs)
-	p.templateFuncSignature = templateFuncSignature(p.staticFuncs)
 	return p
 }
 
@@ -928,14 +979,7 @@ func (p *Partial) mergeFuncMapInternal(funcMap, customFuncMap template.FuncMap) 
 		p.staticFuncs = make(template.FuncMap, len(funcMap))
 	}
 	maps.Copy(p.staticFuncs, funcMap)
-	if len(customFuncMap) > 0 {
-		p.hasCustomFunctions = true
-		if p.customFuncs == nil {
-			p.customFuncs = make(template.FuncMap, len(customFuncMap))
-		}
-		maps.Copy(p.customFuncs, customFuncMap)
-	}
-	p.templateFuncSignature = templateFuncSignature(p.staticFuncs)
+	p.setFuncMapLocked(customFuncMap)
 }
 
 // getStaticFuncMap returns the combined function map of the partial.
@@ -956,20 +1000,74 @@ func (p *Partial) getCustomFuncMap() template.FuncMap {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
+	funcs := p.contractFuncMapLocked()
 	if p.parent != nil {
-		funcs := maps.Clone(p.parent.getCustomFuncMap())
-		maps.Copy(funcs, p.customFuncs)
-		return funcs
+		parentFuncs := p.parent.getCustomFuncMap()
+		maps.Copy(parentFuncs, funcs)
+		return parentFuncs
 	}
 
-	return maps.Clone(p.customFuncs)
+	return funcs
+}
+
+func (p *Partial) contractFuncMapLocked() template.FuncMap {
+	funcs := make(template.FuncMap)
+	for _, contract := range p.contracts {
+		if contract.Kind != ContractFunc || contract.Name == "" || contract.Value == nil {
+			continue
+		}
+		funcs[contract.Name] = contract.Value
+	}
+	return funcs
+}
+
+func (p *Partial) setFuncMapLocked(funcMap template.FuncMap) {
+	for name, fn := range funcMap {
+		if isProtectedFunctionName(name) {
+			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", name)
+			continue
+		}
+
+		p.staticFuncs[name] = fn
+		p.upsertContractLocked(ContractInformation{
+			Kind:  ContractFunc,
+			Name:  name,
+			Value: fn,
+		}, func(existing ContractInformation) bool {
+			return existing.Kind == ContractFunc && existing.Name == name
+		})
+	}
+}
+
+func (p *Partial) upsertContractLocked(contract ContractInformation, match func(ContractInformation) bool) {
+	for i, existing := range p.contracts {
+		if match(existing) {
+			p.contracts[i] = contract
+			return
+		}
+	}
+	p.contracts = append(p.contracts, contract)
+}
+
+func (p *Partial) removeContractsLocked(match func(ContractInformation) bool) {
+	p.contracts = slices.DeleteFunc(p.contracts, match)
+}
+
+func (p *Partial) getDotContract() (any, bool) {
+	contracts := p.getContracts()
+	for i := len(contracts) - 1; i >= 0; i-- {
+		if contracts[i].Kind == ContractDot {
+			return contracts[i].Value, true
+		}
+	}
+	return nil, false
 }
 
 func (p *Partial) getFunctionSignature() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	signature := p.templateFuncSignature
+	signature := templateFuncSignature(p.staticFuncs)
 	if p.parent != nil {
 		signature = mergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
 	}
@@ -977,30 +1075,21 @@ func (p *Partial) getFunctionSignature() string {
 }
 
 func (p *Partial) getHasCustomFunctions() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	if p.hasCustomFunctions {
-		return true
-	}
-	if p.parent != nil {
-		return p.parent.getHasCustomFunctions()
-	}
-	return false
+	return len(p.getCustomFuncMap()) > 0
 }
 
-func (p *Partial) getModels() []any {
+func (p *Partial) getContracts() []ContractInformation {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	models := slices.Clone(p.models)
+	contracts := slices.Clone(p.contracts)
 	if p.parent != nil {
-		parentModels := p.parent.getModels()
-		if len(parentModels) > 0 {
-			models = append(parentModels, models...)
+		parentContracts := p.parent.getContracts()
+		if len(parentContracts) > 0 {
+			contracts = append(parentContracts, contracts...)
 		}
 	}
-	return models
+	return contracts
 }
 
 func (p *Partial) getRequestFuncMap(data *Data) template.FuncMap {
@@ -1605,13 +1694,15 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		currentURL = r.URL
 	}
 
+	dot, hasDot := p.getDotContract()
+
 	data := &Data{
 		URL:      currentURL,
 		BasePath: p.getBasePath(),
 		Request:  r,
 		Ctx:      ctx,
 		Data:     p.data,
-		Dot:      p.dot,
+		Dot:      dot,
 		Global:   p.getGlobalData(),
 		Service:  p.getServiceData(),
 		Layout:   p.getLayoutData(),
@@ -1647,15 +1738,15 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 		defer releaseTemplate()
 	}
 	if p.useCache {
-		if err := p.registerModelsForExecution(tmpl, renderTemplates); err != nil {
+		if err := p.registerContractsForExecution(tmpl, renderTemplates); err != nil {
 			return "", err
 		}
 	}
 
 	var buf bytes.Buffer
 	root := any(data)
-	if p.dotSet {
-		root = p.dot
+	if hasDot {
+		root = dot
 	}
 	if err = tmpl.Execute(&buf, root); err != nil {
 		p.getLogger().Error("error executing template", "template", p.templates[0], "error", err)
@@ -1736,17 +1827,17 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 		parseFuncs = mergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
 	}
 	t := template.New(path.Base(p.templates[0])).Funcs(parseFuncs)
-	contracts, err := modelContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := typedRootContractsFromFS(p.getFS(), renderTemplates)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error scanning template models: %w", err)
+		return nil, nil, fmt.Errorf("error scanning template contracts: %w", err)
 	}
-	if err := validateModelContracts(contracts); err != nil {
+	if err := validateRootContracts(contracts); err != nil {
 		return nil, nil, err
 	}
 	if len(contracts) > 0 {
 		if p.useCache {
-			t.Funcs(placeholderModelFuncMap(contracts))
-		} else if err := godocrenderer.RegisterFromContracts(t, contracts, p.getModels()...); err != nil {
+			t.Funcs(placeholderRootFuncMap(contracts))
+		} else if err := registerRootContracts(t, contracts, p.getContracts()); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -1771,33 +1862,33 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	return tmpl, nil, nil
 }
 
-func (p *Partial) registerModelsForExecution(tmpl *template.Template, renderTemplates []string) error {
+func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderTemplates []string) error {
 	if tmpl == nil {
 		return nil
 	}
-	contracts, err := modelContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := typedRootContractsFromFS(p.getFS(), renderTemplates)
 	if err != nil {
-		return fmt.Errorf("error scanning template models: %w", err)
+		return fmt.Errorf("error scanning template contracts: %w", err)
 	}
 	if len(contracts) == 0 {
 		return nil
 	}
-	if err := validateModelContracts(contracts); err != nil {
+	if err := validateRootContracts(contracts); err != nil {
 		return err
 	}
-	return godocrenderer.RegisterFromContracts(tmpl, contracts, p.getModels()...)
+	return registerRootContracts(tmpl, contracts, p.getContracts())
 }
 
-func validateModelContracts(contracts map[string]string) error {
+func validateRootContracts(contracts map[string]typedRootContract) error {
 	for name := range contracts {
 		if _, protected := protectedFunctionNames[name]; protected {
-			return fmt.Errorf("register models: @model %s conflicts with a go-partial template helper", name)
+			return fmt.Errorf("register contracts: %s conflicts with a go-partial template helper", name)
 		}
 	}
 	return nil
 }
 
-func placeholderModelFuncMap(contracts map[string]string) template.FuncMap {
+func placeholderRootFuncMap(contracts map[string]typedRootContract) template.FuncMap {
 	funcs := make(template.FuncMap, len(contracts))
 	for name := range contracts {
 		funcs[name] = func() any {
@@ -1805,6 +1896,99 @@ func placeholderModelFuncMap(contracts map[string]string) template.FuncMap {
 		}
 	}
 	return funcs
+}
+
+func registerRootContracts(tmpl *template.Template, contracts map[string]typedRootContract, bindings []ContractInformation) error {
+	funcs := make(template.FuncMap, len(contracts))
+	for name, contract := range contracts {
+		value, err := resolveContractValue(name, contract, bindings)
+		if err != nil {
+			return err
+		}
+		captured := value
+		funcs[name] = func() any {
+			return captured
+		}
+	}
+	tmpl.Funcs(funcs)
+	return nil
+}
+
+func resolveContractValue(name string, contract typedRootContract, bindings []ContractInformation) (any, error) {
+	for _, binding := range bindings {
+		if binding.Kind != "" && binding.Kind != ContractRoot {
+			continue
+		}
+		if binding.Annotation != "" && binding.Annotation != contract.Annotation {
+			continue
+		}
+		if binding.Name != name {
+			continue
+		}
+		if !contractValueMatchesType(contract.Type, binding.Value) {
+			return nil, fmt.Errorf("register contracts: @%s %s expects %s, got %s", contract.Annotation, name, contract.Type, contractValueTypeName(binding.Value))
+		}
+		return binding.Value, nil
+	}
+
+	var matches []any
+	for _, binding := range bindings {
+		if binding.Kind != "" && binding.Kind != ContractRoot {
+			continue
+		}
+		if binding.Name != "" {
+			continue
+		}
+		if binding.Annotation != "" && binding.Annotation != contract.Annotation {
+			continue
+		}
+		if contractValueMatchesType(contract.Type, binding.Value) {
+			matches = append(matches, binding.Value)
+		}
+	}
+
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return nil, fmt.Errorf("register contracts: @%s %s has no matching value for %s", contract.Annotation, name, contract.Type)
+	default:
+		return nil, fmt.Errorf("register contracts: @%s %s has multiple matching values for %s; bind it by name", contract.Annotation, name, contract.Type)
+	}
+}
+
+func contractValueMatchesType(contractType string, value any) bool {
+	valueType := contractValueTypeName(value)
+	if valueType == "" {
+		return false
+	}
+	contractType = normalizeContractType(contractType)
+	if valueType == contractType {
+		return true
+	}
+	return strings.HasPrefix(valueType, "main.") && shortContractTypeName(valueType) == shortContractTypeName(contractType)
+}
+
+func contractValueTypeName(value any) string {
+	if value == nil {
+		return ""
+	}
+	typ := reflect.TypeOf(value)
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if typ.Name() == "" || typ.PkgPath() == "" {
+		return fmt.Sprintf("%T", value)
+	}
+	return typ.PkgPath() + "." + typ.Name()
+}
+
+func shortContractTypeName(typeName string) string {
+	lastDot := strings.LastIndex(typeName, ".")
+	if lastDot < 0 || lastDot == len(typeName)-1 {
+		return typeName
+	}
+	return typeName[lastDot+1:]
 }
 
 func addTemplatePathAliases(tmpl *template.Template, names []string) error {
@@ -1994,39 +2178,34 @@ func (p *Partial) clone() *Partial {
 
 	// Create a new Partial instance
 	clone := &Partial{
-		id:                    p.id,
-		parent:                p.parent,
-		request:               p.request,
-		layoutContentID:       p.layoutContentID,
-		renderOOB:             p.renderOOB,
-		alwaysSwapOOB:         p.alwaysSwapOOB,
-		fs:                    p.fs,
-		logger:                p.logger,
-		connector:             p.connector,
-		useCache:              p.useCache,
-		selection:             p.selection,
-		targetResolver:        p.targetResolver,
-		templates:             slices.Clone(p.templates),
-		staticFuncs:           maps.Clone(p.staticFuncs),
-		customFuncs:           maps.Clone(p.customFuncs),
-		templateFuncSignature: p.templateFuncSignature,
-		hasCustomFunctions:    p.hasCustomFunctions,
-		basePath:              p.basePath,
-		data:                  maps.Clone(p.data),
-		dot:                   p.dot,
-		dotSet:                p.dotSet,
-		models:                slices.Clone(p.models),
-		layoutData:            maps.Clone(p.layoutData),
-		serviceData:           maps.Clone(p.serviceData),
-		response:              p.response,
-		errorRenderer:         p.errorRenderer,
-		debugRenderer:         p.debugRenderer,
-		interactionRenderer:   p.interactionRenderer,
-		templateCache:         p.templateCache,
-		errorMode:             p.errorMode,
-		errorModeSet:          p.errorModeSet,
-		children:              maps.Clone(p.children),
-		oobChildren:           maps.Clone(p.oobChildren),
+		id:                  p.id,
+		parent:              p.parent,
+		request:             p.request,
+		layoutContentID:     p.layoutContentID,
+		renderOOB:           p.renderOOB,
+		alwaysSwapOOB:       p.alwaysSwapOOB,
+		fs:                  p.fs,
+		logger:              p.logger,
+		connector:           p.connector,
+		useCache:            p.useCache,
+		selection:           p.selection,
+		targetResolver:      p.targetResolver,
+		templates:           slices.Clone(p.templates),
+		staticFuncs:         maps.Clone(p.staticFuncs),
+		basePath:            p.basePath,
+		data:                maps.Clone(p.data),
+		contracts:           slices.Clone(p.contracts),
+		layoutData:          maps.Clone(p.layoutData),
+		serviceData:         maps.Clone(p.serviceData),
+		response:            p.response,
+		errorRenderer:       p.errorRenderer,
+		debugRenderer:       p.debugRenderer,
+		interactionRenderer: p.interactionRenderer,
+		templateCache:       p.templateCache,
+		errorMode:           p.errorMode,
+		errorModeSet:        p.errorModeSet,
+		children:            maps.Clone(p.children),
+		oobChildren:         maps.Clone(p.oobChildren),
 	}
 
 	return clone

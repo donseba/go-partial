@@ -37,7 +37,7 @@ When a template uses `SetDot`, request-specific values are still available throu
 | `urlIs`, `urlStarts`, `urlContains`, `urlPath`, `joinPath` | URL helpers | Read and compare request paths. |
 | `targetValue`, `selectionValue`, `actionValue` | Connector helpers | Read current connector target, selection, and action values. |
 
-Translation helpers such as `tl`, `tn`, `ctl`, and `ctn` are not built in. Add them through `Service.UseFuncs`, `Layout.UseFuncs`, or `Partial.UseFuncs`.
+Translation helpers such as `tl`, `tn`, `ctl`, and `ctn` are not built in. Add them through `Service.SetFunc`, `Layout.SetFunc`, or `Partial.SetFunc`.
 
 ## Typed Template Composition
 
@@ -97,9 +97,9 @@ When a layout wraps a content partial, the wrapper renders that configured route
 
 Use native `template` for typed composition inside the content partial. Register partials in Go when they also need to be renderable as HTMX targets or OOB output.
 
-## go-doc `@model` Contracts With `UseModels`
+## go-doc `@model` Contracts With `SetModel`
 
-Use `SetDot` when the whole template root is one app value. Use `@model` plus `UseModels` when you want named model functions in the template:
+Use `SetDot` when the whole template root is one app value. Use `@model` plus `SetModel` when you want named root functions in the template:
 
 ```gotemplate
 {{/*
@@ -113,10 +113,10 @@ Use `SetDot` when the whole template root is one app value. Use `@model` plus `U
 
 ```go
 content := partial.NewID("content", "templates/page.gohtml").
-    UseModels(page, user)
+    SetModel(page, user)
 ```
 
-The template owns the names `Page` and `User`. go-partial delegates type matching to `github.com/donseba/go-doc/renderer`, so the controller passes values by type instead of repeating the names.
+The template owns the names `Page` and `User`. go-partial scans the go-doc contract and matches controller values by type instead of asking you to repeat the names in Go.
 
 ## Request Helpers With Dot Templates
 
@@ -186,38 +186,29 @@ Interaction helpers render connector-aware loading or request markup for endpoin
 {{ refresh "/cart/summary" }}
 ```
 
-For configured interactions, put the values on your typed page model:
-
-```go
-type Page struct {
-    Interact PageInteractions
-}
-
-type PageInteractions struct {
-    Stats         partial.Interaction
-    Notifications partial.Interaction
-    CartChanged   partial.Interaction
-    CartRefresh   partial.Interaction
-}
-
-page := Page{
-    Interact: PageInteractions{
-        Stats:         partial.Async("/stats").ID("stats-loader").Target("#stats"),
-        Notifications: partial.Poll("/notifications").Every(10 * time.Second),
-        CartChanged:   partial.On("cart:changed", "/cart/summary").Target("#cart"),
-        CartRefresh:   partial.Refresh("/cart/summary").Target("#cart").Swap(partial.SwapOuterHTML),
-    },
-}
-
-content.SetDot(page)
-```
+For configured interactions, declare named `@interaction` roots and register matching values from Go:
 
 ```gotemplate
-{{ async .Interact.Stats }}
-{{ poll .Interact.Notifications }}
-{{ on .Interact.CartChanged }}
-{{ async .Interact.Cart }}
-{{ refresh .Interact.CartRefresh }}
+{{/*
+@interaction Stats github.com/donseba/go-partial.Interaction
+@interaction Notifications github.com/donseba/go-partial.Interaction
+@interaction CartChanged github.com/donseba/go-partial.Interaction
+@interaction CartRefresh github.com/donseba/go-partial.Interaction
+*/}}
+
+{{ async Stats }}
+{{ poll Notifications }}
+{{ on CartChanged }}
+{{ refresh CartRefresh }}
+```
+
+```go
+content.SetInteraction(
+    partial.Async("/stats").As("Stats").ID("stats-loader").Target("#stats"),
+    partial.Poll("/notifications").As("Notifications").Every(10*time.Second),
+    partial.On("cart:changed", "/cart/summary").As("CartChanged").Target("#cart"),
+    partial.Refresh("/cart/summary").As("CartRefresh").Target("#cart").Swap(partial.SwapOuterHTML),
+)
 ```
 
 With the HTMX connector, `async` renders markup shaped like:
@@ -314,7 +305,7 @@ Connector helpers expose the active target, selection, and action values:
 Translation helpers are user-owned. The renderer exposes `.Loc` from the request context, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
 
 ```go
-service.UseFuncs(translator.FuncMap())
+service.SetFunc(translator.FuncMap())
 ```
 
 ```gotemplate

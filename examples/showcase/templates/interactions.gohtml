@@ -1,5 +1,14 @@
 {{/*
 @dot github.com/donseba/go-partial/examples/showcase.InteractionPage
+@interaction Async github.com/donseba/go-partial.Interaction
+@interaction Poll github.com/donseba/go-partial.Interaction
+@interaction On github.com/donseba/go-partial.Interaction
+@interaction Refresh github.com/donseba/go-partial.Interaction
+@interaction Profile github.com/donseba/go-partial.Interaction
+@interaction ProfileRefresh github.com/donseba/go-partial.Interaction
+@interaction Stream github.com/donseba/go-partial.Interaction
+@interaction Prefetch github.com/donseba/go-partial.Interaction
+@interaction Reveal github.com/donseba/go-partial.Interaction
 */}}
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
@@ -12,13 +21,13 @@
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">async</h2>
             <p class="leading-7 text-stone-600">Load immediately after the shell is visible.</p>
-            {{ async .Interact.Async }}
+            {{ async true }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">poll</h2>
             <p class="leading-7 text-stone-600">Refresh this region every few seconds.</p>
-            {{ poll .Interact.Poll }}
+            {{ poll Poll }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
@@ -32,14 +41,14 @@
                 <strong>Event target</strong>
                 <p class="leading-7 text-stone-600">This panel is waiting for a custom browser event.</p>
             </div>
-            {{ on .Interact.On }}
+            {{ on On }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">refresh</h2>
             <p class="leading-7 text-stone-600">Click the control to update only the target region below.</p>
             <div class="flex flex-wrap items-center gap-2.5">
-                {{ refresh .Interact.Refresh }}
+                {{ refresh Refresh }}
                 <span>Target <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">#refresh-panel</code></span>
             </div>
             <div id="refresh-panel" class="grid gap-1.5 rounded-lg border border-stone-300 bg-stone-50 p-3">
@@ -63,14 +72,14 @@
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">named async</h2>
             <p class="leading-7 text-stone-600">An async region with a stable ID that can be refreshed or targeted later.</p>
-            {{ async .Interact.Profile }}
-            {{ refresh .Interact.ProfileRefresh }}
+            {{ async Profile }}
+            {{ refresh ProfileRefresh }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">stream</h2>
             <p class="leading-7 text-stone-600">Receive a server-rendered fragment from an SSE message.</p>
-            {{ stream .Interact.Stream }}
+            {{ stream Stream }}
         </article>
 
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
@@ -90,7 +99,7 @@
                     <dd>Invisible <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">&lt;link&gt;</code> element</dd>
                 </div>
             </dl>
-            {{ prefetch .Interact.Prefetch }}
+            {{ prefetch Prefetch }}
         </article>
     </div>
 
@@ -98,7 +107,7 @@
         <h2 class="text-lg font-bold text-stone-950">reveal</h2>
         <p class="leading-7 text-stone-600">Scroll down to trigger this region when it enters the viewport.</p>
         <div class="flex min-h-[900px] items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-200/60 text-center text-stone-600">Keep scrolling. This spacer exists so reveal does not fire immediately.</div>
-        {{ reveal .Interact.Reveal }}
+        {{ reveal Reveal }}
     </article>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
@@ -108,11 +117,8 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content.SetDot(InteractionPage{
-    Interact: InteractionSet{
-        Poll: partial.Poll("/interactions/poll").Every(3 * time.Second),
-    },
-})
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content.SetDot(InteractionPage{Title: "Interaction helpers"}).
+    SetInteraction(partial.Poll("/interactions/poll").Every(3 * time.Second))
 
 func (app *App) interactionsPoll(w http.ResponseWriter, r *http.Request) {
     content := partial.NewID("interaction-poll", "templates/interaction_result.gohtml")
@@ -122,14 +128,14 @@ func (app *App) interactionsPoll(w http.ResponseWriter, r *http.Request) {
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async .Interact.Async }}" }}
-{{ "{{ reveal .Interact.Reveal }}" }}
-{{ "{{ poll .Interact.Poll }}" }}
-{{ "{{ on .Interact.On }}" }}
-{{ "{{ stream .Interact.Stream }}" }}
-{{ "{{ prefetch .Interact.Prefetch }}" }}
-{{ "{{ refresh .Interact.Refresh }}" }}
-{{ "{{ async .Interact.Profile }}" }}
-{{ "{{ refresh .Interact.ProfileRefresh }}" }}</code></pre>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async Async }}" }}
+{{ "{{ reveal Reveal }}" }}
+{{ "{{ poll Poll }}" }}
+{{ "{{ on On }}" }}
+{{ "{{ stream Stream }}" }}
+{{ "{{ prefetch Prefetch }}" }}
+{{ "{{ refresh Refresh }}" }}
+{{ "{{ async Profile }}" }}
+{{ "{{ refresh ProfileRefresh }}" }}</code></pre>
     </article>
 </section>

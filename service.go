@@ -138,17 +138,15 @@ func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
 	return svc
 }
 
-// UseFuncs merges template functions into the Service.
-func (svc *Service) UseFuncs(funcMap template.FuncMap) *Service {
+// SetFunc registers template functions on the Service.
+func (svc *Service) SetFunc(funcMaps ...template.FuncMap) *Service {
 	if svc == nil {
 		return nil
 	}
 	svc.funcsLock.Lock()
 	defer svc.funcsLock.Unlock()
 
-	customFuncs := mergeStaticFuncMap(svc.staticFuncs, funcMap, svc.config.Logger)
-	if len(customFuncs) > 0 {
-		maps.Copy(svc.customFuncs, customFuncs)
+	if mergeFuncMapsInto(svc.staticFuncs, svc.customFuncs, svc.config.Logger, funcMaps...) {
 		svc.hasCustomFunctions = true
 	}
 	return svc
@@ -277,20 +275,31 @@ func (l *Layout) AddData(key string, value any) *Layout {
 	return l
 }
 
-// UseFuncs merges template functions into the Layout.
-func (l *Layout) UseFuncs(funcMap template.FuncMap) *Layout {
+// SetFunc registers template functions in the Layout tree.
+func (l *Layout) SetFunc(funcMaps ...template.FuncMap) *Layout {
 	if l == nil {
 		return nil
 	}
 	l.funcsLock.Lock()
 	defer l.funcsLock.Unlock()
 
-	customFuncs := mergeStaticFuncMap(l.staticFuncs, funcMap, l.service.config.Logger)
-	if len(customFuncs) > 0 {
-		maps.Copy(l.customFuncs, customFuncs)
+	if mergeFuncMapsInto(l.staticFuncs, l.customFuncs, l.service.config.Logger, funcMaps...) {
 		l.hasCustomFunctions = true
 	}
 	return l
+}
+
+func mergeFuncMapsInto(staticFuncs, customFuncs template.FuncMap, logger Logger, funcMaps ...template.FuncMap) bool {
+	changed := false
+	for _, funcMap := range funcMaps {
+		merged := mergeStaticFuncMap(staticFuncs, funcMap, logger)
+		if len(merged) == 0 {
+			continue
+		}
+		maps.Copy(customFuncs, merged)
+		changed = true
+	}
+	return changed
 }
 
 func (l *Layout) getStaticFuncMap() template.FuncMap {

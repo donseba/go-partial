@@ -104,20 +104,7 @@ type InfiniteToast struct {
 }
 
 type InteractionPage struct {
-	Title    string
-	Interact InteractionSet
-}
-
-type InteractionSet struct {
-	Async          partial.Interaction
-	Poll           partial.Interaction
-	On             partial.Interaction
-	Refresh        partial.Interaction
-	Profile        partial.Interaction
-	ProfileRefresh partial.Interaction
-	Stream         partial.Interaction
-	Prefetch       partial.Interaction
-	Reveal         partial.Interaction
+	Title string
 }
 
 type InteractionResult struct {

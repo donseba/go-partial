@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/donseba/go-partial/connector"
 )
@@ -20,7 +21,8 @@ type (
 	}
 
 	Interaction struct {
-		interaction connector.Interaction
+		contractName string
+		interaction  connector.Interaction
 	}
 )
 
@@ -84,6 +86,11 @@ func (i Interaction) Interaction() connector.Interaction {
 
 func (i Interaction) ID(id string) Interaction {
 	i.interaction.ID = id
+	return i
+}
+
+func (i Interaction) As(name string) Interaction {
+	i.contractName = strings.TrimSpace(name)
 	return i
 }
 
@@ -199,4 +206,52 @@ func interactionPlaceholder(interaction connector.Interaction) string {
 
 func escapeAttr(value string) string {
 	return template.HTMLEscapeString(value)
+}
+
+func (i Interaction) contractRootName() string {
+	if i.contractName != "" {
+		return i.contractName
+	}
+	return interactionNameFromEndpoint(i.interaction.URL)
+}
+
+func interactionNameFromEndpoint(endpoint string) string {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return ""
+	}
+	if idx := strings.IndexAny(endpoint, "?#"); idx >= 0 {
+		endpoint = endpoint[:idx]
+	}
+	endpoint = strings.Trim(endpoint, "/")
+	if endpoint == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(endpoint, "/"); idx >= 0 {
+		endpoint = endpoint[idx+1:]
+	}
+
+	parts := strings.FieldsFunc(endpoint, func(r rune) bool {
+		return r == '-' || r == '_' || r == '.' || r == ':'
+	})
+	if len(parts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for _, part := range parts {
+		upperNext := true
+		for _, r := range part {
+			if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+				upperNext = true
+				continue
+			}
+			if upperNext {
+				b.WriteRune(unicode.ToUpper(r))
+				upperNext = false
+				continue
+			}
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

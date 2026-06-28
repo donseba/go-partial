@@ -76,7 +76,7 @@ func TestWithTemplateRegistersChildByFileName(t *testing.T) {
 	}
 }
 
-func TestUseModelsRegistersGoDocModelContracts(t *testing.T) {
+func TestSetModelRegistersGoDocModelContracts(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}<h1>{{ Page.Title }}</h1>`,
 	}}
@@ -84,7 +84,7 @@ func TestUseModelsRegistersGoDocModelContracts(t *testing.T) {
 	out, err := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		UseModels(contractPage{Title: "Typed page"}).
+		SetModel(contractPage{Title: "Typed page"}).
 		Render(context.Background())
 	if err != nil {
 		t.Fatalf("render contract model: %v", err)
@@ -94,14 +94,14 @@ func TestUseModelsRegistersGoDocModelContracts(t *testing.T) {
 	}
 }
 
-func TestUseModelsRegistersGoDocModelContractsWithCache(t *testing.T) {
+func TestSetModelRegistersGoDocModelContractsWithCache(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}<h1>{{ Page.Title }}</h1>`,
 	}}
 
 	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
-		UseModels(contractPage{Title: "First"})
+		SetModel(contractPage{Title: "First"})
 
 	out, err := content.Render(context.Background())
 	if err != nil {
@@ -112,9 +112,9 @@ func TestUseModelsRegistersGoDocModelContractsWithCache(t *testing.T) {
 	}
 
 	second := content.clone()
-	second.models = nil
+	second.contracts = nil
 	out, err = second.
-		UseModels(contractPage{Title: "Second"}).
+		SetModel(contractPage{Title: "Second"}).
 		Render(context.Background())
 	if err != nil {
 		t.Fatalf("render second contract model: %v", err)
@@ -124,7 +124,7 @@ func TestUseModelsRegistersGoDocModelContractsWithCache(t *testing.T) {
 	}
 }
 
-func TestUseModelsRejectsProtectedHelperCollision(t *testing.T) {
+func TestSetModelRejectsProtectedHelperCollision(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/* @model locale github.com/donseba/go-partial.contractPage */}}{{ locale.Title }}`,
 	}}
@@ -132,10 +132,105 @@ func TestUseModelsRejectsProtectedHelperCollision(t *testing.T) {
 	_, err := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		UseModels(contractPage{Title: "Typed page"}).
+		SetModel(contractPage{Title: "Typed page"}).
 		Render(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "conflicts with a go-partial template helper") {
 		t.Fatalf("expected protected helper collision, got %v", err)
+	}
+}
+
+func TestSetInteractionRegistersNamedGoDocInteractionContracts(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/*
+@interaction LikesPoll github.com/donseba/go-partial.Interaction
+@interaction LikeButton github.com/donseba/go-partial.Interaction
+*/}}<section>{{ poll LikesPoll }}{{ refresh LikeButton }}</section>`,
+	}}
+
+	out, err := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		UseTemplateCache(false).
+		SetInteraction(
+			Poll("/likes").As("LikesPoll").EveryString("5s").ID("likes-poll"),
+			Refresh("/likes/toggle").As("LikeButton").ID("like-button").Placeholder("Like"),
+		).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("render interaction contracts: %v", err)
+	}
+	html := string(out)
+	if !strings.Contains(html, `id="likes-poll"`) || !strings.Contains(html, `data-url="/likes"`) {
+		t.Fatalf("expected LikesPoll interaction output, got %s", html)
+	}
+	if !strings.Contains(html, `id="like-button"`) || !strings.Contains(html, `data-url="/likes/toggle"`) {
+		t.Fatalf("expected LikeButton interaction output, got %s", html)
+	}
+}
+
+func TestSetInteractionRegistersNamedGoDocInteractionContractsWithCache(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/*
+@interaction LikesPoll github.com/donseba/go-partial.Interaction
+*/}}<section>{{ poll LikesPoll }}</section>`,
+	}}
+
+	content := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		SetInteraction(Poll("/likes/first").As("LikesPoll").ID("likes-poll"))
+
+	first, err := content.Render(context.Background())
+	if err != nil {
+		t.Fatalf("render first interaction contract: %v", err)
+	}
+	if !strings.Contains(string(first), `data-url="/likes/first"`) {
+		t.Fatalf("expected first interaction output, got %s", first)
+	}
+
+	second := content.clone()
+	second.contracts = nil
+	out, err := second.
+		SetInteraction(Poll("/likes/second").As("LikesPoll").ID("likes-poll")).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("render second interaction contract: %v", err)
+	}
+	if !strings.Contains(string(out), `data-url="/likes/second"`) {
+		t.Fatalf("expected second interaction output, got %s", out)
+	}
+}
+
+func TestSetInteractionDerivesContractNameFromEndpoint(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/*
+@interaction Async github.com/donseba/go-partial.Interaction
+*/}}<section>{{ async Async }}</section>`,
+	}}
+
+	out, err := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		UseTemplateCache(false).
+		SetInteraction(Async("/interactions/async")).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("render inferred interaction contract: %v", err)
+	}
+	if !strings.Contains(string(out), `data-url="/interactions/async"`) {
+		t.Fatalf("expected inferred interaction output, got %s", out)
+	}
+}
+
+func TestInteractionNameFromEndpoint(t *testing.T) {
+	tests := map[string]string{
+		"/stats":                  "Stats",
+		"/cart-summary":           "CartSummary",
+		"/interactions/async":     "Async",
+		"/users/:id/profile_card": "ProfileCard",
+		"/":                       "",
+	}
+	for endpoint, want := range tests {
+		if got := interactionNameFromEndpoint(endpoint); got != want {
+			t.Fatalf("interactionNameFromEndpoint(%q) = %q, want %q", endpoint, got, want)
+		}
 	}
 }
 
@@ -341,7 +436,7 @@ func TestTemplateCacheUsesCurrentCustomFunctions(t *testing.T) {
 	render := func(label string) string {
 		t.Helper()
 		content := NewID("content", "templates/content.html")
-		content.UseFuncs(template.FuncMap{
+		content.SetFunc(template.FuncMap{
 			"label": func() string {
 				return label
 			},
@@ -385,7 +480,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 				})
 				return func(t *testing.T, label string) string {
 					t.Helper()
-					svc.UseFuncs(template.FuncMap{
+					svc.SetFunc(template.FuncMap{
 						"label": func() string {
 							return label
 						},
@@ -410,7 +505,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 					t.Helper()
 					content := NewID("content", "templates/content.html")
 					layout := svc.NewLayout()
-					layout.UseFuncs(template.FuncMap{
+					layout.SetFunc(template.FuncMap{
 						"label": func() string {
 							return label
 						},
@@ -434,7 +529,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 				return func(t *testing.T, label string) string {
 					t.Helper()
 					content := NewID("content", "templates/content.html")
-					content.UseFuncs(template.FuncMap{
+					content.SetFunc(template.FuncMap{
 						"label": func() string {
 							return label
 						},
@@ -546,7 +641,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 		t.Helper()
 		content := NewID("content", "templates/content.html")
 		wrapper := NewID("layout", "templates/layout.html")
-		wrapper.UseFuncs(template.FuncMap{
+		wrapper.SetFunc(template.FuncMap{
 			"label": func() string {
 				return label
 			},
@@ -568,7 +663,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 
 func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 	svc := NewService(nil)
-	svc.UseFuncs(template.FuncMap{
+	svc.SetFunc(template.FuncMap{
 		"partial": func() string {
 			return "blocked"
 		},
@@ -1034,7 +1129,7 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 	svc := NewService(&Config{
 		FS: fsys,
 	})
-	svc.UseFuncs(template.FuncMap{
+	svc.SetFunc(template.FuncMap{
 		"tl": func(loc Localizer, key string) string {
 			return loc.GetLocale() + ":" + key
 		},
@@ -1277,15 +1372,71 @@ func TestSetDotKeepsRequestHelpersAvailable(t *testing.T) {
 	}
 }
 
-func TestUseFuncs(t *testing.T) {
+func TestSetDotReplacesExistingDotContract(t *testing.T) {
+	type page struct {
+		Title string
+	}
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.html": `{{/* @dot github.com/example/app.Page */}}{{ .Title }}`,
+	}}
+
+	out, err := NewID("content", "templates/page.html").
+		SetFileSystem(fsys).
+		SetDot(page{Title: "First"}).
+		SetDot(page{Title: "Second"}).
+		Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "Second" {
+		t.Fatalf("render = %s, want Second", out)
+	}
+}
+
+func TestPartialSetFuncUsesContractStoreWithCache(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.html": `{{ label "Ada" }}`,
+	}}
+
+	content := NewID("content", "templates/page.html").
+		SetFileSystem(fsys).
+		UseTemplateCache(true).
+		SetFunc(template.FuncMap{
+			"label": func(name string) string { return "first:" + name },
+		})
+
+	first, err := content.Render(context.Background())
+	if err != nil {
+		t.Fatalf("first render: %v", err)
+	}
+	if strings.TrimSpace(string(first)) != "first:Ada" {
+		t.Fatalf("first render = %s", first)
+	}
+
+	second := content.clone().
+		SetFunc(template.FuncMap{
+			"label": func(name string) string { return "second:" + name },
+		})
+	out, err := second.Render(context.Background())
+	if err != nil {
+		t.Fatalf("second render: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "second:Ada" {
+		t.Fatalf("second render = %s", out)
+	}
+}
+
+func TestSetFunc(t *testing.T) {
 	svc := NewService(nil)
 
-	svc.UseFuncs(template.FuncMap{
+	svc.SetFunc(template.FuncMap{
 		"existingFunc": func() string { return "existing" },
 		"newFunc":      func() string { return "new" },
 		"dict":         func() string { return "should not overwrite" },
 		"content":      func() string { return "should not overwrite" },
 		"partial":      func() string { return "should not overwrite" },
+	}, template.FuncMap{
+		"secondMapFunc": func() string { return "second-map" },
 	})
 
 	funcs := svc.getStaticFuncMap()
@@ -1299,6 +1450,10 @@ func TestUseFuncs(t *testing.T) {
 
 	if funcs["existingFunc"].(func() string)() != "existing" {
 		t.Error("existingFunc should return 'existing'")
+	}
+
+	if funcs["secondMapFunc"].(func() string)() != "second-map" {
+		t.Error("secondMapFunc should return 'second-map'")
 	}
 
 	if _, ok := funcs["dict"].(func() string); ok {

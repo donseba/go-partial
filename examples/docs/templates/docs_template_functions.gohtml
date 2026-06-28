@@ -126,9 +126,9 @@
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Scope</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">API</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Package default</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.AddGlobalFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers every later service should receive.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers for one render pipeline or page shell.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.UseFuncs</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers local to one component tree.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers for one render pipeline or page shell.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers local to one component tree.</td></tr>
         </tbody>
     </table>
 
@@ -143,7 +143,7 @@
 })</code></pre>
 
     <p class="leading-7 text-slate-400">Service helpers are available to every layout and partial rendered through that service.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.UseFuncs(template.FuncMap{
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(template.FuncMap{
     "money": func(cents int) string {
         return fmt.Sprintf("EUR %.2f", float64(cents)/100)
     },
@@ -154,7 +154,7 @@
 
     <p class="leading-7 text-slate-400">Partial helpers stay local to that component tree. Use this for helpers that do not make sense globally.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">row := partial.NewID("row", "row.gohtml")
-row.UseFuncs(template.FuncMap{
+row.SetFunc(template.FuncMap{
     "statusLabel": func(status string) string {
         return strings.ToUpper(status)
     },
