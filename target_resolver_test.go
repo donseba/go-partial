@@ -23,28 +23,28 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 	}
 
 	fsys := &inMemoryFS{}
-	fsys.AddFile("table.gohtml", `<table><tbody>{{ range .Data.Rows }}{{ template "row.gohtml" . }}{{ end }}</tbody></table>`)
+	fsys.AddFile("table.gohtml", `<table><tbody>{{ range .Rows }}{{ template "row.gohtml" . }}{{ end }}</tbody></table>`)
 	fsys.AddFile("row.gohtml", `<tr id="row-{{ .ID }}"><td>{{ .Name }}</td></tr>`)
 
 	table := NewID("content", "table.gohtml").
 		SetFileSystem(fsys).
-		SetData(map[string]any{"Rows": rows})
+		SetDot(map[string]any{"Rows": rows})
 	rowPartial := NewID("row", "row.gohtml").SetFileSystem(fsys)
 	table.With(rowPartial)
-	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, map[string]any, bool) {
+	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
 		if !strings.HasPrefix(target, "row-") {
-			return nil, nil, false
+			return nil, false
 		}
 		id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
 		if err != nil {
-			return nil, nil, false
+			return nil, false
 		}
 		for _, candidate := range rows {
 			if candidate.ID == id {
-				return NewID(target, "row.gohtml").SetFileSystem(fsys).SetDot(candidate), nil, true
+				return NewID(target, "row.gohtml").SetFileSystem(fsys).SetDot(candidate), true
 			}
 		}
-		return nil, nil, false
+		return nil, false
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/rows", nil)

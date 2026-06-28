@@ -10,10 +10,29 @@ import (
 	"testing"
 
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/templatehelpers"
 )
 
 type contractPage struct {
 	Title string
+}
+
+type testNamedContract struct {
+	name string
+	Kind string
+	URL  string
+}
+
+func (c testNamedContract) ContractName() string {
+	return c.name
+}
+
+func testContract(name string, kind string, url string) testNamedContract {
+	return testNamedContract{
+		name: name,
+		Kind: kind,
+		URL:  url,
+	}
 }
 
 func TestNewRoot(t *testing.T) {
@@ -42,14 +61,6 @@ func TestNewRoot(t *testing.T) {
 
 	if len(root.oobChildren) != 0 {
 		t.Errorf("NewRoot should have 0 oobChildren, got %d", len(root.oobChildren))
-	}
-
-	if root.data == nil {
-		t.Error("NewRoot should have non-nil data")
-	}
-
-	if len(root.data) != 0 {
-		t.Errorf("NewRoot should have 0 data, got %d", len(root.data))
 	}
 
 	if root.Reset() != root {
@@ -139,98 +150,83 @@ func TestSetModelRejectsProtectedHelperCollision(t *testing.T) {
 	}
 }
 
-func TestSetInteractionRegistersNamedGoDocInteractionContracts(t *testing.T) {
+func TestSetContractRegistersNamedGoDocSymbolContracts(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/*
-@interaction LikesPoll github.com/donseba/go-partial.Interaction
-@interaction LikeButton github.com/donseba/go-partial.Interaction
-*/}}<section>{{ poll LikesPoll }}{{ refresh LikeButton }}</section>`,
+@widget LikesPoll github.com/donseba/go-partial.testNamedContract
+@widget LikeButton github.com/donseba/go-partial.testNamedContract
+*/}}<section>{{ LikesPoll.Kind }}:{{ LikesPoll.URL }} {{ LikeButton.Kind }}:{{ LikeButton.URL }}</section>`,
 	}}
 
 	out, err := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		SetInteraction(
-			Poll("/likes").As("LikesPoll").EveryString("5s").ID("likes-poll"),
-			Refresh("/likes/toggle").As("LikeButton").ID("like-button").Placeholder("Like"),
+		SetContract("widget",
+			testContract("LikesPoll", "poll", "/likes"),
+			testContract("LikeButton", "refresh", "/likes/toggle"),
 		).
 		Render(context.Background())
 	if err != nil {
-		t.Fatalf("render interaction contracts: %v", err)
+		t.Fatalf("render symbol contracts: %v", err)
 	}
 	html := string(out)
-	if !strings.Contains(html, `id="likes-poll"`) || !strings.Contains(html, `data-url="/likes"`) {
-		t.Fatalf("expected LikesPoll interaction output, got %s", html)
+	if !strings.Contains(html, `poll:/likes`) {
+		t.Fatalf("expected LikesPoll contract output, got %s", html)
 	}
-	if !strings.Contains(html, `id="like-button"`) || !strings.Contains(html, `data-url="/likes/toggle"`) {
-		t.Fatalf("expected LikeButton interaction output, got %s", html)
+	if !strings.Contains(html, `refresh:/likes/toggle`) {
+		t.Fatalf("expected LikeButton contract output, got %s", html)
 	}
 }
 
-func TestSetInteractionRegistersNamedGoDocInteractionContractsWithCache(t *testing.T) {
+func TestSetContractRegistersNamedGoDocSymbolContractsWithCache(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/*
-@interaction LikesPoll github.com/donseba/go-partial.Interaction
-*/}}<section>{{ poll LikesPoll }}</section>`,
+@widget LikesPoll github.com/donseba/go-partial.testNamedContract
+*/}}<section>{{ LikesPoll.URL }}</section>`,
 	}}
 
 	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
-		SetInteraction(Poll("/likes/first").As("LikesPoll").ID("likes-poll"))
+		SetContract("widget", testContract("LikesPoll", "poll", "/likes/first"))
 
 	first, err := content.Render(context.Background())
 	if err != nil {
-		t.Fatalf("render first interaction contract: %v", err)
+		t.Fatalf("render first symbol contract: %v", err)
 	}
-	if !strings.Contains(string(first), `data-url="/likes/first"`) {
-		t.Fatalf("expected first interaction output, got %s", first)
+	if !strings.Contains(string(first), `/likes/first`) {
+		t.Fatalf("expected first contract output, got %s", first)
 	}
 
 	second := content.clone()
 	second.contracts = nil
 	out, err := second.
-		SetInteraction(Poll("/likes/second").As("LikesPoll").ID("likes-poll")).
+		SetContract("widget", testContract("LikesPoll", "poll", "/likes/second")).
 		Render(context.Background())
 	if err != nil {
-		t.Fatalf("render second interaction contract: %v", err)
+		t.Fatalf("render second symbol contract: %v", err)
 	}
-	if !strings.Contains(string(out), `data-url="/likes/second"`) {
-		t.Fatalf("expected second interaction output, got %s", out)
+	if !strings.Contains(string(out), `/likes/second`) {
+		t.Fatalf("expected second contract output, got %s", out)
 	}
 }
 
-func TestSetInteractionDerivesContractNameFromEndpoint(t *testing.T) {
+func TestSetContractSupportsNamedContracts(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/*
-@interaction Async github.com/donseba/go-partial.Interaction
-*/}}<section>{{ async Async }}</section>`,
+@widget Async github.com/donseba/go-partial.testNamedContract
+*/}}<section>{{ Async.URL }}</section>`,
 	}}
 
 	out, err := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		SetInteraction(Async("/interactions/async")).
+		SetContract("widget", testContract("Async", "async", "/interactions/async")).
 		Render(context.Background())
 	if err != nil {
-		t.Fatalf("render inferred interaction contract: %v", err)
+		t.Fatalf("render named contract: %v", err)
 	}
-	if !strings.Contains(string(out), `data-url="/interactions/async"`) {
-		t.Fatalf("expected inferred interaction output, got %s", out)
-	}
-}
-
-func TestInteractionNameFromEndpoint(t *testing.T) {
-	tests := map[string]string{
-		"/stats":                  "Stats",
-		"/cart-summary":           "CartSummary",
-		"/interactions/async":     "Async",
-		"/users/:id/profile_card": "ProfileCard",
-		"/":                       "",
-	}
-	for endpoint, want := range tests {
-		if got := interactionNameFromEndpoint(endpoint); got != want {
-			t.Fatalf("interactionNameFromEndpoint(%q) = %q, want %q", endpoint, got, want)
-		}
+	if !strings.Contains(string(out), `/interactions/async`) {
+		t.Fatalf("expected named contract output, got %s", out)
 	}
 }
 
@@ -241,13 +237,13 @@ func TestRequestBasic(t *testing.T) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ content }}</body></html>`,
-				"templates/content.html": "<div>{{.Data.Text}}</div>",
+				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
 
 		// content
 		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
+		content.SetDot(map[string]any{
 			"Text": "Welcome to the home page",
 		})
 		p := New("templates/index.html").ID("root")
@@ -294,7 +290,7 @@ func TestRequestWrap(t *testing.T) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ content }}</body></html>`,
-				"templates/content.html": "<div>{{.Data.Text}}</div>",
+				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
 
@@ -302,7 +298,7 @@ func TestRequestWrap(t *testing.T) {
 
 		// content
 		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
+		content.SetDot(map[string]any{
 			"Text": "Welcome to the home page",
 		})
 
@@ -345,7 +341,7 @@ func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"templates/layout.html":  `<html><body>{{ content }}</body></html>`,
-			"templates/content.html": `<div>{{ .Data.Text }}</div>`,
+			"templates/content.html": `<div>{{ .Text }}</div>`,
 		},
 	}
 	svc := NewService(&Config{
@@ -359,7 +355,7 @@ func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 
 	render := func(text string) string {
 		t.Helper()
-		content := NewID("content", "templates/content.html").SetData(map[string]any{
+		content := NewID("content", "templates/content.html").SetDot(map[string]any{
 			"Text": text,
 		})
 		layout := NewID("layout", "templates/layout.html")
@@ -381,12 +377,12 @@ func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 func TestTemplateCacheIsServiceScoped(t *testing.T) {
 	firstFS := &inMemoryFS{
 		Files: map[string]string{
-			"templates/content.html": `<p>first {{ .Data.Name }}</p>`,
+			"templates/content.html": `<p>first {{ .Name }}</p>`,
 		},
 	}
 	secondFS := &inMemoryFS{
 		Files: map[string]string{
-			"templates/content.html": `<p>second {{ .Data.Name }}</p>`,
+			"templates/content.html": `<p>second {{ .Name }}</p>`,
 		},
 	}
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
@@ -400,7 +396,7 @@ func TestTemplateCacheIsServiceScoped(t *testing.T) {
 			FS:               fsys,
 			UseTemplateCache: true,
 		})
-		content := NewID("content", "templates/content.html").SetData(map[string]any{
+		content := NewID("content", "templates/content.html").SetDot(map[string]any{
 			"Name": name,
 		})
 		out, err := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
@@ -559,8 +555,8 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<main>{{ content }}{{ template "notice.html" .Data.Notice }}</main>`,
-			"templates/content.html": `<section>{{ partial "templates/row.html" "Name" "Ada" }}</section>`,
+			"templates/layout.html":  `<main>{{ content }}{{ template "notice.html" . }}</main>`,
+			"templates/content.html": `<section>{{ partial runtime "templates/row.html" "Name" "Ada" }}</section>`,
 			"templates/row.html":     `<p>{{ .Name }}</p>`,
 			"templates/notice.html":  `<aside id="notice"{{ oobAttr }}>{{ .Message }}</aside>`,
 		},
@@ -573,8 +569,9 @@ func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 	notice := NewID("notice", "templates/notice.html").
 		SetDot(map[string]any{"Message": "Saved"}).
 		SetAlwaysSwapOOB(true)
-	layout := NewID("layout", "templates/layout.html").WithOOB(notice)
-	layout.AddData("Notice", map[string]any{"Message": "Saved"})
+	layout := NewID("layout", "templates/layout.html").
+		SetDot(map[string]any{"Message": "Saved"}).
+		WithOOB(notice)
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -601,7 +598,7 @@ func TestPartialHelperRendersTemplatePath(t *testing.T) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/page.gohtml":  `<section>{{ partial "templates/card.gohtml" .Data.Card }}{{ partial "/templates/badge.gohtml" "Label" "Ready" }}</section>`,
+			"templates/page.gohtml":  `<section>{{ partial runtime "templates/card.gohtml" .Card }}{{ partial runtime "/templates/badge.gohtml" "Label" "Ready" }}</section>`,
 			"templates/card.gohtml":  `<article>{{ .Name }}</article>`,
 			"templates/badge.gohtml": `<span>{{ .Label }}</span>`,
 		},
@@ -609,7 +606,7 @@ func TestPartialHelperRendersTemplatePath(t *testing.T) {
 
 	out, err := NewID("page", "templates/page.gohtml").
 		SetFileSystem(fsys).
-		SetData(map[string]any{"Card": cardData{Name: "Ada"}}).
+		SetDot(map[string]any{"Card": cardData{Name: "Ada"}}).
 		Render(context.Background())
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
@@ -687,18 +684,18 @@ func TestRequestOOB(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ content }}{{ template "footer.html" .Data.Footer }}</body></html>`,
-				"templates/content.html": "<div>{{.Data.Text}}</div>",
+				"templates/index.html":   `<html><body>{{ content }}{{ template "footer.html" . }}</body></html>`,
+				"templates/content.html": "<div>{{.Text}}</div>",
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
 
 		p := New("templates/index.html").ID("root")
-		p.AddData("Footer", map[string]any{"Text": "This is the footer"})
+		p.SetDot(map[string]any{"Text": "This is the footer"})
 
 		// content
 		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
+		content.SetDot(map[string]any{
 			"Text": "Welcome to the home page",
 		})
 		// oob
@@ -749,15 +746,15 @@ func TestRequestOOBSwap(t *testing.T) {
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/index.html":   `<html><body>{{ content }}{{ template "footer.html" .Data.Footer }}</body></html>`,
-				"templates/content.html": "<div>{{.Data.Text}}</div>",
+				"templates/index.html":   `<html><body>{{ content }}{{ template "footer.html" . }}</body></html>`,
+				"templates/content.html": "<div>{{.Text}}</div>",
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
 
 		// the main template that will be rendered
 		p := New("templates/index.html").ID("root")
-		p.AddData("Footer", map[string]any{"Text": "This is the footer"})
+		p.SetDot(map[string]any{"Text": "This is the footer"})
 
 		// oob footer that resides on the page
 		oob := New("templates/footer.html").ID("footer")
@@ -768,7 +765,7 @@ func TestRequestOOBSwap(t *testing.T) {
 
 		// the actual content required for the page
 		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
+		content.SetDot(map[string]any{
 			"Text": "Welcome to the home page",
 		})
 
@@ -809,13 +806,14 @@ func TestRequestOOBSwap(t *testing.T) {
 
 func TestDeepNested(t *testing.T) {
 	svc := NewService(&Config{})
+	svc.SetFunc(templatehelpers.FuncMap())
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html":   `<html><body>{{ content }}</body></html>`,
-				"templates/content.html": "<div>{{.Data.Text}}</div>",
-				"templates/nested.html":  `<div>{{ upper .Data.Text }}</div>`,
+				"templates/content.html": "<div>{{.Text}}</div>",
+				"templates/nested.html":  `<div>{{ upper .Text }}</div>`,
 			},
 		}
 
@@ -823,13 +821,13 @@ func TestDeepNested(t *testing.T) {
 
 		// nested content
 		nested := New("templates/nested.html").ID("nested")
-		nested.SetData(map[string]any{
+		nested.SetDot(map[string]any{
 			"Text": "This is the nested content",
 		})
 
 		// content
 		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
+		content.SetDot(map[string]any{
 			"Text": "Welcome to the home page",
 		}).With(nested)
 
@@ -887,50 +885,40 @@ func TestMissingPartial(t *testing.T) {
 	}
 }
 
-func TestDataInTemplates(t *testing.T) {
-	svc := NewService(&Config{})
-	svc.AddData("Title", "My Page")
-
-	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
-		// Create a new layout
-		layout := svc.NewLayout()
-
-		// Set layout data
-		layout.SetData(map[string]any{
-			"PageTitle": "Home Page",
-			"User":      "John Doe",
-		})
-
-		fsys := &inMemoryFS{
-			Files: map[string]string{
-				"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ content }}</body></html>`,
-				"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
-			},
-		}
-
-		content := New("templates/content.html").ID("content")
-		content.SetData(map[string]any{
-			"Articles": []string{"Article 1", "Article 2", "Article 3"},
-		})
-
-		p := New("templates/index.html").ID("root")
-
-		out, err := layout.FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		_, _ = w.Write([]byte(out))
+func TestTypedDotsInTemplates(t *testing.T) {
+	type shell struct {
+		Title string
+	}
+	type contentData struct {
+		PageTitle string
+		User      string
+		Articles  []string
 	}
 
-	request, _ := http.NewRequest(http.MethodGet, "/", nil)
-	response := httptest.NewRecorder()
+	svc := NewService(&Config{})
+	fsys := &inMemoryFS{
+		Files: map[string]string{
+			"templates/index.html":   `<html><head><title>{{ .Title }}</title></head><body>{{ content }}</body></html>`,
+			"templates/content.html": `<div>{{ .PageTitle }}</div><div>{{ .User }}</div><div>{{ .Articles }}</div>`,
+		},
+	}
 
-	handleRequest(response, request)
+	content := New("templates/content.html").ID("content").SetDot(contentData{
+		PageTitle: "Home Page",
+		User:      "John Doe",
+		Articles:  []string{"Article 1", "Article 2", "Article 3"},
+	})
+	wrapper := New("templates/index.html").ID("root").SetDot(shell{Title: "My Page"})
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	expected := "<html><head><title>My Page</title></head><body><div>Home Page</div><div>John Doe</div><div>[Article 1 Article 2 Article 3]</div></body></html>"
-	if response.Body.String() != expected {
-		t.Errorf("expected %s, got %s", expected, response.Body.String())
+	if string(out) != expected {
+		t.Errorf("expected %s, got %s", expected, out)
 	}
 }
 
@@ -1091,7 +1079,7 @@ func TestSelectionIfUsesDefaultSelection(t *testing.T) {
 func TestSelectionPartialUsesErrorFragmentOnRenderError(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("content.gohtml", `{{ selection }}`)
-	fsys.AddFile("broken.gohtml", `<div>{{ if .Data.Missing }}broken</div>`)
+	fsys.AddFile("broken.gohtml", `<div>{{ if .Missing }}broken</div>`)
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
 	content.WithSelectMap("broken", map[string]*Partial{
@@ -1124,7 +1112,7 @@ func (l testLocalizer) GetLocale() string {
 
 func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("content.gohtml", `{{ tl .Loc "hello" }}`)
+	fsys.AddFile("content.gohtml", `{{ tl ctx.Loc "hello" }}`)
 
 	svc := NewService(&Config{
 		FS: fsys,
@@ -1215,8 +1203,8 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/index.html":   `<html><head><title>{{ .Service.Title }}</title></head><body>{{ content }}</body></html>`,
-			"templates/content.html": `<div>{{ .Layout.PageTitle }}</div><div>{{ .Layout.User }}</div><div>{{ .Data.Articles }}</div>`,
+			"templates/index.html":   `<html><head><title>{{ .Title }}</title></head><body>{{ content }}</body></html>`,
+			"templates/content.html": `<div>{{ .PageTitle }}</div><div>{{ .User }}</div><div>{{ .Articles }}</div>`,
 		},
 	}
 
@@ -1225,12 +1213,13 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 	// Create content partial
 	content := NewID("content", "templates/content.html")
-	content.SetData(map[string]any{
-		"Title":   "Benchmark Test",
-		"Message": "This is a benchmark test.",
+	content.SetDot(map[string]any{
+		"PageTitle": "Benchmark Test",
+		"User":      "Ada",
+		"Articles":  "This is a benchmark test.",
 	})
 
-	index := NewID("index", "templates/index.html")
+	index := NewID("index", "templates/index.html").SetDot(map[string]any{"Title": "Benchmark Test"})
 
 	// Set the content partial in the layout
 	layout.Set(content).Wrap(index)
@@ -1252,19 +1241,20 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 func TestRenderTable(t *testing.T) {
 	svc := NewService(&Config{})
+	svc.SetFunc(templatehelpers.FuncMap())
 
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		// Define in-memory templates for the table and the row
 		fsys := &inMemoryFS{
 			Files: map[string]string{
-				"templates/table.html": `<table>{{ range $i := .Data.Rows }}{{ partial "templates/row.html" (dict "RowNumber" $i) }}{{ end }}</table>`,
+				"templates/table.html": `<table>{{ range $i := .Rows }}{{ partial runtime "templates/row.html" (dict "RowNumber" $i) }}{{ end }}</table>`,
 				"templates/row.html":   `<tr><td>Row {{ .RowNumber }}</td></tr>`,
 			},
 		}
 
 		// Create the table partial and set data
 		tablePartial := New("templates/table.html").ID("table")
-		tablePartial.SetData(map[string]any{
+		tablePartial.SetDot(map[string]any{
 			"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
 		})
 		// Render the table partial
@@ -1313,11 +1303,11 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 	rowPartial := NewID("row", "templates/row.html").
 		SetFileSystem(fsys)
 	table.With(rowPartial)
-	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, map[string]any, bool) {
+	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
 		if target != "row-2" {
-			return nil, nil, false
+			return nil, false
 		}
-		return NewID(target, "templates/row.html").SetDot(row{ID: 2, Name: "Tea"}), nil, true
+		return NewID(target, "templates/row.html").SetDot(row{ID: 2, Name: "Tea"}), true
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -1456,8 +1446,8 @@ func TestSetFunc(t *testing.T) {
 		t.Error("secondMapFunc should return 'second-map'")
 	}
 
-	if _, ok := funcs["dict"].(func() string); ok {
-		t.Error("dict should not be overwritten in FuncMap")
+	if funcs["dict"].(func() string)() != "should not overwrite" {
+		t.Error("dict should be overridable because it is an optional helper, not a core go-partial helper")
 	}
 
 	if _, ok := funcs["content"]; ok {

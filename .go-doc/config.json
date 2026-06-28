@@ -1,0 +1,66 @@
+{
+  "enabled": true,
+  "include": ["/"],
+  "exclude": ["vendor", "references", "node_modules"],
+  "writeIndex": false,
+  "providers": [
+    "github.com/donseba/go-partial/exp/interactions",
+    "github.com/donseba/go-partial/exp/templatehelpers"
+  ],
+  "symbolAnnotations": [
+    {
+      "name": "interaction",
+      "type": "github.com/donseba/go-partial.Interaction"
+    }
+  ],
+  "templateFunctions": [
+    {
+      "name": "runtime",
+      "signatures": [
+        "func() *github.com/donseba/go-partial.Runtime"
+      ]
+    },
+    {
+      "name": "async",
+      "path": "github.com/donseba/go-partial/exp/interactions.Async"
+    },
+    {
+      "name": "reveal",
+      "path": "github.com/donseba/go-partial/exp/interactions.Reveal"
+    },
+    {
+      "name": "poll",
+      "path": "github.com/donseba/go-partial/exp/interactions.Poll"
+    },
+    {
+      "name": "on",
+      "path": "github.com/donseba/go-partial/exp/interactions.On"
+    },
+    {
+      "name": "stream",
+      "path": "github.com/donseba/go-partial/exp/interactions.Stream"
+    },
+    {
+      "name": "prefetch",
+      "path": "github.com/donseba/go-partial/exp/interactions.Prefetch"
+    },
+    {
+      "name": "refresh",
+      "path": "github.com/donseba/go-partial/exp/interactions.Refresh"
+    },
+    {
+      "name": "partial",
+      "signatures": [
+        "func(runtime *github.com/donseba/go-partial.Runtime, path string) html/template.HTML",
+        "func(runtime *github.com/donseba/go-partial.Runtime, path string, dot any) html/template.HTML",
+        "func(runtime *github.com/donseba/go-partial.Runtime, path string, pairs ...any) html/template.HTML"
+      ]
+    },
+    {
+      "name": "debug",
+      "signatures": [
+        "func(runtime *github.com/donseba/go-partial.Runtime, value any) html/template.HTML"
+      ]
+    }
+  ]
+}

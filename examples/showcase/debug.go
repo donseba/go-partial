@@ -17,7 +17,7 @@ func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 	custom := partial.NewID("custom-debug", "templates/debug_custom.gohtml").
 		SetFileSystem(os.DirFS("examples/showcase")).
 		SetDot(DebugCustomPage{Name: "Ada", Role: "Editor"}).
-		SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
+		SetDebugRenderer(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime, value any) (template.HTML, error) {
 			return template.HTML(customDebugHTML(value)), nil
 		})
 	customHTML, err := custom.Render(app.requestContext(r))

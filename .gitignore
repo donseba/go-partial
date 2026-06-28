@@ -28,7 +28,8 @@ go.work.sum
 .git/
 /references/
 .idea/
-.go-doc/
+.go-doc/*
+!.go-doc/config.json
 .partial/
 docs/
 !examples/docs/

@@ -73,13 +73,13 @@ The same row template can still be rendered as an HTMX target by registering a p
 rowPartial := partial.NewID("row", "templates/row.gohtml")
 
 table.With(rowPartial)
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     if !strings.HasPrefix(target, "row-") {
-        return nil, nil, false
+        return nil, false
     }
 
     row := loadCurrentRow(target)
-    return partial.NewID(target, "templates/row.gohtml").SetDot(row), nil, true
+    return partial.NewID(target, "templates/row.gohtml").SetDot(row), true
 })
 ```
 
@@ -138,7 +138,7 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 `partial` renders a template path through go-partial's render path. This is useful when you want to render another template with request helpers, model registration, error fallback, and the configured filesystem/cache behavior, but you do not want to make that template part of the native parse tree.
 
 ```gotemplate
-{{ partial "templates/notice.gohtml" .Notice }}
+{{ partial runtime "templates/notice.gohtml" .Notice }}
 ```
 
 ```gotemplate
@@ -151,9 +151,9 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 
 Arguments:
 
-- `{{ partial "templates/card.gohtml" }}` renders the path with the current partial context.
-- `{{ partial "templates/card.gohtml" .Card }}` renders the path with `.Card` as dot.
-- `{{ partial "templates/card.gohtml" "Title" "Hello" }}` renders the path with a small dot map, so the callee reads `{{ .Title }}`.
+- `{{ partial runtime "templates/card.gohtml" }}` renders the path with the current partial context.
+- `{{ partial runtime "templates/card.gohtml" .Card }}` renders the path with `.Card` as dot.
+- `{{ partial runtime "templates/card.gohtml" "Title" "Hello" }}` renders the path with a small dot map, so the callee reads `{{ .Title }}`.
 
 For rows and larger fragments, prefer native `template` plus `@dot`, because that gives go-doc the strongest type information. Use `partial` when the nested render should go through go-partial itself.
 
@@ -162,7 +162,7 @@ For rows and larger fragments, prefer native `template` plus `@dot`, because tha
 `dict` builds a map for templates that need one.
 
 ```gotemplate
-{{ partial "templates/notice.gohtml" (dict "Message" .FlashMessage "Tone" "success") }}
+{{ partial runtime "templates/notice.gohtml" (dict "Message" .FlashMessage "Tone" "success") }}
 ```
 
 Rules:
@@ -176,38 +176,60 @@ Rules:
 
 Interaction helpers render connector-aware loading or request markup for endpoints. The active connector supplies protocol attributes, and the interaction renderer owns the final HTML wrapper.
 
+Interaction helpers live in `github.com/donseba/go-partial/exp/interactions`
+and are opt-in. Register them explicitly:
+
+```go
+import "github.com/donseba/go-partial/exp/interactions"
+
+service.SetFunc(interactions.FuncMap())
+```
+
+Those functions carry `go-doc:sig` comments for overloads such as endpoint
+strings and named interactions. Add them through `.go-doc/config.json` as
+`templateFunctions` so editors understand both helper forms:
+
 ```gotemplate
-{{ async "/stats" }}
-{{ reveal "/charts/monthly" }}
-{{ poll "/notifications" }}
-{{ on "cart:changed" "/cart/summary" }}
-{{ stream "/activity/events" }}
-{{ prefetch "/users/42" }}
-{{ refresh "/cart/summary" }}
+{{ async runtime "/stats" }}
+{{ reveal runtime "/charts/monthly" }}
+{{ poll runtime "/notifications" }}
+{{ on runtime "cart:changed" "/cart/summary" }}
+{{ stream runtime "/activity/events" }}
+{{ prefetch runtime "/users/42" }}
+{{ refresh runtime "/cart/summary" }}
+```
+
+The endpoint form is ideal when the route belongs directly to the template. For
+example, repeated rows can pass route placeholders from the current dot value:
+
+```gotemplate
+{{ range .Rows }}
+    {{ async runtime "/async/row/:row" "row" .ID }}
+{{ end }}
 ```
 
 For configured interactions, declare named `@interaction` roots and register matching values from Go:
 
 ```gotemplate
 {{/*
-@interaction Stats github.com/donseba/go-partial.Interaction
-@interaction Notifications github.com/donseba/go-partial.Interaction
-@interaction CartChanged github.com/donseba/go-partial.Interaction
-@interaction CartRefresh github.com/donseba/go-partial.Interaction
+@interaction Stats github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Notifications github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction CartChanged github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction CartRefresh github.com/donseba/go-partial/exp/interactions.Interaction
 */}}
 
-{{ async Stats }}
-{{ poll Notifications }}
-{{ on CartChanged }}
-{{ refresh CartRefresh }}
+{{ async runtime Stats }}
+{{ poll runtime Notifications }}
+{{ on runtime CartChanged }}
+{{ refresh runtime CartRefresh }}
 ```
 
 ```go
-content.SetInteraction(
-    partial.Async("/stats").As("Stats").ID("stats-loader").Target("#stats"),
-    partial.Poll("/notifications").As("Notifications").Every(10*time.Second),
-    partial.On("cart:changed", "/cart/summary").As("CartChanged").Target("#cart"),
-    partial.Refresh("/cart/summary").As("CartRefresh").Target("#cart").Swap(partial.SwapOuterHTML),
+content.SetContract("interaction",
+    interactions.NewAsync("/stats").As("Stats").ID("stats-loader").Target("#stats"),
+    interactions.NewPoll("/notifications").As("Notifications").Every(10*time.Second),
+    interactions.NewOn("cart:changed", "/cart/summary").As("CartChanged").Target("#cart"),
+    interactions.NewRefresh("/cart/summary").As("CartRefresh").Target("#cart").Swap(interactions.SwapOuterHTML),
 )
 ```
 
@@ -226,11 +248,11 @@ With the HTMX connector, `async` renders markup shaped like:
 Route parameters use `:name` placeholders:
 
 ```go
-row := partial.Async("/table/row/:row").Param("row", row.ID)
+row := interactions.NewAsync("/table/row/:row").Param("row", row.ID)
 ```
 
 ```gotemplate
-{{ async "/table/row/:row" "row" .ID }}
+{{ async runtime "/table/row/:row" "row" .ID }}
 ```
 
 Interaction helpers are deferred client-side loading, not blocking server-side execution. Use native `template` or `partial` when the current server render should include the markup immediately.
@@ -300,6 +322,20 @@ Connector helpers expose the active target, selection, and action values:
 {{ actionValue }}
 ```
 
+These helpers stay in core because they are tied to the active request,
+connector, and render path. go-partial protects only this core set:
+`runtime`, `partial`, `content`, request/context helpers, OOB helpers, and the
+target/selection/action helper families.
+
+Generic helpers such as strings, maps, dates, and counters are convenience
+helpers. Register them from the optional provider when you want them:
+
+```go
+import "github.com/donseba/go-partial/exp/templatehelpers"
+
+service.SetFunc(templatehelpers.FuncMap())
+```
+
 ## Translation Helpers
 
 Translation helpers are user-owned. The renderer exposes `.Loc` from the request context, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
@@ -337,3 +373,4 @@ Safe render flow:
 ```text
 resolve target -> load current data -> clone parsed template -> bind request helpers -> execute
 ```
+

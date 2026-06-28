@@ -11,12 +11,12 @@
     <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">Endpoint partial</h2>
-            {{ async "/async/stats" }}
+            {{ async runtime "/async/stats" }}
         </article>
         <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
             <h2 class="text-lg font-bold text-stone-950">Route parameter</h2>
             {{ range .Rows }}
-                {{ async "/async/row/:row" "row" .ID }}
+                {{ async runtime "/async/row/:row" "row" .ID }}
             {{ end }}
         </article>
     </div>
@@ -39,7 +39,7 @@ func (app *App) asyncStats(w http.ResponseWriter, r *http.Request) {
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async \"/async/stats\" }}" }}
-{{ "{{ async \"/async/row/:row\" \"row\" .ID }}" }}</code></pre>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async runtime \"/async/stats\" }}" }}
+{{ "{{ async runtime \"/async/row/:row\" \"row\" .ID }}" }}</code></pre>
     </article>
 </section>

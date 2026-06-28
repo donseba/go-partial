@@ -19,20 +19,18 @@ type (
 	}
 
 	Config struct {
-		Connector           connector.Connector
-		UseTemplateCache    bool
-		Logger              Logger
-		FS                  fs.FS
-		ErrorRenderer       ErrorRenderer
-		DebugRenderer       DebugRenderer
-		InteractionRenderer InteractionRenderer
-		ErrorMode           ErrorMode
-		fs                  fs.FS
+		Connector        connector.Connector
+		UseTemplateCache bool
+		Logger           Logger
+		FS               fs.FS
+		ErrorRenderer    ErrorRenderer
+		DebugRenderer    DebugRenderer
+		ErrorMode        ErrorMode
+		fs               fs.FS
 	}
 
 	Service struct {
 		config             *Config
-		data               map[string]any
 		staticFuncs        template.FuncMap
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
@@ -46,7 +44,6 @@ type (
 		filesystem         fs.FS
 		content            *Partial
 		wrapper            *Partial
-		data               map[string]any
 		request            *http.Request
 		staticFuncs        template.FuncMap
 		customFuncs        template.FuncMap
@@ -73,7 +70,6 @@ func NewService(cfg *Config) *Service {
 	functions := copyFuncMap()
 	return &Service{
 		config:        cfg,
-		data:          make(map[string]any),
 		funcsLock:     sync.RWMutex{},
 		staticFuncs:   functions,
 		customFuncs:   make(template.FuncMap),
@@ -92,25 +88,12 @@ func (svc *Service) NewLayout() *Layout {
 	customFuncs := svc.getCustomFuncMap()
 	return &Layout{
 		service:            svc,
-		data:               make(map[string]any),
 		filesystem:         fsys,
 		connector:          svc.connector,
 		staticFuncs:        functions,
 		customFuncs:        customFuncs,
 		hasCustomFunctions: svc.getHasCustomFunctions(),
 	}
-}
-
-// SetData sets the data for the Service.
-func (svc *Service) SetData(data map[string]any) *Service {
-	svc.data = data
-	return svc
-}
-
-// AddData adds data to the Service.
-func (svc *Service) AddData(key string, value any) *Service {
-	svc.data[key] = value
-	return svc
 }
 
 func (svc *Service) SetConnector(conn connector.Connector) *Service {
@@ -125,11 +108,6 @@ func (svc *Service) SetErrorRenderer(renderer ErrorRenderer) *Service {
 
 func (svc *Service) SetDebugRenderer(renderer DebugRenderer) *Service {
 	svc.config.DebugRenderer = renderer
-	return svc
-}
-
-func (svc *Service) SetInteractionRenderer(renderer InteractionRenderer) *Service {
-	svc.config.InteractionRenderer = renderer
 	return svc
 }
 
@@ -217,17 +195,6 @@ func (l *Layout) SetDebugRenderer(renderer DebugRenderer) *Layout {
 	return l
 }
 
-func (l *Layout) SetInteractionRenderer(renderer InteractionRenderer) *Layout {
-	l.service.config.InteractionRenderer = renderer
-	if l.content != nil {
-		l.content.SetInteractionRenderer(renderer)
-	}
-	if l.wrapper != nil {
-		l.wrapper.SetInteractionRenderer(renderer)
-	}
-	return l
-}
-
 func (l *Layout) SetErrorMode(mode ErrorMode) *Layout {
 	l.service.config.ErrorMode = mode
 	if l.content != nil {
@@ -261,18 +228,6 @@ func (l *Layout) attachContentToWrapper() {
 	}
 	l.wrapper.With(l.content)
 	l.wrapper.layoutContentID = l.content.id
-}
-
-// SetData sets the data for the layout.
-func (l *Layout) SetData(data map[string]any) *Layout {
-	l.data = data
-	return l
-}
-
-// AddData adds data to the layout.
-func (l *Layout) AddData(key string, value any) *Layout {
-	l.data[key] = value
-	return l
 }
 
 // SetFunc registers template functions in the Layout tree.
@@ -389,14 +344,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	if l.service.config.DebugRenderer != nil {
 		p.debugRenderer = l.service.config.DebugRenderer
 	}
-	if l.service.config.InteractionRenderer != nil {
-		p.interactionRenderer = l.service.config.InteractionRenderer
-	}
 	p.errorMode = l.service.config.ErrorMode
 	p.errorModeSet = true
 	p.templateCache = l.service.templateCache
-	p.serviceData = l.service.data
-	p.layoutData = l.data
 	p.request = l.request
 
 	for _, child := range p.children {

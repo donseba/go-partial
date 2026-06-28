@@ -7,6 +7,8 @@ import (
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/interactions"
+	"github.com/donseba/go-partial/exp/templatehelpers"
 )
 
 func main() {
@@ -26,8 +28,7 @@ func main() {
 		carts:        make(map[string]map[int]int),
 		flowSessions: make(map[string]*partial.FlowSessionData),
 	}
-	app.service.SetFunc(showcaseTranslationFunctions())
-	app.service.SetInteractionRenderer(showcaseInteractionRenderer())
+	app.service.SetFunc(showcaseTranslationFunctions(), interactions.FuncMap(interactions.WithRenderer(showcaseInteractionRenderer())), templatehelpers.FuncMap())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)

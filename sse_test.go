@@ -64,11 +64,11 @@ func TestSSEWriterSignal(t *testing.T) {
 
 func TestSSEWriterPatchPartial(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("notice.gohtml", `<div>{{ .Data.Message }}</div>`)
+	fsys.AddFile("notice.gohtml", `<div>{{ .Message }}</div>`)
 
 	partial := NewID("notice", "notice.gohtml").
 		SetFileSystem(fsys).
-		SetData(map[string]any{"Message": "Saved"})
+		SetDot(map[string]any{"Message": "Saved"})
 
 	rec := httptest.NewRecorder()
 	writer := NewSSEWriter(rec)

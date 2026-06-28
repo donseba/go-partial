@@ -31,22 +31,22 @@ table := partial.NewID("content", "templates/users/table.gohtml").
     SetDot(UserTablePage{Rows: rows}).
     With(rowPartial)
 
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     if !strings.HasPrefix(target, "row-") {
-        return nil, nil, false
+        return nil, false
     }
 
     id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
     if err != nil {
-        return nil, nil, false
+        return nil, false
     }
 
     row, ok := loadUserRow(ctx, id)
     if !ok {
-        return nil, nil, false
+        return nil, false
     }
 
-    return partial.NewID(target, "templates/users/user_row.gohtml").SetDot(row), nil, true
+    return partial.NewID(target, "templates/users/user_row.gohtml").SetDot(row), true
 })</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Request flow</h2>

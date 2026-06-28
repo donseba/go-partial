@@ -100,7 +100,7 @@ SSE is a writer layer, not a connector. Use it when the server decides to stream
 events := partial.NewSSEWriter(w)
 
 status := partial.NewID("status", "status.gohtml").
-    SetData(map[string]any{"Step": 2})
+    SetDot(StatusPatch{Step: 2})
 
 _ = events.PatchPartial(r.Context(), r, "#status", status)
 _ = events.Signal("progress", map[string]any{"step": 2})

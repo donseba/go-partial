@@ -14,7 +14,7 @@ import (
 
 func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
 	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys)
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -51,7 +51,7 @@ func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T
 
 func TestWriteWithRequestRendersDetailedDefaultErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
 	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).SetErrorMode(ErrorModeDetailed)
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -93,7 +93,7 @@ func TestExtractTemplateErrorLocation(t *testing.T) {
 
 func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
 	p := New("broken.gohtml").
 		ID("broken").
@@ -116,7 +116,7 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 
 func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
 	p := New("broken.gohtml").
 		ID("content").
@@ -150,7 +150,7 @@ func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 
 func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 	fsys.AddFile("header.gohtml", `<header id="app-header"{{ oobAttr }}>Header</header>`)
 
 	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
@@ -185,7 +185,7 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ content }}</main><footer>Footer</footer></body></html>`)
-	fsys.AddFile("broken.gohtml", `{{ if .Data.Missing }}missing`)
+	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
 	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
 	content := NewID("content", "broken.gohtml").

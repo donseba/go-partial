@@ -35,12 +35,12 @@ content.WithSelectMap("summary", map[string]*partial.Partial{
 &lt;/button&gt;</code></pre>
 
     <h2 id="action" class="scroll-mt-8 text-xl font-bold text-slate-50">Action</h2>
-    <p class="leading-7 text-slate-400">Use action when the request should run server logic before choosing output. The callback receives the current partial and render data, so it can inspect the requested action, mutate application state, or choose a result partial.</p>
+    <p class="leading-7 text-slate-400">Use action when the request should run server logic before choosing output. The callback receives the current partial and runtime, so it can inspect the requested action, mutate application state, or choose a result partial.</p>
 
     <p class="leading-7 text-slate-400">This snippet maps request action values to different response partials. The action value comes from the configured connector. In Go code, connector packages expose constants such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.HeaderAction</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.HeaderSelect</code> for clients that need to construct requests themselves.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content := partial.NewID("content", "counter.gohtml")
 
-content.WithTemplateAction(func(ctx context.Context, p *partial.Partial, data *partial.Data) (*partial.Partial, error) {
+content.WithTemplateAction(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
     switch p.GetRequestActionValue() {
     case "increment":
         counter.Increment()

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"html/template"
 	"log"
 	"math/rand/v2"
@@ -14,16 +13,13 @@ import (
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/interactions"
 )
 
 func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
 	content := partial.NewID(id, tmpl)
 	if data != nil {
-		if values, ok := data.(map[string]any); ok {
-			content.SetData(values)
-		} else {
-			content.SetDot(data)
-		}
+		content.SetDot(data)
 	}
 	app.renderPartial(w, r, content)
 }
@@ -77,8 +73,8 @@ func (app *App) wrapper() *partial.Partial {
 	return wrapper
 }
 
-func showcaseInteractionRenderer() partial.InteractionRenderer {
-	return func(ctx context.Context, p *partial.Partial, data *partial.Data, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
+func showcaseInteractionRenderer() interactions.Renderer {
+	return func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
 		attrText := showcaseInteractionAttrs(attrs)
 		placeholder := template.HTMLEscapeString(interaction.Placeholder)
 

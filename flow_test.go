@@ -88,9 +88,9 @@ func TestPageFlowStepFromURL(t *testing.T) {
 }
 
 func TestPageFlowRenderIntegration(t *testing.T) {
-	infoPartial := New().ID("info").SetData(map[string]any{"msg": "Welcome!"})
-	formPartial := New().ID("form").SetData(map[string]any{"prompt": "Enter value:"})
-	confirmPartial := New().ID("confirm").SetData(map[string]any{"done": true})
+	infoPartial := New().ID("info").SetDot(map[string]any{"msg": "Welcome!"})
+	formPartial := New().ID("form").SetDot(map[string]any{"prompt": "Enter value:"})
+	confirmPartial := New().ID("confirm").SetDot(map[string]any{"done": true})
 
 	steps := []FlowStep{
 		{Name: "info", Partial: infoPartial},
@@ -117,7 +117,15 @@ func TestPageFlowRenderIntegration(t *testing.T) {
 		if step.Partial == nil {
 			t.Fatalf("step %q has no partial", stepName)
 		}
-		return step.Partial.data
+		dot, ok := step.Partial.getDotContract()
+		if !ok {
+			t.Fatalf("step %q has no dot", stepName)
+		}
+		values, ok := dot.(map[string]any)
+		if !ok {
+			t.Fatalf("step %q dot = %T, want map[string]any", stepName, dot)
+		}
+		return values
 	}
 
 	if got := renderStep("info")["msg"]; got != "Welcome!" {
@@ -132,9 +140,9 @@ func TestPageFlowRenderIntegration(t *testing.T) {
 }
 
 func TestPageFlowEndToEndHTTP(t *testing.T) {
-	infoPartial := New().ID("info").SetData(map[string]any{"msg": "Welcome!"})
-	formPartial := New().ID("form").SetData(map[string]any{"prompt": "Enter value:"})
-	confirmPartial := New().ID("confirm").SetData(map[string]any{"done": true})
+	infoPartial := New().ID("info").SetDot(map[string]any{"msg": "Welcome!"})
+	formPartial := New().ID("form").SetDot(map[string]any{"prompt": "Enter value:"})
+	confirmPartial := New().ID("confirm").SetDot(map[string]any{"done": true})
 
 	steps := []FlowStep{
 		{Name: "info", Partial: infoPartial},
@@ -198,7 +206,9 @@ func TestPageFlowEndToEndHTTP(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 		switch step.Name {
 		case "info":
-			_, _ = w.Write([]byte("<h1>" + step.Partial.data["msg"].(string) + "</h1>"))
+			dot, _ := step.Partial.getDotContract()
+			values := dot.(map[string]any)
+			_, _ = w.Write([]byte("<h1>" + values["msg"].(string) + "</h1>"))
 		case "form":
 			_, _ = w.Write([]byte("<form method='POST'><input name='field'><button>Submit</button></form>"))
 		case "confirm":

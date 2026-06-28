@@ -25,45 +25,21 @@ import (
 )
 
 var (
-	// protectedFunctionNames is a set of function names that are protected from being overridden
-	protectedFunctionNames = map[string]struct{}{
+	// coreFunctionNames are the helpers go-partial injects per render and needs
+	// for its own layout, request, connector, and runtime behavior. Optional
+	// helper providers must not overwrite these names.
+	coreFunctionNames = map[string]struct{}{
 		"action":          {},
-		"async":           {},
-		"and":             {},
-		"context":         {},
 		"content":         {},
 		"ctx":             {},
-		"dict":            {},
 		"debug":           {},
-		"eq":              {},
-		"ge":              {},
-		"gt":              {},
-		"html":            {},
-		"index":           {},
-		"js":              {},
 		"joinPath":        {},
 		"basePath":        {},
-		"le":              {},
-		"len":             {},
-		"lt":              {},
-		"ne":              {},
-		"not":             {},
-		"on":              {},
-		"or":              {},
 		"oob":             {},
 		"oobAttr":         {},
 		"partial":         {},
-		"poll":            {},
-		"prefetch":        {},
-		"print":           {},
-		"printf":          {},
-		"println":         {},
-		"refresh":         {},
 		"request":         {},
-		"reveal":          {},
-		"slice":           {},
-		"stream":          {},
-		"urlquery":        {},
+		"runtime":         {},
 		"actionHeader":    {},
 		"actionIs":        {},
 		"actionValue":     {},
@@ -82,44 +58,6 @@ var (
 		"urlPath":         {},
 		"urlStarts":       {},
 	}
-
-	requestFuncSignature = functionNameSignatureFromNames([]string{
-		"action",
-		"actionHeader",
-		"actionIs",
-		"actionValue",
-		"async",
-		"context",
-		"content",
-		"ctx",
-		"debug",
-		"joinPath",
-		"basePath",
-		"on",
-		"oob",
-		"oobAttr",
-		"partial",
-		"poll",
-		"prefetch",
-		"refresh",
-		"request",
-		"reveal",
-		"selection",
-		"selectionHeader",
-		"selectionIs",
-		"selectionValue",
-		"stream",
-		"targetHeader",
-		"targetIs",
-		"targetValue",
-		"csrf",
-		"locale",
-		"url",
-		"urlContains",
-		"urlIs",
-		"urlPath",
-		"urlStarts",
-	})
 )
 
 type (
@@ -138,73 +76,39 @@ type (
 
 	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
-		id                  string
-		parent              *Partial
-		request             *http.Request
-		layoutContentID     string
-		renderOOB           bool
-		alwaysSwapOOB       bool
-		fs                  fs.FS
-		logger              Logger
-		connector           connector.Connector
-		useCache            bool
-		templates           []string
-		staticFuncs         template.FuncMap
-		basePath            string
-		data                map[string]any
-		contracts           []ContractInformation
-		layoutData          map[string]any
-		serviceData         map[string]any
-		responseHeaders     map[string]string
-		response            connector.Response
-		errorRenderer       ErrorRenderer
-		debugRenderer       DebugRenderer
-		interactionRenderer InteractionRenderer
-		templateCache       *templateStore
-		errorMode           ErrorMode
-		errorModeSet        bool
-		targetResolver      TargetResolver
-		mu                  sync.RWMutex
-		children            map[string]*Partial
-		oobChildren         map[string]struct{}
-		selection           *Selection
-		templateAction      func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
-		action              func(ctx context.Context, p *Partial, data *Data) (*Partial, error)
+		id              string
+		parent          *Partial
+		request         *http.Request
+		layoutContentID string
+		renderOOB       bool
+		alwaysSwapOOB   bool
+		fs              fs.FS
+		logger          Logger
+		connector       connector.Connector
+		useCache        bool
+		templates       []string
+		staticFuncs     template.FuncMap
+		basePath        string
+		contracts       []ContractInformation
+		responseHeaders map[string]string
+		response        connector.Response
+		errorRenderer   ErrorRenderer
+		debugRenderer   DebugRenderer
+		templateCache   *templateStore
+		errorMode       ErrorMode
+		errorModeSet    bool
+		targetResolver  TargetResolver
+		mu              sync.RWMutex
+		children        map[string]*Partial
+		oobChildren     map[string]struct{}
+		selection       *Selection
+		templateAction  func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)
+		action          func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)
 	}
 
 	Selection struct {
 		Partials map[string]*Partial
 		Default  string
-	}
-
-	// Data is the internal and fallback render envelope.
-	//
-	// Prefer SetDot and typed go-doc contracts for application templates. Data is
-	// still used when no explicit dot is set, by request helper closures, and by
-	// low-level hooks such as error, debug, action, and interaction renderers.
-	Data struct {
-		// Ctx is the render context.
-		Ctx context.Context
-		// URL is the request URL.
-		URL *url.URL
-		// Request contains the http.Request.
-		Request *http.Request
-		// Data contains data for the current partial.
-		Data map[string]any
-		// Dot contains the explicit root value used when the template is executed with SetDot.
-		Dot any
-		// Service contains data configured on the Service.
-		Service map[string]any
-		// Layout contains data configured on the current Layout.
-		Layout map[string]any
-		// Global contains data inherited from ancestor partials.
-		Global map[string]any
-		// Loc contains the request localizer.
-		Loc Localizer
-		// Csrf contains the request CSRF token.
-		Csrf CsrfToken
-		// BasePath is the base path of the partial.
-		BasePath string
 	}
 
 	// RenderContext contains request-scoped values exposed by the ctx template helper.
@@ -218,11 +122,11 @@ type (
 		BasePath string
 	}
 
-	TargetResolver func(ctx context.Context, r *http.Request, target string) (*Partial, map[string]any, bool)
+	TargetResolver func(ctx context.Context, r *http.Request, target string) (*Partial, bool)
 
 	ErrorRenderer func(ctx context.Context, p *Partial, r *http.Request, err error) (template.HTML, error)
 
-	DebugRenderer func(ctx context.Context, p *Partial, data *Data, value any) (template.HTML, error)
+	DebugRenderer func(ctx context.Context, p *Partial, runtime *Runtime, value any) (template.HTML, error)
 
 	ErrorMode int
 
@@ -259,6 +163,10 @@ type (
 		Annotation string
 		Name       string
 		Value      any
+	}
+
+	NamedContract interface {
+		ContractName() string
 	}
 )
 
@@ -338,19 +246,15 @@ const HeaderGoPartialError = "X-Go-Partial-Error"
 func New(templates ...string) *Partial {
 	functions := copyFuncMap()
 	return &Partial{
-		id:                  "root",
-		templates:           templates,
-		staticFuncs:         functions,
-		data:                make(map[string]any),
-		layoutData:          make(map[string]any),
-		serviceData:         make(map[string]any),
-		children:            make(map[string]*Partial),
-		oobChildren:         make(map[string]struct{}),
-		fs:                  os.DirFS("./"),
-		errorRenderer:       DefaultErrorRenderer(),
-		debugRenderer:       DefaultDebugRenderer(),
-		interactionRenderer: DefaultInteractionRenderer(),
-		templateCache:       newTemplateStore(),
+		id:            "root",
+		templates:     templates,
+		staticFuncs:   functions,
+		children:      make(map[string]*Partial),
+		oobChildren:   make(map[string]struct{}),
+		fs:            os.DirFS("./"),
+		errorRenderer: DefaultErrorRenderer(),
+		debugRenderer: DefaultDebugRenderer(),
+		templateCache: newTemplateStore(),
 	}
 }
 
@@ -404,7 +308,7 @@ func DefaultErrorRenderer() ErrorRenderer {
 }
 
 func DefaultDebugRenderer() DebugRenderer {
-	return func(ctx context.Context, p *Partial, data *Data, value any) (template.HTML, error) {
+	return func(ctx context.Context, p *Partial, runtime *Runtime, value any) (template.HTML, error) {
 		debugData := DebugData{
 			Value:  value,
 			Output: formatDebugValue(value),
@@ -413,9 +317,9 @@ func DefaultDebugRenderer() DebugRenderer {
 			debugData.PartialID = p.id
 			debugData.Templates = slices.Clone(p.templates)
 		}
-		if data != nil {
-			debugData.Request = data.Request
-			debugData.URL = data.URL
+		if runtime != nil {
+			debugData.Request = runtime.Request()
+			debugData.URL = runtime.URL()
 		}
 
 		tmpl, parseErr := template.New("go-partial-debug").Parse(defaultDebugTemplate)
@@ -475,10 +379,7 @@ func (p *Partial) ID(id string) *Partial {
 
 // Reset resets the partial to its initial state.
 func (p *Partial) Reset() *Partial {
-	p.data = make(map[string]any)
 	p.contracts = nil
-	p.layoutData = make(map[string]any)
-	p.serviceData = make(map[string]any)
 	p.children = make(map[string]*Partial)
 	p.oobChildren = make(map[string]struct{})
 
@@ -511,19 +412,6 @@ func (p *Partial) SetDebugRenderer(renderer DebugRenderer) *Partial {
 	return p
 }
 
-func (p *Partial) SetInteractionRenderer(renderer InteractionRenderer) *Partial {
-	if p == nil {
-		return nil
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.interactionRenderer = renderer
-
-	return p
-}
-
 func (p *Partial) SetErrorMode(mode ErrorMode) *Partial {
 	if p == nil {
 		return nil
@@ -552,16 +440,9 @@ func (p *Partial) SetBasePath(basePath string) *Partial {
 	return p
 }
 
-// SetData sets the data for the partial.
-func (p *Partial) SetData(data map[string]any) *Partial {
-	p.data = data
-	return p
-}
-
 // SetDot sets the root value passed to html/template Execute.
-// When unset, go-partial executes templates with its normal *Data wrapper.
-// When set, templates receive this value as "." and can still use request helpers
-// such as ctx, request, url, locale, csrf, and basePath.
+// Templates receive this value as "." and can still use request helpers such as
+// ctx, request, url, locale, csrf, basePath, runtime, partial, content, and debug.
 func (p *Partial) SetDot(value any) *Partial {
 	if p == nil {
 		return nil
@@ -574,7 +455,7 @@ func (p *Partial) SetDot(value any) *Partial {
 	return p
 }
 
-// ClearDot removes the explicit root value and restores the normal *Data wrapper.
+// ClearDot removes the explicit root value.
 func (p *Partial) ClearDot() *Partial {
 	if p == nil {
 		return nil
@@ -587,10 +468,8 @@ func (p *Partial) ClearDot() *Partial {
 	return p
 }
 
-// SetContract registers a typed value for a go-doc root declaration.
-//
-// Values are matched to declarations by type. Use SetInteraction for named
-// interaction contracts.
+// SetContract registers typed values for go-doc root declarations.
+// Values are matched by type unless they implement NamedContract.
 func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 	if p == nil {
 		return nil
@@ -604,9 +483,18 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, value := range values {
+		name := ""
+		if named, ok := value.(NamedContract); ok {
+			name = strings.TrimSpace(named.ContractName())
+			if name == "" {
+				p.getLogger().Warn("contract name cannot be derived", "annotation", annotation)
+				continue
+			}
+		}
 		p.contracts = append(p.contracts, ContractInformation{
 			Kind:       ContractRoot,
 			Annotation: annotation,
+			Name:       name,
 			Value:      value,
 		})
 	}
@@ -616,41 +504,6 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 // SetModel registers values for typed model declarations.
 func (p *Partial) SetModel(values ...any) *Partial {
 	return p.SetContract("model", values...)
-}
-
-// SetInteraction registers one or more @interaction contracts.
-//
-// Use Interaction.As when the contract name should be explicit. Without As,
-// go-partial derives a name from the endpoint tail, so "/stats" becomes
-// "Stats" and "/interactions/async" becomes "Async".
-func (p *Partial) SetInteraction(interactions ...Interaction) *Partial {
-	if p == nil {
-		return nil
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	for _, interaction := range interactions {
-		name := interaction.contractRootName()
-		if name == "" {
-			p.getLogger().Warn("interaction contract name cannot be derived")
-			continue
-		}
-		p.upsertContractLocked(ContractInformation{
-			Kind:       ContractRoot,
-			Annotation: "interaction",
-			Name:       name,
-			Value:      interaction,
-		}, func(existing ContractInformation) bool {
-			return existing.Kind == ContractRoot && existing.Annotation == "interaction" && existing.Name == name
-		})
-	}
-	return p
-}
-
-// AddData adds data to the partial.
-func (p *Partial) AddData(key string, value any) *Partial {
-	p.data[key] = value
-	return p
 }
 
 func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
@@ -708,25 +561,6 @@ func (p *Partial) SetConnector(connector connector.Connector) *Partial {
 	return p
 }
 
-// MergeData merges the data into the partial.
-func (p *Partial) MergeData(data map[string]any, override bool) *Partial {
-	if p.data == nil {
-		p.data = make(map[string]any)
-	}
-	if override {
-		maps.Copy(p.data, data)
-		return p
-	}
-	for k, v := range data {
-		if _, ok := p.data[k]; ok {
-			continue
-		}
-
-		p.data[k] = v
-	}
-	return p
-}
-
 func (p *Partial) SetAlwaysSwapOOB(alwaysSwapOOB bool) *Partial {
 	p.alwaysSwapOOB = alwaysSwapOOB
 	return p
@@ -778,7 +612,6 @@ func (p *Partial) With(child *Partial) *Partial {
 	defer p.mu.Unlock()
 
 	p.children[child.id] = child
-	p.children[child.id].serviceData = p.serviceData
 	p.children[child.id].parent = p
 
 	return p
@@ -808,7 +641,7 @@ func inferTemplateID(templatePath string) string {
 //
 // The resolver runs before this partial renders. It can inspect request data,
 // perform application work, and return a different partial to render.
-func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
+func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)) *Partial {
 	p.action = action
 	return p
 }
@@ -816,7 +649,7 @@ func (p *Partial) WithAction(action func(ctx context.Context, p *Partial, data *
 // WithTemplateAction registers the callback used by the {{ action }} helper.
 //
 // Use this when the template decides where the action result should appear.
-func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, p *Partial, data *Data) (*Partial, error)) *Partial {
+func (p *Partial) WithTemplateAction(templateAction func(ctx context.Context, p *Partial, runtime *Runtime) (*Partial, error)) *Partial {
 	p.templateAction = templateAction
 	return p
 }
@@ -1092,50 +925,41 @@ func (p *Partial) getContracts() []ContractInformation {
 	return contracts
 }
 
-func (p *Partial) getRequestFuncMap(data *Data) template.FuncMap {
+func (p *Partial) getRequestFuncMap(state *RenderContext) template.FuncMap {
 	funcs := make(template.FuncMap, 40)
-	p.addRequestFuncs(funcs, data)
+	p.addRequestFuncs(funcs, state)
 	return funcs
 }
 
-func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
-	funcs["partial"] = partialFunc(p, data)
-	funcs["content"] = contentFunc(p, data)
-	funcs["async"] = interactionFunc(p, data, connector.InteractionAsync)
-	funcs["reveal"] = interactionFunc(p, data, connector.InteractionReveal)
-	funcs["poll"] = interactionFunc(p, data, connector.InteractionPoll)
-	funcs["stream"] = interactionFunc(p, data, connector.InteractionStream)
-	funcs["prefetch"] = interactionFunc(p, data, connector.InteractionPrefetch)
-	funcs["refresh"] = interactionFunc(p, data, connector.InteractionRefresh)
-	funcs["on"] = onFunc(p, data)
-	funcs["selection"] = selectionFunc(p, data)
-	funcs["action"] = actionFunc(p, data)
-	funcs["debug"] = debugFunc(p, data)
+func (p *Partial) addRequestFuncs(funcs template.FuncMap, state *RenderContext) {
+	templateRuntime := newRuntime(p, state)
+
+	funcs["runtime"] = func() *Runtime {
+		return templateRuntime
+	}
+
+	funcs["partial"] = func(runtime *Runtime, path string, args ...any) template.HTML {
+		return runtime.Partial(path, args...)
+	}
+	funcs["content"] = contentFunc(p, state)
+	funcs["selection"] = selectionFunc(p, state)
+	funcs["action"] = actionFunc(p, state)
+	funcs["debug"] = func(runtime *Runtime, value any) template.HTML {
+		return runtime.Debug(value)
+	}
 
 	renderCtx := func() *RenderContext {
-		locale := ""
-		if data.Loc != nil {
-			locale = data.Loc.GetLocale()
-		}
-		return &RenderContext{
-			Context:  data.Ctx,
-			Request:  data.Request,
-			URL:      data.URL,
-			Loc:      data.Loc,
-			Locale:   locale,
-			Csrf:     data.Csrf,
-			BasePath: data.BasePath,
-		}
+		return state
 	}
 
 	funcs["ctx"] = renderCtx
 
 	funcs["request"] = func() *http.Request {
-		return data.Request
+		return state.Request
 	}
 
 	funcs["url"] = func() *url.URL {
-		return data.URL
+		return state.URL
 	}
 
 	funcs["locale"] = func() string {
@@ -1143,32 +967,32 @@ func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 	}
 
 	funcs["csrf"] = func() CsrfToken {
-		return data.Csrf
+		return state.Csrf
 	}
 
 	funcs["basePath"] = func() string {
-		return data.BasePath
+		return state.BasePath
 	}
 
 	funcs["urlIs"] = func(current string) bool {
-		if data.URL == nil {
+		if state.URL == nil {
 			return false
 		}
-		return strings.Trim(data.URL.Path, "/") == strings.Trim(current, "/")
+		return strings.Trim(state.URL.Path, "/") == strings.Trim(current, "/")
 	}
 
 	funcs["urlStarts"] = func(current string) bool {
-		if data.URL == nil {
+		if state.URL == nil {
 			return false
 		}
-		return strings.HasPrefix(data.URL.Path, current)
+		return strings.HasPrefix(state.URL.Path, current)
 	}
 
 	funcs["urlContains"] = func(current string) bool {
-		if data.URL == nil {
+		if state.URL == nil {
 			return false
 		}
-		return strings.Contains(data.URL.Path, current)
+		return strings.Contains(state.URL.Path, current)
 	}
 
 	funcs["joinPath"] = func(parts ...string) string {
@@ -1178,10 +1002,6 @@ func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 	funcs["urlPath"] = func(base string, parts ...string) template.URL {
 		allParts := append([]string{base}, parts...)
 		return template.URL(path.Join(allParts...))
-	}
-
-	funcs["context"] = func() context.Context {
-		return data.Ctx
 	}
 
 	funcs["targetHeader"] = func() string {
@@ -1250,18 +1070,12 @@ func (p *Partial) addRequestFuncs(funcs template.FuncMap, data *Data) {
 
 func placeholderRequestFuncMap() template.FuncMap {
 	return template.FuncMap{
-		"partial":         func(string, ...any) template.HTML { return "" },
+		"runtime":         func() *Runtime { return nil },
+		"partial":         func(*Runtime, string, ...any) template.HTML { return "" },
 		"content":         func() template.HTML { return "" },
-		"async":           func(any, ...any) template.HTML { return "" },
-		"reveal":          func(any, ...any) template.HTML { return "" },
-		"poll":            func(any, ...any) template.HTML { return "" },
-		"stream":          func(any, ...any) template.HTML { return "" },
-		"prefetch":        func(any, ...any) template.HTML { return "" },
-		"refresh":         func(any, ...any) template.HTML { return "" },
-		"on":              func(any, ...any) template.HTML { return "" },
 		"selection":       func() template.HTML { return "" },
 		"action":          func() template.HTML { return "" },
-		"debug":           func(any) template.HTML { return "" },
+		"debug":           func(*Runtime, any) template.HTML { return "" },
 		"ctx":             func() *RenderContext { return nil },
 		"request":         func() *http.Request { return nil },
 		"url":             func() *url.URL { return nil },
@@ -1273,7 +1087,6 @@ func placeholderRequestFuncMap() template.FuncMap {
 		"urlContains":     func(string) bool { return false },
 		"joinPath":        func(...string) string { return "" },
 		"urlPath":         func(string, ...string) template.URL { return "" },
-		"context":         func() context.Context { return nil },
 		"targetHeader":    func() string { return "" },
 		"targetValue":     func() string { return "" },
 		"targetIs":        func(...string) bool { return false },
@@ -1305,7 +1118,7 @@ func addMissingFuncs(funcs template.FuncMap, defaults template.FuncMap) {
 }
 
 func isProtectedFunctionName(name string) bool {
-	if _, ok := protectedFunctionNames[name]; ok {
+	if _, ok := coreFunctionNames[name]; ok {
 		return true
 	}
 	return strings.HasPrefix(name, "_")
@@ -1323,50 +1136,6 @@ func filterFuncMap(funcs template.FuncMap, required map[string]struct{}) templat
 		}
 	}
 	return filtered
-}
-
-func copyDataMap(in map[string]any) map[string]any {
-	if in == nil {
-		return map[string]any{}
-	}
-	return maps.Clone(in)
-}
-
-func (p *Partial) getGlobalData() map[string]any {
-	if p.parent != nil {
-		return p.parent.getGlobalDataMergedWithOwn()
-	}
-	return map[string]any{}
-}
-
-func (p *Partial) getGlobalDataMergedWithOwn() map[string]any {
-	parentGlobal := map[string]any{}
-	if p.parent != nil {
-		parentGlobal = p.parent.getGlobalDataMergedWithOwn()
-	}
-	merged := maps.Clone(parentGlobal)
-	maps.Copy(merged, p.data)
-	return merged
-}
-
-func (p *Partial) getLayoutData() map[string]any {
-	if p.parent != nil {
-		layoutData := p.parent.getLayoutData()
-		merged := maps.Clone(layoutData)
-		maps.Copy(merged, p.layoutData)
-		return merged
-	}
-	return p.layoutData
-}
-
-func (p *Partial) getServiceData() map[string]any {
-	if p.parent != nil {
-		serviceData := p.parent.getServiceData()
-		merged := maps.Clone(serviceData)
-		maps.Copy(merged, p.serviceData)
-		return merged
-	}
-	return p.serviceData
 }
 
 func (p *Partial) getBasePath() string {
@@ -1470,22 +1239,6 @@ func (p *Partial) getDebugRenderer() DebugRenderer {
 	}
 
 	return DefaultDebugRenderer()
-}
-
-func (p *Partial) getInteractionRenderer() InteractionRenderer {
-	if p == nil {
-		return DefaultInteractionRenderer()
-	}
-
-	if p.interactionRenderer != nil {
-		return p.interactionRenderer
-	}
-
-	if p.parent != nil {
-		return p.parent.getInteractionRenderer()
-	}
-
-	return DefaultInteractionRenderer()
 }
 
 func (p *Partial) getErrorMode() ErrorMode {
@@ -1598,16 +1351,13 @@ func (p *Partial) renderResolvedTarget(ctx context.Context, r *http.Request, tar
 		return "", false, nil
 	}
 
-	resolvedPartial, data, ok := resolver(ctx, r, target)
+	resolvedPartial, ok := resolver(ctx, r, target)
 	if !ok || resolvedPartial == nil {
 		return "", false, nil
 	}
 
 	resolvedClone := resolvedPartial.clone()
 	resolvedClone.parent = p
-	if data != nil {
-		resolvedClone.MergeData(data, true)
-	}
 
 	out, err := resolvedClone.renderSelf(ctx, r)
 	if err != nil {
@@ -1696,23 +1446,25 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 
 	dot, hasDot := p.getDotContract()
 
-	data := &Data{
+	locale := ""
+	localizer := getLocalizer(ctx)
+	if localizer != nil {
+		locale = localizer.GetLocale()
+	}
+	state := &RenderContext{
 		URL:      currentURL,
 		BasePath: p.getBasePath(),
 		Request:  r,
-		Ctx:      ctx,
-		Data:     p.data,
-		Dot:      dot,
-		Global:   p.getGlobalData(),
-		Service:  p.getServiceData(),
-		Layout:   p.getLayoutData(),
-		Loc:      getLocalizer(ctx),
+		Context:  ctx,
+		Loc:      localizer,
+		Locale:   locale,
 		Csrf:     getCsrfToken(ctx),
 	}
+	templateRuntime := newRuntime(p, state)
 
 	if p.action != nil {
 		var err error
-		p, err = p.action(ctx, p, data)
+		p, err = p.action(ctx, p, templateRuntime)
 		if err != nil {
 			p.getLogger().Error("error in action function", "error", err)
 			return "", fmt.Errorf("error in action function: %w", err)
@@ -1723,10 +1475,10 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 	cacheKey := p.generateCacheKey(renderTemplates, p.getFunctionSignature())
 	var funcs template.FuncMap
 	if p.useCache {
-		funcs = p.getRequestFuncMap(data)
+		funcs = p.getRequestFuncMap(state)
 	} else {
 		funcs = p.getStaticFuncMap()
-		p.addRequestFuncs(funcs, data)
+		p.addRequestFuncs(funcs, state)
 	}
 
 	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache, renderTemplates)
@@ -1744,7 +1496,7 @@ func (p *Partial) renderSelf(ctx context.Context, r *http.Request) (template.HTM
 	}
 
 	var buf bytes.Buffer
-	root := any(data)
+	root := any(nil)
 	if hasDot {
 		root = dot
 	}
@@ -1881,7 +1633,7 @@ func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderT
 
 func validateRootContracts(contracts map[string]typedRootContract) error {
 	for name := range contracts {
-		if _, protected := protectedFunctionNames[name]; protected {
+		if _, protected := coreFunctionNames[name]; protected {
 			return fmt.Errorf("register contracts: %s conflicts with a go-partial template helper", name)
 		}
 	}
@@ -2101,7 +1853,7 @@ func functionNameSignature(funcs template.FuncMap) string {
 }
 
 func templateFuncSignature(funcs template.FuncMap) string {
-	return mergeFunctionSignatures(functionNameSignature(funcs), requestFuncSignature)
+	return mergeFunctionSignatures(functionNameSignature(funcs), functionNameSignatureFromSet(coreFunctionNames))
 }
 
 func functionNameSignatureFromNames(names []string) string {
@@ -2122,6 +1874,14 @@ func functionNameSignatureFromNames(names []string) string {
 		builder.WriteString(";")
 	}
 	return builder.String()
+}
+
+func functionNameSignatureFromSet(names map[string]struct{}) string {
+	out := make([]string, 0, len(names))
+	for name := range names {
+		out = append(out, name)
+	}
+	return functionNameSignatureFromNames(out)
 }
 
 func mergeFunctionSignatures(signatures ...string) string {
@@ -2178,34 +1938,30 @@ func (p *Partial) clone() *Partial {
 
 	// Create a new Partial instance
 	clone := &Partial{
-		id:                  p.id,
-		parent:              p.parent,
-		request:             p.request,
-		layoutContentID:     p.layoutContentID,
-		renderOOB:           p.renderOOB,
-		alwaysSwapOOB:       p.alwaysSwapOOB,
-		fs:                  p.fs,
-		logger:              p.logger,
-		connector:           p.connector,
-		useCache:            p.useCache,
-		selection:           p.selection,
-		targetResolver:      p.targetResolver,
-		templates:           slices.Clone(p.templates),
-		staticFuncs:         maps.Clone(p.staticFuncs),
-		basePath:            p.basePath,
-		data:                maps.Clone(p.data),
-		contracts:           slices.Clone(p.contracts),
-		layoutData:          maps.Clone(p.layoutData),
-		serviceData:         maps.Clone(p.serviceData),
-		response:            p.response,
-		errorRenderer:       p.errorRenderer,
-		debugRenderer:       p.debugRenderer,
-		interactionRenderer: p.interactionRenderer,
-		templateCache:       p.templateCache,
-		errorMode:           p.errorMode,
-		errorModeSet:        p.errorModeSet,
-		children:            maps.Clone(p.children),
-		oobChildren:         maps.Clone(p.oobChildren),
+		id:              p.id,
+		parent:          p.parent,
+		request:         p.request,
+		layoutContentID: p.layoutContentID,
+		renderOOB:       p.renderOOB,
+		alwaysSwapOOB:   p.alwaysSwapOOB,
+		fs:              p.fs,
+		logger:          p.logger,
+		connector:       p.connector,
+		useCache:        p.useCache,
+		selection:       p.selection,
+		targetResolver:  p.targetResolver,
+		templates:       slices.Clone(p.templates),
+		staticFuncs:     maps.Clone(p.staticFuncs),
+		basePath:        p.basePath,
+		contracts:       slices.Clone(p.contracts),
+		response:        p.response,
+		errorRenderer:   p.errorRenderer,
+		debugRenderer:   p.debugRenderer,
+		templateCache:   p.templateCache,
+		errorMode:       p.errorMode,
+		errorModeSet:    p.errorModeSet,
+		children:        maps.Clone(p.children),
+		oobChildren:     maps.Clone(p.oobChildren),
 	}
 
 	return clone

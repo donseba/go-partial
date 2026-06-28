@@ -11,7 +11,7 @@
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Default debug renderer</h2>
         <p class="leading-7 text-stone-600">This output comes from the embedded go-partial debug template.</p>
-        {{ debug .Payload }}
+        {{ debug runtime .Payload }}
     </article>
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
@@ -30,6 +30,6 @@ html, err := service.NewLayout().Set(custom).RenderWithRequest(ctx, r)</code></p
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ debug .Payload }}" }}</code></pre>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ debug runtime .Payload }}" }}</code></pre>
     </article>
 </section>

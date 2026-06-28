@@ -125,13 +125,13 @@ With the HTMX connector, these become `HX-Retarget`, `HX-Reswap`, and `HX-Trigge
 The `debug` template helper renders a styled diagnostic box using an embedded template:
 
 ```gotemplate
-{{ debug . }}
+{{ debug runtime . }}
 ```
 
 Override debug output globally, per layout, or per partial:
 
 ```go
-service.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, data *partial.Data, value any) (template.HTML, error) {
+service.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime, value any) (template.HTML, error) {
     return template.HTML(`<pre class="debug">` + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + `</pre>`), nil
 })
 ```
@@ -294,24 +294,66 @@ When more than one root has the same Go type, bind by name:
 
 ```gotemplate
 {{/*
-@interaction LikesPoll github.com/donseba/go-partial.Interaction
-@interaction LikeButton github.com/donseba/go-partial.Interaction
+@interaction LikesPoll github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction LikeButton github.com/donseba/go-partial/exp/interactions.Interaction
 */}}
 
-{{ poll LikesPoll }}
-{{ refresh LikeButton }}
+{{ poll runtime LikesPoll }}
+{{ refresh runtime LikeButton }}
 ```
 
 ```go
-content.SetInteraction(
-    partial.Poll("/posts/42/likes").As("LikesPoll").Every(5*time.Second),
-    partial.Refresh("/posts/42/likes").As("LikeButton").Target("#likes"),
+content.SetContract("interaction",
+    interactions.NewPoll("/posts/42/likes").As("LikesPoll").Every(5*time.Second),
+    interactions.NewRefresh("/posts/42/likes").As("LikeButton").Target("#likes"),
 )
 ```
 
-`SetInteraction` is the shorthand for `@interaction` roots. Use `As(name)` when the endpoint does not naturally produce the contract name; otherwise the last endpoint segment is capitalized, so `/stats` becomes `Stats`. `SetContract(annotation, values...)` handles custom typed root annotations by type.
+Interaction roots are normal go-doc contracts registered with `SetContract("interaction", values...)`. Use `As(name)` when the endpoint does not naturally produce the contract name; otherwise the last endpoint segment is capitalized, so `/stats` becomes `Stats`.
 
 Contract names cannot collide with go-partial helpers such as `partial`, `locale`, `ctx`, or `url`.
+
+go-partial keeps interaction template helpers in `github.com/donseba/go-partial/exp/interactions`.
+They are opt-in:
+
+```go
+import "github.com/donseba/go-partial/exp/interactions"
+
+service.SetFunc(interactions.FuncMap())
+```
+
+Those functions include go-doc signature metadata for the overloads that normal
+Go function declarations cannot express. The repository `.go-doc/config.json`
+wires them into editor tooling for this repo so helper calls such as
+`{{ async runtime "/stats" }}` and `{{ async runtime Stats }}` can both be
+completed and validated. The `runtime` argument is a per-render value injected
+by go-partial; it exposes request context, the active connector, partial tree,
+and diagnostic renderers to helpers without package globals.
+
+Use the inline endpoint form when the endpoint is naturally local to the
+template, especially inside loops:
+
+```gotemplate
+{{ range .Rows }}
+    {{ async runtime "/async/row/:row" "row" .ID }}
+{{ end }}
+```
+
+Use a named interaction when Go should own stable IDs, targets, intervals,
+events, placeholders, or reuse:
+
+```gotemplate
+{{/*
+@interaction LikesPoll github.com/donseba/go-partial/exp/interactions.Interaction
+*/}}
+{{ poll runtime LikesPoll }}
+```
+
+```go
+content.SetContract("interaction",
+    interactions.NewPoll("/posts/42/likes").As("LikesPoll").Every(5*time.Second),
+)
+```
 
 ## Template Composition
 For repeated sections that should be understood by go-doc and also render as HTMX targets, prefer native templates plus `SetDot`. The parent owns the loop, and the nested template receives the row as normal dot data:
@@ -337,9 +379,9 @@ Register the row partial on the parent so the parent parse can see the row templ
 ```go
 rowPartial := partial.NewID("row", "templates/row.html")
 table.With(rowPartial)
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     row := findRowForTarget(target)
-    return partial.NewID(target, "templates/row.html").SetDot(row), nil, true
+    return partial.NewID(target, "templates/row.html").SetDot(row), true
 })
 ```
 
@@ -352,7 +394,7 @@ For layout wrappers, render the route content through `content`:
 Avoid using `partial` as a general row-composition helper in new code. Native `template` calls keep the template idiomatic and give go-doc the strongest type information. Use `partial` when you intentionally want to render a template path through go-partial's render path:
 
 ```gotemplate
-{{ partial "templates/notice.gohtml" .Notice }}
+{{ partial runtime "templates/notice.gohtml" .Notice }}
 ```
 
 Keep registered partials for HTMX targets, OOB output, selection/action rendering, and places where the browser can request a stable partial ID.
@@ -400,6 +442,37 @@ p.SetFunc(funcs)
 ```
 
 `SetFunc` registers helpers in the current scope. Function names inherited from the service or layout remain available, and protected go-partial helper names cannot be overwritten.
+
+go-partial reserves only the helpers it injects for rendering and request state:
+`runtime`, `partial`, `content`, `ctx`, `request`, `url`, `locale`, `csrf`,
+OOB helpers, and connector helpers such as `targetIs`, `selectionIs`, and
+`actionIs`. Generic helpers such as `dict`, string helpers, and date helpers are
+ordinary template functions and may be replaced.
+
+Optional helper providers live under `exp/`:
+
+```go
+import (
+    "github.com/donseba/go-partial/exp/interactions"
+    "github.com/donseba/go-partial/exp/templatehelpers"
+)
+
+service.SetFunc(
+    interactions.FuncMap(),
+    templatehelpers.FuncMap(),
+)
+```
+
+For go-doc, point provider discovery at the same packages:
+
+```json
+{
+  "providers": [
+    "github.com/donseba/go-partial/exp/interactions",
+    "github.com/donseba/go-partial/exp/templatehelpers"
+  ]
+}
+```
 
 ### Usage in Template:
 ```html
@@ -459,12 +532,12 @@ tablePartial := partial.NewID("table", "templates/table.html").
     SetDot(TablePage{Rows: rows})
 tablePartial.With(rowPartial)
 
-tablePartial.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+tablePartial.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     row, ok := findRowForTarget(target)
     if !ok {
-        return nil, nil, false
+        return nil, false
     }
-    return partial.NewID(target, "templates/row.html").SetDot(row), nil, true
+    return partial.NewID(target, "templates/row.html").SetDot(row), true
 })
 
 out, err := layout.Set(tablePartial).RenderWithRequest(r.Context(), r)
@@ -484,10 +557,10 @@ This is equivalent to `tablePartial.With(partial.NewID("row", "templates/row.htm
 In your templates, prefer this model:
 
 - **{{.}}**: Your app model when the partial uses `SetDot`.
-- **Typed roots**: Additional typed values registered with `SetModel`, `SetInteraction`, or `SetContract`.
+- **Typed roots**: Additional typed values registered with `SetModel` or `SetContract`.
 - **{{ctx}}**, **{{request}}**, **{{url}}**, **{{locale}}**, **{{csrf}}**, **{{basePath}}**: request-aware helpers that stay available when `SetDot` changes `.`.
 
-The older map-wrapper APIs (`SetData`, `AddData`, and `MergeData`) are still available for tests and compatibility, but they are not the recommended v1 data model. They expose values through `.Data`, which go-doc cannot type as precisely as a real model.
+go-partial does not wrap your model in `.Data`, `.Service`, `.Layout`, or `.Global`. Shared application values should be explicit typed roots, for example `SetModel(serviceInfo)` with a matching go-doc declaration. Request-scoped values live behind helper functions so changing dot never hides them.
 
 ## Concurrency and Template Caching
 The package includes concurrency safety measures for template caching:
@@ -559,3 +632,4 @@ Contributions are welcome! Please open an issue or submit a pull request with yo
 
 This project is licensed under the [MIT License](LICENSE).
 ```
+

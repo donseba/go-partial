@@ -8,6 +8,7 @@ import (
 	"time"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/interactions"
 )
 
 func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
@@ -17,16 +18,16 @@ func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
 		SetDot(InteractionPage{
 			Title: "Interaction helpers",
 		}).
-		SetInteraction(
-			partial.Async("/interactions/async"),
-			partial.Poll("/interactions/poll").Every(3*time.Second),
-			partial.On("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
-			partial.Refresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
-			partial.Async("/interactions/profile").ID("profile"),
-			partial.Refresh("/interactions/profile").As("ProfileRefresh").ID("profile-refresh").Target("#profile").Placeholder("Refresh profile"),
-			partial.Stream("/interactions/stream").Placeholder("Waiting for stream..."),
-			partial.Prefetch("/interactions/async").As("Prefetch"),
-			partial.Reveal("/interactions/reveal"),
+		SetContract("interaction",
+			interactions.NewAsync("/interactions/async"),
+			interactions.NewPoll("/interactions/poll").Every(3*time.Second),
+			interactions.NewOn("showcase:ping", "/interactions/on").ID("on-listener").Target("#on-target").Placeholder(""),
+			interactions.NewRefresh("/interactions/refresh").ID("refresh-trigger").Target("#refresh-panel").Placeholder("Refresh panel"),
+			interactions.NewAsync("/interactions/profile").ID("profile"),
+			interactions.NewRefresh("/interactions/profile").As("ProfileRefresh").ID("profile-refresh").Target("#profile").Placeholder("Refresh profile"),
+			interactions.NewStream("/interactions/stream").Placeholder("Waiting for stream..."),
+			interactions.NewPrefetch("/interactions/async").As("Prefetch"),
+			interactions.NewReveal("/interactions/reveal"),
 		).
 		With(asyncPartial)
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/donseba/go-partial/exp/templatehelpers"
 )
 
 type benchmarkRow struct {
@@ -42,7 +44,7 @@ func benchmarkRenderWithRequestSimple(b *testing.B, useCache bool) {
 	partial := NewID("content", "templates/simple.gohtml").
 		SetFileSystem(benchmarkFS()).
 		UseTemplateCache(useCache).
-		SetData(map[string]any{
+		SetDot(map[string]any{
 			"Title": "Benchmark",
 			"Body":  "A small direct render.",
 		})
@@ -73,6 +75,7 @@ func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
 		FS:               benchmarkFS(),
 		UseTemplateCache: useCache,
 	})
+	svc.SetFunc(templatehelpers.FuncMap())
 	content := benchmarkContentPartial()
 	wrapper := benchmarkLayoutPartial()
 	request := benchmarkRequest()
@@ -102,6 +105,7 @@ func benchmarkRenderPerRequestLayout(b *testing.B, useCache bool) {
 		FS:               benchmarkFS(),
 		UseTemplateCache: useCache,
 	})
+	svc.SetFunc(templatehelpers.FuncMap())
 	request := benchmarkRequest()
 	ctx := context.Background()
 
@@ -127,7 +131,7 @@ func benchmarkRenderPerRequestLayout(b *testing.B, useCache bool) {
 func benchmarkContentPartial() *Partial {
 	row := NewID("row", "templates/row.gohtml")
 	return NewID("content", "templates/content.gohtml").
-		SetData(map[string]any{
+		SetDot(map[string]any{
 			"Title": "Benchmark table",
 			"Owner": "Ada",
 			"Rows":  benchmarkRows(40),
@@ -137,9 +141,11 @@ func benchmarkContentPartial() *Partial {
 
 func benchmarkLayoutPartial() *Partial {
 	notice := NewID("notice", "templates/notice.gohtml").
-		SetData(map[string]any{"Message": "Rendered as an OOB child"}).
+		SetDot(map[string]any{"Message": "Rendered as an OOB child"}).
 		SetAlwaysSwapOOB(true)
-	return NewID("layout", "templates/layout.gohtml").WithOOB(notice)
+	return NewID("layout", "templates/layout.gohtml").
+		SetDot(map[string]any{"App": "Bench App"}).
+		WithOOB(notice)
 }
 
 func benchmarkRows(count int) []benchmarkRow {
@@ -157,11 +163,11 @@ func benchmarkRows(count int) []benchmarkRow {
 
 func benchmarkFS() *inMemoryFS {
 	return &inMemoryFS{Files: map[string]string{
-		"templates/layout.gohtml":  `<!doctype html><html><body><header>{{ .Service.App }}</header>{{ content }}</body></html>`,
-		"templates/content.gohtml": `<section><h1>{{ .Data.Title }}</h1><table>{{ range .Data.Rows }}{{ template "row.gohtml" (dict "Row" . "Owner" $.Data.Owner) }}{{ end }}</table></section>`,
+		"templates/layout.gohtml":  `<!doctype html><html><body><header>{{ .App }}</header>{{ content }}</body></html>`,
+		"templates/content.gohtml": `<section><h1>{{ .Title }}</h1><table>{{ range .Rows }}{{ template "row.gohtml" (dict "Row" . "Owner" $.Owner) }}{{ end }}</table></section>`,
 		"templates/row.gohtml":     `<tr id="row-{{ .Row.ID }}"><td>{{ .Row.Name }}</td><td>{{ .Row.Price }}</td><td>{{ .Row.Status }}</td><td>{{ .Owner }}</td></tr>`,
-		"templates/notice.gohtml":  `<aside id="notice"{{ oobAttr }}>{{ .Data.Message }}</aside>`,
-		"templates/simple.gohtml":  `<article><h1>{{ .Data.Title }}</h1><p>{{ .Data.Body }}</p></article>`,
+		"templates/notice.gohtml":  `<aside id="notice"{{ oobAttr }}>{{ .Message }}</aside>`,
+		"templates/simple.gohtml":  `<article><h1>{{ .Title }}</h1><p>{{ .Body }}</p></article>`,
 	}}
 }
 

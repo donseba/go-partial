@@ -5,9 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/interactions"
+	"github.com/donseba/go-partial/exp/templatehelpers"
 )
 
 type NavItem struct {
@@ -42,6 +45,7 @@ func main() {
 			ErrorMode: partial.ErrorModeDetailed,
 		}),
 	}
+	app.service.SetFunc(interactions.FuncMap(), templatehelpers.FuncMap())
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.overview)
 	mux.HandleFunc("/docs/installation", app.installation)
@@ -94,7 +98,13 @@ func (app *App) selectionAction(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
-	app.render(w, r, "templates/docs_interactions.gohtml")
+	app.render(w, r, "templates/docs_interactions.gohtml", func(content *partial.Partial) {
+		content.SetContract("interaction",
+			interactions.NewPoll("/notifications").As("Notifications").Every(10*time.Second),
+			interactions.NewOn("cart:changed", "/cart/summary").As("CartChanged").Target("#cart"),
+			interactions.NewRefresh("/cart/summary").As("CartRefresh").Target("#cart").Swap(interactions.SwapOuterHTML),
+		)
+	})
 }
 
 func (app *App) deferred(w http.ResponseWriter, r *http.Request) {
@@ -149,8 +159,13 @@ func (app *App) errorBoundaries(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "templates/docs_error_boundaries.gohtml")
 }
 
-func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string) {
+func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string, configure ...func(*partial.Partial)) {
 	content := partial.NewID("content", tmpl).SetDot(DocsPage{})
+	for _, fn := range configure {
+		if fn != nil {
+			fn(content)
+		}
+	}
 	header := DocsHeaderPage{}
 	sidebar := DocsNavPage{Nav: app.navItems()}
 	wrapper := partial.NewID("layout", "templates/layout.gohtml").SetDot(DocsShellPage{

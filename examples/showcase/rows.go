@@ -22,21 +22,21 @@ func (app *App) tablePartial() *partial.Partial {
 		Rows:  app.rows,
 	})
 	content.With(rowPartial)
-	content.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, map[string]any, bool) {
+	content.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
 		if !strings.HasPrefix(target, "row-") {
-			return nil, nil, false
+			return nil, false
 		}
 		id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
 		if err != nil {
-			return nil, nil, false
+			return nil, false
 		}
 		for _, row := range app.rows {
 			if row.ID == id {
 				row.Status = "Updated " + time.Now().Format("15:04:05")
-				return partial.NewID(target, "templates/row.gohtml").SetDot(row), nil, true
+				return partial.NewID(target, "templates/row.gohtml").SetDot(row), true
 			}
 		}
-		return nil, nil, false
+		return nil, false
 	})
 	return content
 }
