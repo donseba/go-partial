@@ -2,6 +2,7 @@ package interactions
 
 import (
 	"context"
+	"html/template"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -22,6 +23,33 @@ func TestInteractionContractNameFromEndpoint(t *testing.T) {
 		if got := nameFromEndpoint(endpoint); got != want {
 			t.Fatalf("nameFromEndpoint(%q) = %q, want %q", endpoint, got, want)
 		}
+	}
+}
+
+func TestRendererCustomizesInteractionMarkup(t *testing.T) {
+	fsys := fstest.MapFS{
+		"async.gohtml": &fstest.MapFile{Data: []byte(`{{ async runtime "/stats" }}`)},
+	}
+
+	p := partial.NewID("async", "async.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys).
+		SetFunc(FuncMap()).
+		Use(Renderer(func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
+			return template.HTML(`<section data-kind="` + string(interaction.Kind) + `" ` + renderAttrs(attrs) + `></section>`), nil
+		}))
+
+	out, err := p.Render(context.Background())
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	body := string(out)
+	if !strings.Contains(body, `<section data-kind="async"`) {
+		t.Fatalf("expected custom interaction wrapper, got %q", body)
+	}
+	if !strings.Contains(body, `hx-get="/stats"`) {
+		t.Fatalf("expected connector attributes, got %q", body)
 	}
 }
 

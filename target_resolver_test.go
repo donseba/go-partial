@@ -28,10 +28,12 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 
 	table := NewID("content", "table.gohtml").
 		SetFileSystem(fsys).
-		SetDot(map[string]any{"Rows": rows})
+		SetDot(map[string]any{"Rows": rows}).
+		SetFunc(testTargetFuncMap()).
+		Use(testTargetRenderer())
 	rowPartial := NewID("row", "row.gohtml").SetFileSystem(fsys)
 	table.With(rowPartial)
-	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
+	testUseTargetResolver(table, func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
 		if !strings.HasPrefix(target, "row-") {
 			return nil, false
 		}

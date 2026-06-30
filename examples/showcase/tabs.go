@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/selection"
 )
 
 func (app *App) tabs(w http.ResponseWriter, r *http.Request) {
@@ -20,7 +21,7 @@ func (app *App) tabs(w http.ResponseWriter, r *http.Request) {
 			{Key: "failing", Label: "Fails"},
 		},
 	})
-	content.WithSelectMap("overview", map[string]*partial.Partial{
+	selection.WithSelectMap(content, "overview", map[string]*partial.Partial{
 		"overview": overview,
 		"activity": activity,
 		"settings": settings,

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"html/template"
 
-	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/localization"
 )
 
 type showcaseLocalizer struct {
@@ -42,11 +42,11 @@ func (t showcaseTranslator) FuncMap() template.FuncMap {
 	}
 }
 
-func (t showcaseTranslator) tl(loc partial.Localizer, key string, args ...any) string {
+func (t showcaseTranslator) tl(loc localization.Localizer, key string, args ...any) string {
 	return t.translate(loc.GetLocale(), key, args...)
 }
 
-func (t showcaseTranslator) tn(loc partial.Localizer, singular string, plural string, n int, args ...any) string {
+func (t showcaseTranslator) tn(loc localization.Localizer, singular string, plural string, n int, args ...any) string {
 	key := plural
 	if n == 1 {
 		key = singular
@@ -54,11 +54,11 @@ func (t showcaseTranslator) tn(loc partial.Localizer, singular string, plural st
 	return t.translate(loc.GetLocale(), key, args...)
 }
 
-func (t showcaseTranslator) ctl(loc partial.Localizer, context string, key string, args ...any) string {
+func (t showcaseTranslator) ctl(loc localization.Localizer, context string, key string, args ...any) string {
 	return t.translate(loc.GetLocale(), context+"."+key, args...)
 }
 
-func (t showcaseTranslator) ctn(loc partial.Localizer, context string, singular string, plural string, n int, args ...any) string {
+func (t showcaseTranslator) ctn(loc localization.Localizer, context string, singular string, plural string, n int, args ...any) string {
 	key := plural
 	if n == 1 {
 		key = singular
@@ -85,7 +85,7 @@ func showcaseTranslationFunctions() template.FuncMap {
 	return showcaseTranslator{messages: map[string]map[string]string{
 		"en_US": {
 			"title":       "Localization",
-			"intro":       "The localizer is stored in the request context and exposed to every template as .Loc.",
+			"intro":       "The localizer is stored in the request context and exposed to every template as localizer.",
 			"checkout":    "Checkout",
 			"oneMessage":  "You have one message.",
 			"manyMessage": "You have %d messages.",
@@ -98,7 +98,7 @@ func showcaseTranslationFunctions() template.FuncMap {
 		},
 		"nl_NL": {
 			"title":       "Lokalisatie",
-			"intro":       "De localizer staat in de request-context en is in elke template beschikbaar als .Loc.",
+			"intro":       "De localizer staat in de request-context en is in elke template beschikbaar als localizer.",
 			"checkout":    "Afrekenen",
 			"oneMessage":  "Je hebt een bericht.",
 			"manyMessage": "Je hebt %d berichten.",
@@ -111,7 +111,7 @@ func showcaseTranslationFunctions() template.FuncMap {
 		},
 		"fr_FR": {
 			"title":       "Localisation",
-			"intro":       "Le localizer vit dans le contexte de la requete et chaque template le lit avec .Loc.",
+			"intro":       "Le localizer vit dans le contexte de la requete et chaque template le lit avec localizer.",
 			"checkout":    "Paiement",
 			"oneMessage":  "Vous avez un message.",
 			"manyMessage": "Vous avez %d messages.",

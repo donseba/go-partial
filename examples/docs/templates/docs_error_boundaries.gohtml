@@ -6,7 +6,7 @@
 
     <h2 class="text-xl font-bold text-slate-50">Default behavior</h2>
     <p class="leading-7 text-slate-400">Direct top-level failures render a useful error page. Region failures render an error section inside the parent output.</p>
-    <p class="leading-7 text-slate-400">The built-in renderer focuses on the template failure itself. In detailed mode it shows the partial ID, template list, request URL, extracted template location, and original render error.</p>
+    <p class="leading-7 text-slate-400">The optional <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/errors</code> renderer focuses on the template failure itself. In detailed mode it shows the partial ID, template list, request URL, extracted template location, and original render error.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Where boundaries apply</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
@@ -20,18 +20,21 @@
     </table>
 
     <h2 class="text-xl font-bold text-slate-50">Development and production</h2>
-    <p class="leading-7 text-slate-400">The default mode is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorModeSafe</code>. It keeps the fallback useful but hides detailed error messages. During development, opt into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ErrorModeDetailed</code> to show the partial ID, template list, URL, template location, and original error.</p>
+    <p class="leading-7 text-slate-400">The default extension mode is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">errors.ModeSafe</code>. It keeps the fallback useful but hides detailed error messages. During development, opt into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">errors.ModeDetailed</code> to show the partial ID, template list, URL, template location, and original error.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    ErrorMode: partial.ErrorModeDetailed,
-})</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(nil).
+    Use(errors.Renderer(errors.WithMode(errors.ModeDetailed)))</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Custom renderer</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    ErrorRenderer: func(ctx context.Context, p *partial.Partial, r *http.Request, err error) (template.HTML, error) {
-        return template.HTML("&lt;section&gt;Something went wrong&lt;/section&gt;"), nil
-    },
-})</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(nil).
+    Use(partial.RendererHooks{
+        InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+            if ctx.Kind != errors.RenderKindError {
+                return next(ctx)
+            }
+            return template.HTML("&lt;section&gt;Something went wrong&lt;/section&gt;"), nil
+        },
+    })</code></pre>
 
     <p class="leading-7 text-slate-400">The separate showcase app includes a live broken-template example. It keeps the shell in place and only replaces the failing content section.</p>
 </article>

@@ -4,8 +4,8 @@
 <section class="grid gap-5">
     <header class="grid max-w-3xl gap-2.5">
         <span class="text-[13px] font-extrabold uppercase text-teal-900">Localization</span>
-        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ tl .Loc "title" }}</h1>
-        <p class="leading-7 text-stone-600">{{ tl .Loc "intro" }}</p>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ tl localizer "title" }}</h1>
+        <p class="leading-7 text-stone-600">{{ tl localizer "intro" }}</p>
     </header>
 
     <div class="rounded-lg border border-stone-300 bg-white p-4 grid gap-3.5">
@@ -23,19 +23,19 @@
         </div>
 
         <article class="grid gap-3.5">
-            <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ tl .Loc "active" }}: {{ .Loc.GetLocale }}</span>
-            <h2 class="text-lg font-bold text-stone-950">{{ tl .Loc "checkout" }}</h2>
+            <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ tl localizer "active" }}: {{ locale }}</span>
+            <h2 class="text-lg font-bold text-stone-950">{{ tl localizer "checkout" }}</h2>
             <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-lg border border-stone-300 bg-white p-4">
-                <dt>{{ tl .Loc "total" }}</dt>
+                <dt>{{ tl localizer "total" }}</dt>
                 <dd>EUR 42.75</dd>
-                <dt>{{ tl .Loc "delivery" }}</dt>
-                <dd>{{ tl .Loc "status" }}</dd>
+                <dt>{{ tl localizer "delivery" }}</dt>
+                <dd>{{ tl localizer "status" }}</dd>
                 <dt>tn</dt>
-                <dd>{{ tn .Loc "oneMessage" "manyMessage" .Count .Count }}</dd>
+                <dd>{{ tn localizer "oneMessage" "manyMessage" .Count .Count }}</dd>
                 <dt>ctl</dt>
-                <dd>{{ ctl .Loc "button" "save" }}</dd>
+                <dd>{{ ctl localizer "button" "save" }}</dd>
             </dl>
-            <p class="leading-7 text-stone-600">{{ tl .Loc "explanation" }}</p>
+            <p class="leading-7 text-stone-600">{{ tl localizer "explanation" }}</p>
         </article>
     </div>
 
@@ -46,14 +46,14 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := localization.WithLocalizer(r.Context(), localizer)
 content.WriteWithRequest(ctx, w, r)</code></pre>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;h1&gt;{{ "{{ tl .Loc \"title\" }}" }}&lt;/h1&gt;
-&lt;p&gt;{{ "{{ tn .Loc \"oneMessage\" \"manyMessage\" .Count .Count }}" }}&lt;/p&gt;
-&lt;button&gt;{{ "{{ ctl .Loc \"button\" \"save\" }}" }}&lt;/button&gt;</code></pre>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;h1&gt;{{ "{{ tl localizer \"title\" }}" }}&lt;/h1&gt;
+&lt;p&gt;{{ "{{ tn localizer \"oneMessage\" \"manyMessage\" .Count .Count }}" }}&lt;/p&gt;
+&lt;button&gt;{{ "{{ ctl localizer \"button\" \"save\" }}" }}&lt;/button&gt;</code></pre>
     </article>
 </section>

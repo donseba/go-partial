@@ -11,6 +11,7 @@ import (
 	"github.com/donseba/go-partial/connector"
 	"github.com/donseba/go-partial/exp/interactions"
 	"github.com/donseba/go-partial/exp/templatehelpers"
+	exterrors "github.com/donseba/go-partial/ext/errors"
 )
 
 type NavItem struct {
@@ -24,7 +25,8 @@ type DocsPage struct{}
 type DocsHeaderPage struct{}
 
 type DocsNavPage struct {
-	Nav []NavItem
+	Nav    []NavItem
+	Groups []string
 }
 
 type DocsShellPage struct {
@@ -42,7 +44,9 @@ func main() {
 		service: partial.NewService(&partial.Config{
 			Connector: connector.NewHTMX(nil),
 			FS:        os.DirFS("examples/docs"),
-			ErrorMode: partial.ErrorModeDetailed,
+			Renderers: []partial.Renderer{
+				exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
+			},
 		}),
 	}
 	app.service.SetFunc(interactions.FuncMap(), templatehelpers.FuncMap())
@@ -167,7 +171,8 @@ func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string, conf
 		}
 	}
 	header := DocsHeaderPage{}
-	sidebar := DocsNavPage{Nav: app.navItems()}
+	nav := app.navItems()
+	sidebar := DocsNavPage{Nav: nav, Groups: navGroups(nav)}
 	wrapper := partial.NewID("layout", "templates/layout.gohtml").SetDot(DocsShellPage{
 		AppName: "go-partial",
 		Header:  header,
@@ -189,20 +194,33 @@ func (app *App) navItems() []NavItem {
 		{Path: "/docs/installation", Label: "Installation", Group: "Guide"},
 		{Path: "/docs/rendering", Label: "Rendering model", Group: "Guide"},
 		{Path: "/docs/data-context", Label: "Data and context", Group: "Guide"},
-		{Path: "/docs/selection-action", Label: "Selection and action", Group: "Guide"},
-		{Path: "/docs/interactions", Label: "Interaction helpers", Group: "Guide"},
 		{Path: "/docs/deferred", Label: "Deferred partials", Group: "Guide"},
-		{Path: "/docs/flow", Label: "Page flows", Group: "Guide"},
-		{Path: "/docs/target-resolver", Label: "Target resolver", Group: "Guide"},
-		{Path: "/docs/localization", Label: "Localization", Group: "Guide"},
-		{Path: "/docs/error-boundaries", Label: "Error boundaries", Group: "Guide"},
+		{Path: "/docs/error-boundaries", Label: "Error boundaries", Group: "ext"},
+		{Path: "/docs/selection-action", Label: "Selection and action", Group: "exp"},
+		{Path: "/docs/interactions", Label: "Interaction helpers", Group: "exp"},
+		{Path: "/docs/flow", Label: "Page flows", Group: "exp"},
+		{Path: "/docs/target-resolver", Label: "Target resolver", Group: "exp"},
+		{Path: "/docs/localization", Label: "Localization", Group: "exp"},
+		{Path: "/docs/integrations/sse", Label: "Server-sent events", Group: "exp"},
+		{Path: "/docs/api/pageflow", Label: "PageFlow API", Group: "exp"},
 		{Path: "/docs/integrations", Label: "Overview", Group: "Integration"},
 		{Path: "/docs/integrations/htmx", Label: "HTMX", Group: "Integration"},
-		{Path: "/docs/integrations/sse", Label: "Server-sent events", Group: "Integration"},
 		{Path: "/docs/integrations/custom-clients", Label: "Custom clients", Group: "Integration"},
 		{Path: "/docs/api", Label: "Core API", Group: "Reference"},
-		{Path: "/docs/api/pageflow", Label: "PageFlow API", Group: "Reference"},
 		{Path: "/docs/template-functions", Label: "Template functions", Group: "Reference"},
 		{Path: "/docs/connectors", Label: "Connectors", Group: "Reference"},
 	}
+}
+
+func navGroups(items []NavItem) []string {
+	seen := make(map[string]struct{}, len(items))
+	groups := make([]string, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item.Group]; ok {
+			continue
+		}
+		seen[item.Group] = struct{}{}
+		groups = append(groups, item.Group)
+	}
+	return groups
 }

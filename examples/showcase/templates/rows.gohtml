@@ -36,7 +36,7 @@
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">row := partial.NewID("row", "templates/row.gohtml")
 table := partial.NewID("content", "templates/rows.gohtml").SetDot(page)
 table.With(row)
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     row := findRow(target)
     return partial.NewID(target, "templates/row.gohtml").SetDot(row), true
 })</code></pre>

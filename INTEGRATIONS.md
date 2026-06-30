@@ -97,7 +97,7 @@ content.SetConnector(connector.NewUnpoly(nil))
 SSE is a writer layer, not a connector. Use it when the server decides to stream rendered patches after the initial request.
 
 ```go
-events := partial.NewSSEWriter(w)
+events := sse.NewWriter(w)
 
 status := partial.NewID("status", "status.gohtml").
     SetDot(StatusPatch{Step: 2})

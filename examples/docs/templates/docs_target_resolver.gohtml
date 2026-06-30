@@ -2,7 +2,7 @@
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Target resolver</h1>
-    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> handles DOM targets that are not fixed partial IDs. It is the tool for tables, feeds, cards, and repeated rows.</p>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> handles DOM targets that are not fixed partial IDs. It is the tool for tables, feeds, cards, and repeated rows.</p>
 
     <h2 class="text-xl font-bold text-slate-50">The problem</h2>
     <p class="leading-7 text-slate-400">A table may render one row template many times. Every row needs its own DOM ID so HTMX can replace exactly that row, while the parent still uses native Go template composition.</p>
@@ -31,7 +31,7 @@ table := partial.NewID("content", "templates/users/table.gohtml").
     SetDot(UserTablePage{Rows: rows}).
     With(rowPartial)
 
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     if !strings.HasPrefix(target, "row-") {
         return nil, false
     }
@@ -54,7 +54,7 @@ table.WithTargetResolver(func(ctx context.Context, r *http.Request, target strin
         <li>The browser sends an HTMX request with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target: row-42</code>.</li>
         <li>The connector marks it as a partial request and exposes the target value.</li>
         <li>go-partial first checks for a registered region with ID <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
-        <li>If no registered region exists, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> receives <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
+        <li>If no registered region exists, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> receives <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
         <li>The resolver returns the row template partial with fresh dot data for row 42.</li>
         <li>Only that row template is rendered and swapped into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">#row-42</code>.</li>
     </ol>
@@ -64,7 +64,7 @@ table.WithTargetResolver(func(ctx context.Context, r *http.Request, target strin
         <li>Keep DOM IDs stable and unique, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-{{ "{" }}id{{ "}" }}</code>.</li>
         <li>Do not cache row HTML when row data can change. Resolve fresh data per request.</li>
         <li>Return <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">false</code> for unknown target shapes so normal registered-region lookup and errors stay predictable.</li>
-        <li>Use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> calls for repeated rendering, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithTargetResolver</code> for targeted replacement of one repeated item.</li>
+        <li>Use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> calls for repeated rendering, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> for targeted replacement of one repeated item.</li>
     </ul>
 </article>
 

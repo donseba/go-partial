@@ -8,6 +8,7 @@ import (
 	"time"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/target"
 )
 
 func (app *App) rowsPage(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +23,7 @@ func (app *App) tablePartial() *partial.Partial {
 		Rows:  app.rows,
 	})
 	content.With(rowPartial)
-	content.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+	target.WithResolver(content, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
 		if !strings.HasPrefix(target, "row-") {
 			return nil, false
 		}

@@ -22,7 +22,7 @@ When a template uses `SetDot`, request-specific values are still available throu
 | --- | --- | --- |
 | `content` | Layout helper | Render the content partial configured with `layout.Set(content).Wrap(wrapper)`. |
 | `partial` | Composition helper | Render a template path through go-partial's render path. Prefer native `template` for typed rows. |
-| `selection` | Helper | Render the selected partial from a `WithSelectMap` registration. |
+| `selection` | Helper | Render the selected partial from a `selection.WithSelectMap` registration. |
 | `action` | Helper | Render the partial returned by an action callback. |
 | `async` | Interaction helper | Render connector-aware deferred loading markup for an endpoint. |
 | `reveal` | Interaction helper | Load an endpoint when the generated area enters the viewport. |
@@ -73,7 +73,7 @@ The same row template can still be rendered as an HTMX target by registering a p
 rowPartial := partial.NewID("row", "templates/row.gohtml")
 
 table.With(rowPartial)
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     if !strings.HasPrefix(target, "row-") {
         return nil, false
     }
@@ -123,7 +123,6 @@ The template owns the names `Page` and `User`. go-partial scans the go-doc contr
 When `SetDot` is used, `.` belongs to your app model. Request-specific data remains available through helpers:
 
 ```gotemplate
-{{ ctx.Locale }}
 {{ ctx.URL.Path }}
 {{ request.Method }}
 {{ locale }}
@@ -131,7 +130,7 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 {{ basePath }}
 ```
 
-`ctx` returns a `partial.RenderContext` containing `Context`, `Request`, `URL`, `Loc`, `Locale`, `Csrf`, and `BasePath`.
+`ctx` returns the active `partial.RenderContext`. Request helpers such as `request`, `url`, `locale`, `csrf`, and `basePath` are installed by the active renderer chain.
 
 ## `partial`
 
@@ -259,10 +258,10 @@ Interaction helpers are deferred client-side loading, not blocking server-side e
 
 ## `selection`
 
-`selection` renders one partial from a `WithSelectMap` registration. The selected key comes from the active connector, for example `X-Select` when using the HTMX connector.
+`selection` renders one partial from a `selection.WithSelectMap` registration. The selected key comes from the active connector, for example `X-Select` when using the HTMX connector.
 
 ```go
-content.WithSelectMap("summary", map[string]*partial.Partial{
+selection.WithSelectMap(content, "summary", map[string]*partial.Partial{
     "summary": partial.NewID("summary", "summary.gohtml"),
     "details": partial.NewID("details", "details.gohtml"),
 })
@@ -322,10 +321,10 @@ Connector helpers expose the active target, selection, and action values:
 {{ actionValue }}
 ```
 
-These helpers stay in core because they are tied to the active request,
-connector, and render path. go-partial protects only this core set:
-`runtime`, `partial`, `content`, request/context helpers, OOB helpers, and the
-target/selection/action helper families.
+URL, runtime, content, request/context, and OOB helpers stay in core because
+they are tied directly to the render path. Connector helpers such as
+`targetValue`, `selectionValue`, and `actionValue` are installed by their
+`exp` renderers when the application opts into those packages.
 
 Generic helpers such as strings, maps, dates, and counters are convenience
 helpers. Register them from the optional provider when you want them:
@@ -336,18 +335,31 @@ import "github.com/donseba/go-partial/exp/templatehelpers"
 service.SetFunc(templatehelpers.FuncMap())
 ```
 
-## Translation Helpers
-
-Translation helpers are user-owned. The renderer exposes `.Loc` from the request context, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
+Use narrower maps when you want a smaller helper surface:
 
 ```go
-service.SetFunc(translator.FuncMap())
+service.SetFunc(
+    templatehelpers.StringFuncMap(),
+    templatehelpers.CollectionFuncMap(),
+)
+```
+
+`templatehelpers.HTMLFuncMap()` is separate because helpers such as `safeHTML`
+mark content as trusted HTML.
+
+## Translation Helpers
+
+Translation helpers are user-owned. The localization renderer exposes `localizer` and `locale`, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
+
+```go
+service.SetFunc(localization.FuncMap(), translator.FuncMap())
+service.Use(localization.Renderer())
 ```
 
 ```gotemplate
-{{ tl .Loc "Hello, World!" }}
-{{ tn .Loc "You have one message." "You have %d messages." 5 5 }}
-{{ ctl .Loc "button" "save" }}
+{{ tl localizer "Hello, World!" }}
+{{ tn localizer "You have one message." "You have %d messages." 5 5 }}
+{{ ctl localizer "button" "save" }}
 ```
 
 `github.com/donseba/go-translator` already exposes `FuncMap()` with this helper style.

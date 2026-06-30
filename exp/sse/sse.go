@@ -1,4 +1,5 @@
-package partial
+// Package sse provides experimental server-sent event helpers for streaming rendered partials.
+package sse
 
 import (
 	"bytes"
@@ -9,65 +10,65 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	partial "github.com/donseba/go-partial"
 )
 
 type (
-	SSEHeaderKey   string
-	SSEHeaderValue string
-	SSEEventName   string
+	HeaderKey   string
+	HeaderValue string
+	EventName   string
 
-	SSEWriter struct {
+	Writer struct {
 		w       http.ResponseWriter
 		flusher http.Flusher
 	}
 
-	SSEPatch struct {
+	Patch struct {
 		Target string        `json:"target"`
 		HTML   template.HTML `json:"html"`
 	}
 
-	SSESignal struct {
+	Signal struct {
 		Name  string `json:"name"`
 		Value any    `json:"value"`
 	}
 )
 
 const (
-	SSEHeaderContentType      SSEHeaderKey = "Content-Type"
-	SSEHeaderCacheControl     SSEHeaderKey = "Cache-Control"
-	SSEHeaderConnection       SSEHeaderKey = "Connection"
-	SSEHeaderXAccelBuffering  SSEHeaderKey = "X-Accel-Buffering"
-	SSEHeaderTransferEncoding SSEHeaderKey = "Transfer-Encoding"
+	HeaderContentType     HeaderKey = "Content-Type"
+	HeaderCacheControl    HeaderKey = "Cache-Control"
+	HeaderConnection      HeaderKey = "Connection"
+	HeaderXAccelBuffering HeaderKey = "X-Accel-Buffering"
 )
 
 const (
-	SSEContentTypeEventStream  SSEHeaderValue = "text/event-stream"
-	SSECacheControlNoCache     SSEHeaderValue = "no-cache"
-	SSEConnectionKeepAlive     SSEHeaderValue = "keep-alive"
-	SSEXAccelBufferingNo       SSEHeaderValue = "no"
-	SSETransferEncodingChunked SSEHeaderValue = "chunked"
+	ContentTypeEventStream HeaderValue = "text/event-stream"
+	CacheControlNoCache    HeaderValue = "no-cache"
+	ConnectionKeepAlive    HeaderValue = "keep-alive"
+	XAccelBufferingNo      HeaderValue = "no"
 )
 
 const (
-	SSEEventPatch  SSEEventName = "partial:patch"
-	SSEEventSignal SSEEventName = "partial:signal"
-	SSEEventError  SSEEventName = "partial:error"
+	EventPatch  EventName = "partial:patch"
+	EventSignal EventName = "partial:signal"
+	EventError  EventName = "partial:error"
 )
 
-func (h SSEHeaderKey) String() string {
+func (h HeaderKey) String() string {
 	return string(h)
 }
 
-func (v SSEHeaderValue) String() string {
+func (v HeaderValue) String() string {
 	return string(v)
 }
 
-func (e SSEEventName) String() string {
+func (e EventName) String() string {
 	return string(e)
 }
 
-func NewSSEWriter(w http.ResponseWriter) *SSEWriter {
-	writer := &SSEWriter{w: w}
+func NewWriter(w http.ResponseWriter) *Writer {
+	writer := &Writer{w: w}
 	if flusher, ok := w.(http.Flusher); ok {
 		writer.flusher = flusher
 	}
@@ -75,18 +76,18 @@ func NewSSEWriter(w http.ResponseWriter) *SSEWriter {
 	return writer
 }
 
-func (s *SSEWriter) ApplyHeaders() {
+func (s *Writer) ApplyHeaders() {
 	if s == nil || s.w == nil {
 		return
 	}
 	headers := s.w.Header()
-	headers.Set(SSEHeaderContentType.String(), SSEContentTypeEventStream.String())
-	headers.Set(SSEHeaderCacheControl.String(), SSECacheControlNoCache.String())
-	headers.Set(SSEHeaderConnection.String(), SSEConnectionKeepAlive.String())
-	headers.Set(SSEHeaderXAccelBuffering.String(), SSEXAccelBufferingNo.String())
+	headers.Set(HeaderContentType.String(), ContentTypeEventStream.String())
+	headers.Set(HeaderCacheControl.String(), CacheControlNoCache.String())
+	headers.Set(HeaderConnection.String(), ConnectionKeepAlive.String())
+	headers.Set(HeaderXAccelBuffering.String(), XAccelBufferingNo.String())
 }
 
-func (s *SSEWriter) Comment(comment string) error {
+func (s *Writer) Comment(comment string) error {
 	if s == nil || s.w == nil {
 		return fmt.Errorf("sse writer is not initialized")
 	}
@@ -99,7 +100,7 @@ func (s *SSEWriter) Comment(comment string) error {
 	return err
 }
 
-func (s *SSEWriter) Retry(after time.Duration) error {
+func (s *Writer) Retry(after time.Duration) error {
 	if s == nil || s.w == nil {
 		return fmt.Errorf("sse writer is not initialized")
 	}
@@ -107,11 +108,11 @@ func (s *SSEWriter) Retry(after time.Duration) error {
 	return err
 }
 
-func (s *SSEWriter) Event(event SSEEventName, data any) error {
+func (s *Writer) Event(event EventName, data any) error {
 	return s.EventID("", event, data)
 }
 
-func (s *SSEWriter) EventID(id string, event SSEEventName, data any) error {
+func (s *Writer) EventID(id string, event EventName, data any) error {
 	if s == nil || s.w == nil {
 		return fmt.Errorf("sse writer is not initialized")
 	}
@@ -138,14 +139,14 @@ func (s *SSEWriter) EventID(id string, event SSEEventName, data any) error {
 	return err
 }
 
-func (s *SSEWriter) PatchHTML(target string, html template.HTML) error {
-	return s.Event(SSEEventPatch, SSEPatch{
+func (s *Writer) PatchHTML(target string, html template.HTML) error {
+	return s.Event(EventPatch, Patch{
 		Target: target,
 		HTML:   html,
 	})
 }
 
-func (s *SSEWriter) PatchPartial(ctx context.Context, r *http.Request, target string, p *Partial) error {
+func (s *Writer) PatchPartial(ctx context.Context, r *http.Request, target string, p *partial.Partial) error {
 	if p == nil {
 		return fmt.Errorf("partial is not initialized")
 	}
@@ -156,23 +157,23 @@ func (s *SSEWriter) PatchPartial(ctx context.Context, r *http.Request, target st
 	return s.PatchHTML(target, html)
 }
 
-func (s *SSEWriter) Signal(name string, value any) error {
-	return s.Event(SSEEventSignal, SSESignal{
+func (s *Writer) Signal(name string, value any) error {
+	return s.Event(EventSignal, Signal{
 		Name:  name,
 		Value: value,
 	})
 }
 
-func (s *SSEWriter) Error(err error) error {
+func (s *Writer) Error(err error) error {
 	if err == nil {
 		return nil
 	}
-	return s.Event(SSEEventError, map[string]string{
+	return s.Event(EventError, map[string]string{
 		"error": err.Error(),
 	})
 }
 
-func (s *SSEWriter) Flush() {
+func (s *Writer) Flush() {
 	if s == nil || s.flusher == nil {
 		return
 	}

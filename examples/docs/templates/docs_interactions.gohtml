@@ -60,13 +60,13 @@
     <h2 class="text-xl font-bold text-slate-50">Custom markup</h2>
     <p class="leading-7 text-slate-400">The default renderer is intentionally simple. Applications can replace it when registering the optional interaction helper functions. The connector still supplies the protocol attributes, so your renderer owns the element, classes, loading state, and accessibility text.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(interactions.FuncMap(interactions.WithRenderer(func(
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.Use(interactions.Renderer(func(
     runtime *partial.Runtime,
     interaction connector.Interaction,
     attrs map[string]string,
 ) (template.HTML, error) {
     return template.HTML(renderMyWrapper(interaction, attrs)), nil
-})))</code></pre>
+}))</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">HTMX output</h2>
     <p class="leading-7 text-slate-400">With the HTMX connector, helpers map to normal HTMX attributes. Polling defaults to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">innerHTML</code> so the wrapper keeps its polling attributes after each response.</p>

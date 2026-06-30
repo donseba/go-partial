@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/selection"
 )
 
 func (app *App) selection(w http.ResponseWriter, r *http.Request) {
@@ -16,7 +17,7 @@ func (app *App) selection(w http.ResponseWriter, r *http.Request) {
 	content := partial.NewID("content", "templates/selection.gohtml").SetDot(PageTitle{
 		Title: "Selection partials",
 	})
-	content.WithSelectMap("summary", map[string]*partial.Partial{
+	selection.WithSelectMap(content, "summary", map[string]*partial.Partial{
 		"summary": summary,
 		"details": details,
 	})

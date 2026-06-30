@@ -8,9 +8,9 @@
         <p class="leading-7 text-stone-600">These values are injected into the template context on every render.</p>
     </header>
 
-    <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5 rounded-lg border border-stone-300 bg-white p-4 rounded-lg border border-stone-300 bg-white p-4">
+    <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5">
         <dt>URL path</dt>
-        <dd>{{ if url }}{{ url.Path }}{{ end }}</dd>
+        <dd>{{ with url }}{{ .Path }}{{ end }}</dd>
         <dt>Base path</dt>
         <dd>{{ if basePath }}{{ basePath }}{{ else }}/{{ end }}</dd>
         <dt>Locale</dt>
@@ -28,8 +28,8 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
-ctx = context.WithValue(ctx, partial.CsrfContextKey, csrf)
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := localization.WithLocalizer(r.Context(), localizer)
+ctx = csrf.WithToken(ctx, csrfToken)
 content.WriteWithRequest(ctx, w, r)</code></pre>
     </article>
 

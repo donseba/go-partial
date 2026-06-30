@@ -137,7 +137,7 @@ func TestSetModelRegistersGoDocModelContractsWithCache(t *testing.T) {
 
 func TestSetModelRejectsProtectedHelperCollision(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
-		"templates/page.gohtml": `{{/* @model locale github.com/donseba/go-partial.contractPage */}}{{ locale.Title }}`,
+		"templates/page.gohtml": `{{/* @model content github.com/donseba/go-partial.contractPage */}}{{ content.Title }}`,
 	}}
 
 	_, err := NewID("content", "templates/page.gohtml").
@@ -942,8 +942,8 @@ func TestWithSelectMap(t *testing.T) {
 
 	// Create the content partial with the selection map
 	contentPartial := New("content.gohtml").
-		ID("content").
-		WithSelectMap("default", partialsMap)
+		ID("content")
+	testWithSelectMap(contentPartial, "default", partialsMap)
 
 	// Create the layout partial
 	index := New("index.gohtml")
@@ -952,6 +952,8 @@ func TestWithSelectMap(t *testing.T) {
 	svc := NewService(&Config{
 		FS: fsys,
 	})
+	svc.SetFunc(testSelectionFuncMap())
+	svc.Use(testSelectionRenderer())
 	layout := svc.NewLayout().
 		Set(contentPartial).
 		Wrap(index)
@@ -1039,9 +1041,10 @@ func TestSelectionPartialInheritsParentConnectorContext(t *testing.T) {
 	fsys.AddFile("settings.gohtml", `<div>{{ selectionValue }}</div>`)
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
-	content.WithSelectMap("settings", map[string]*Partial{
+	testWithSelectMap(content, "settings", map[string]*Partial{
 		"settings": NewID("settings", "settings.gohtml").SetFileSystem(fsys),
 	})
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "settings")
@@ -1061,9 +1064,10 @@ func TestSelectionIfUsesDefaultSelection(t *testing.T) {
 	fsys.AddFile("content.gohtml", `<button class="{{ if selectionIs "summary" }}active{{ end }}">Summary</button>`)
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
-	content.WithSelectMap("summary", map[string]*Partial{
+	testWithSelectMap(content, "summary", map[string]*Partial{
 		"summary": NewID("summary", "summary.gohtml").SetFileSystem(fsys),
 	})
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	out, err := content.RenderWithRequest(context.Background(), req)
@@ -1082,9 +1086,10 @@ func TestSelectionPartialUsesErrorFragmentOnRenderError(t *testing.T) {
 	fsys.AddFile("broken.gohtml", `<div>{{ if .Missing }}broken</div>`)
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
-	content.WithSelectMap("broken", map[string]*Partial{
-		"broken": NewID("broken", "broken.gohtml").SetFileSystem(fsys),
+	testWithSelectMap(content, "broken", map[string]*Partial{
+		"broken": NewID("broken", "broken.gohtml").SetFileSystem(fsys).Use(testErrorRenderer(false)),
 	})
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "broken")
@@ -1110,15 +1115,161 @@ func (l testLocalizer) GetLocale() string {
 	return l.locale
 }
 
+type testLocaleContextKey struct{}
+
+type testSelectionConfig struct {
+	Default  string
+	Partials map[string]*Partial
+}
+
+type testSelectionKey struct{}
+
+type testTargetResolverKey struct{}
+
+func testWithSelectMap(p *Partial, defaultKey string, partials map[string]*Partial) {
+	p.SetExtension(testSelectionKey{}, testSelectionConfig{Default: defaultKey, Partials: partials})
+}
+
+func testSelectionFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"selection":       func() template.HTML { return "" },
+		"selectionHeader": func() string { return "" },
+		"selectionValue":  func() string { return "" },
+		"selectionIs":     func(...string) bool { return false },
+	}
+}
+
+func testSelectionRenderer() Renderer {
+	return RendererHooks{
+		PreflightFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			ctx.SetFunc("selectionHeader", func() string {
+				return ctx.Runtime.Connector().GetSelectHeader()
+			})
+			selectionValue := func() string {
+				selected := ctx.Runtime.Connector().GetSelectValue(ctx.Request)
+				if selected != "" {
+					return selected
+				}
+				value, _ := ctx.Partial.Extension(testSelectionKey{})
+				cfg, _ := value.(testSelectionConfig)
+				return cfg.Default
+			}
+			ctx.SetFunc("selectionValue", selectionValue)
+			ctx.SetFunc("selectionIs", func(in ...string) bool {
+				selected := selectionValue()
+				for _, value := range in {
+					if value == selected {
+						return true
+					}
+				}
+				return false
+			})
+			ctx.SetFunc("selection", func() template.HTML {
+				value, _ := ctx.Partial.Extension(testSelectionKey{})
+				cfg, _ := value.(testSelectionConfig)
+				key := selectionValue()
+				selected := cfg.Partials[key]
+				if selected == nil {
+					return template.HTML("selected partial '" + key + "' not found in parent '" + ctx.Partial.PartialID() + "'")
+				}
+				out, err := ctx.Runtime.RenderPartial(selected)
+				if err != nil {
+					fallback, fallbackErr := selected.renderErrorFragment(ctx.Context, ctx.Request, err)
+					if fallbackErr != nil {
+						return template.HTML("error rendering selected partial '" + key + "': " + fallbackErr.Error())
+					}
+					return fallback
+				}
+				return out
+			})
+			return ctx, nil
+		},
+	}
+}
+
+func testLocalizationFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"locale":    func() string { return "" },
+		"localizer": func() testLocalizer { return testLocalizer{} },
+	}
+}
+
+func testLocalizationRenderer() Renderer {
+	return RendererHooks{
+		PreflightFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			localizer := func() testLocalizer {
+				if loc, ok := ctx.Context.Value(testLocaleContextKey{}).(testLocalizer); ok {
+					return loc
+				}
+				return testLocalizer{locale: "en_US"}
+			}
+			ctx.SetFunc("localizer", localizer)
+			ctx.SetFunc("locale", func() string {
+				return localizer().GetLocale()
+			})
+			return ctx, nil
+		},
+	}
+}
+
+func testTargetFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"targetHeader": func() string { return "" },
+		"targetValue":  func() string { return "" },
+		"targetIs":     func(...string) bool { return false },
+	}
+}
+
+func testUseTargetResolver(p *Partial, resolver func(context.Context, *http.Request, string) (*Partial, bool)) {
+	p.SetExtension(testTargetResolverKey{}, resolver)
+}
+
+func testTargetRenderer() Renderer {
+	return RendererHooks{
+		PreflightFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			ctx.SetFunc("targetHeader", func() string {
+				return ctx.Runtime.Connector().GetTargetHeader()
+			})
+			ctx.SetFunc("targetValue", func() string {
+				return ctx.Runtime.Connector().GetTargetValue(ctx.Request)
+			})
+			ctx.SetFunc("targetIs", func(in ...string) bool {
+				target := ctx.Runtime.Connector().GetTargetValue(ctx.Request)
+				for _, value := range in {
+					if value == target {
+						return true
+					}
+				}
+				return false
+			})
+			if ctx.Kind != RenderKindTarget {
+				return ctx, nil
+			}
+			value, _ := ctx.Partial.Extension(testTargetResolverKey{})
+			resolver, _ := value.(func(context.Context, *http.Request, string) (*Partial, bool))
+			if resolver == nil {
+				return ctx, nil
+			}
+			resolved, ok := resolver(ctx.Context, ctx.Request, ctx.Name)
+			if ok && resolved != nil {
+				ctx.Partial = resolved
+			}
+			return ctx, nil
+		},
+	}
+}
+
 func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("content.gohtml", `{{ tl ctx.Loc "hello" }}`)
+	fsys.AddFile("content.gohtml", `{{ tl localizer "hello" }}`)
 
 	svc := NewService(&Config{
 		FS: fsys,
 	})
+	svc.SetFunc(testLocalizationFuncMap())
+	svc.Use(testLocalizationRenderer())
 	svc.SetFunc(template.FuncMap{
-		"tl": func(loc Localizer, key string) string {
+		"tl": func(loc testLocalizer, key string) string {
 			return loc.GetLocale() + ":" + key
 		},
 		"content": func() string {
@@ -1131,7 +1282,7 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 
 	content := NewID("content", "content.gohtml")
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(context.Background(), LocalizerContextKey, testLocalizer{locale: "nl_NL"})
+	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "nl_NL"})
 
 	out, err := svc.NewLayout().Set(content).RenderWithRequest(ctx, req)
 	if err != nil {
@@ -1168,12 +1319,13 @@ func BenchmarkWithSelectMap(b *testing.B) {
 	layout := service.NewLayout().FS(fsys)
 
 	content := New("content.gohtml").
-		ID("content").
-		WithSelectMap("default", map[string]*Partial{
-			"tab1":    New("tab1.gohtml").ID("tab1"),
-			"tab2":    New("tab2.gohtml").ID("tab2"),
-			"default": New("default.gohtml").ID("default"),
-		})
+		ID("content")
+	testWithSelectMap(content, "default", map[string]*Partial{
+		"tab1":    New("tab1.gohtml").ID("tab1"),
+		"tab2":    New("tab2.gohtml").ID("tab2"),
+		"default": New("default.gohtml").ID("default"),
+	})
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
 
 	index := New("index.gohtml")
 
@@ -1290,7 +1442,7 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"templates/table.html": `{{/* @dot github.com/example/app.Page */}}<table>{{ range .Rows }}{{ template "/templates/row.html" . }}{{ end }}</table>`,
-			"templates/row.html":   `{{/* @dot github.com/example/app.Row */}}<tr id="row-{{ .ID }}"><td>{{ .Name }}</td><td>{{ ctx.Locale }}</td></tr>`,
+			"templates/row.html":   `{{/* @dot github.com/example/app.Row */}}<tr id="row-{{ .ID }}"><td>{{ .Name }}</td><td>{{ locale }}</td></tr>`,
 		},
 	}
 
@@ -1300,10 +1452,12 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 			{ID: 1, Name: "Coffee"},
 			{ID: 2, Name: "Tea"},
 		}})
+	table.SetFunc(testLocalizationFuncMap(), testTargetFuncMap())
+	table.Use(testLocalizationRenderer(), testTargetRenderer())
 	rowPartial := NewID("row", "templates/row.html").
 		SetFileSystem(fsys)
 	table.With(rowPartial)
-	table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
+	testUseTargetResolver(table, func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
 		if target != "row-2" {
 			return nil, false
 		}
@@ -1311,7 +1465,7 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	ctx := context.WithValue(context.Background(), LocalizerContextKey, &defaultLocalizer{locale: "nl_NL"})
+	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "nl_NL"})
 
 	full, err := table.RenderWithRequest(ctx, req)
 	if err != nil {
@@ -1347,10 +1501,12 @@ func TestSetDotKeepsRequestHelpersAvailable(t *testing.T) {
 	p := NewID("page", "templates/page.html").
 		SetFileSystem(fsys).
 		SetBasePath("/app").
-		SetDot(page{Title: "Dashboard"})
+		SetDot(page{Title: "Dashboard"}).
+		SetFunc(testLocalizationFuncMap()).
+		Use(testLocalizationRenderer())
 
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
-	ctx := context.WithValue(context.Background(), LocalizerContextKey, &defaultLocalizer{locale: "en_US"})
+	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "en_US"})
 	out, err := p.RenderWithRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)

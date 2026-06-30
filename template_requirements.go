@@ -29,7 +29,7 @@ type typedRootContract struct {
 	Type       string
 }
 
-func RequiredFuncs(name, src string) ([]string, error) {
+func requiredFuncs(name, src string) ([]string, error) {
 	tree := parse.New(name)
 	tree.Mode = parse.SkipFuncCheck
 
@@ -110,7 +110,7 @@ func requiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error
 		if err != nil {
 			return nil, err
 		}
-		funcs, err := RequiredFuncs(name, string(content))
+		funcs, err := requiredFuncs(name, string(content))
 		if err != nil {
 			return nil, err
 		}

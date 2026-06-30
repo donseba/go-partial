@@ -9,18 +9,20 @@ import (
 	"strings"
 	"time"
 
-	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/csrf"
+	"github.com/donseba/go-partial/exp/localization"
+	"github.com/donseba/go-partial/exp/pageflow"
 )
 
 func (app *App) requestContext(r *http.Request) context.Context {
-	ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, showcaseLocalizer{locale: app.localeFromRequest(r)})
-	return context.WithValue(ctx, partial.CsrfContextKey, showcaseCsrf{
-		key:   partial.DefaultCsrfToken,
+	ctx := localization.WithLocalizer(r.Context(), showcaseLocalizer{locale: app.localeFromRequest(r)})
+	return csrf.WithToken(ctx, showcaseCsrf{
+		key:   csrf.DefaultTokenKey,
 		token: randomID(),
 	})
 }
 
-func (app *App) flowSession(w http.ResponseWriter, r *http.Request) *partial.FlowSessionData {
+func (app *App) flowSession(w http.ResponseWriter, r *http.Request) *pageflow.SessionData {
 	const cookieName = "go_partial_showcase_flow"
 	cookie, err := r.Cookie(cookieName)
 	if err != nil || cookie.Value == "" {
@@ -35,7 +37,7 @@ func (app *App) flowSession(w http.ResponseWriter, r *http.Request) *partial.Flo
 	}
 	session, ok := app.flowSessions[cookie.Value]
 	if !ok {
-		session = &partial.FlowSessionData{}
+		session = &pageflow.SessionData{}
 		app.flowSessions[cookie.Value] = session
 	}
 	return session

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/pageflow"
 )
 
 func (app *App) flow(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +16,7 @@ func (app *App) flow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	steps := app.flowSteps(session, "")
-	flow := partial.NewPageFlow(steps)
+	flow := pageflow.New(steps)
 	if flow.FindStep(session.Current) == -1 {
 		session.Current = steps[0].Name
 	}
@@ -27,7 +28,7 @@ func (app *App) flow(w http.ResponseWriter, r *http.Request) {
 		} else {
 			switch r.FormValue("direction") {
 			case "reset":
-				*session = partial.FlowSessionData{Current: "account"}
+				*session = pageflow.SessionData{Current: "account"}
 			case "back":
 				flow.Prev(session)
 			default:
@@ -50,11 +51,11 @@ func (app *App) flow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	steps = app.flowSteps(session, errorMessage)
-	flow = partial.NewPageFlow(steps)
+	flow = pageflow.New(steps)
 	app.renderPartial(w, r, app.flowPartial(flow, session, errorMessage))
 }
 
-func (app *App) flowSteps(session *partial.FlowSessionData, errorMessage string) []partial.FlowStep {
+func (app *App) flowSteps(session *pageflow.SessionData, errorMessage string) []pageflow.Step {
 	email, _ := session.GetStepData("account")["email"].(string)
 	name, _ := session.GetStepData("details")["name"].(string)
 	plan, _ := session.GetStepData("details")["plan"].(string)
@@ -71,7 +72,7 @@ func (app *App) flowSteps(session *partial.FlowSessionData, errorMessage string)
 		AllData: session.GetAllData(),
 	})
 
-	return []partial.FlowStep{
+	return []pageflow.Step{
 		{
 			Name:    "account",
 			Partial: account,
@@ -98,7 +99,7 @@ func (app *App) flowSteps(session *partial.FlowSessionData, errorMessage string)
 	}
 }
 
-func (app *App) flowPartial(flow *partial.PageFlow, session *partial.FlowSessionData, errorMessage string) *partial.Partial {
+func (app *App) flowPartial(flow *pageflow.PageFlow, session *pageflow.SessionData, errorMessage string) *partial.Partial {
 	current := flow.CurrentStep(session)
 	currentName := ""
 	if current != nil {

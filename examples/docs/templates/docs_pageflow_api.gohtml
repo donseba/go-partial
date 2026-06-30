@@ -2,32 +2,32 @@
 <article class="grid max-w-5xl gap-6">
     <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Reference</p>
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">PageFlow API</h1>
-    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">PageFlow defines the flow. FlowSessionData carries per-user state. That split lets a single flow definition be reused safely across requests, tabs, and users.</p>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">PageFlow defines the flow. pageflow.SessionData carries per-user state. That split lets a single flow definition be reused safely across requests, tabs, and users.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Types</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Type</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowStep</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">One named step with an optional partial and validation callback.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.Step</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">One named step with an optional partial and validation callback.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">PageFlow</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The ordered step definition. It does not store current user progress.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Per-user flow state: current step, collected step data, and validation results.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Per-user flow state: current step, collected step data, and validation results.</td></tr>
         </tbody>
     </table>
 
-    <h2 class="text-xl font-bold text-slate-50">FlowStep</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type FlowStep struct {
+    <h2 class="text-xl font-bold text-slate-50">pageflow.Step</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Step struct {
     Name     string
     Partial  *partial.Partial
     Validate func(r *http.Request, data map[string]any) error
 }</code></pre>
 
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Name</code> should be stable because it is stored in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData.Current</code>, used as the registered partial ID in templates, and used as the key for step data and validation state.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Name</code> should be stable because it is stored in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData.Current</code>, used as the registered partial ID in templates, and used as the key for step data and validation state.</p>
 
     <h2 class="text-xl font-bold text-slate-50">PageFlow methods</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">NewPageFlow(steps)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a flow definition from ordered steps.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.New(steps)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Create a flow definition from ordered steps.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FirstStep()</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the first step, or nil when there are no steps.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">CurrentStep(session)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the step named by <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code>, falling back to the first step.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetCurrentStep(session, name)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Set <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">session.Current</code> only when the named step exists.</td></tr>
@@ -51,7 +51,7 @@
 
     <h2 class="text-xl font-bold text-slate-50">Request handler shape</h2>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">session := loadFlowSession(r)
-flow := partial.NewPageFlow(steps)
+flow := pageflow.New(steps)
 
 step := flow.CurrentStep(session)
 data := map[string]any{
@@ -74,7 +74,7 @@ saveFlowSession(w, session)</code></pre>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">current := flow.CurrentStep(session)
 
 type FlowPage struct {
-    Steps       []partial.FlowStep
+    Steps       []pageflow.Step
     CurrentStep string
     Validated   map[string]bool
 }
@@ -90,6 +90,6 @@ for _, step := range flow.Steps {
 }</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Why session owns current</h2>
-    <p class="leading-7 text-slate-400">A flow definition is usually stable enough to create once and reuse. Current step is not stable; it belongs to a browser session, user, request, or persisted draft. Keeping it in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData</code> prevents one user's progress from mutating another user's flow.</p>
+    <p class="leading-7 text-slate-400">A flow definition is usually stable enough to create once and reuse. Current step is not stable; it belongs to a browser session, user, request, or persisted draft. Keeping it in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData</code> prevents one user's progress from mutating another user's flow.</p>
 </article>
 

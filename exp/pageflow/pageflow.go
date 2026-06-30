@@ -1,44 +1,46 @@
-package partial
+// Package pageflow contains experimental helpers for multi-step page flows.
+package pageflow
 
-import "net/http"
+import (
+	"net/http"
 
-// FlowStep represents a single step in a page flow.
-type FlowStep struct {
+	partial "github.com/donseba/go-partial"
+)
+
+// Step describes a single page-flow step.
+type Step struct {
 	Name     string
-	Partial  *Partial
+	Partial  *partial.Partial
 	Validate func(r *http.Request, data map[string]any) error
 }
 
-// PageFlow manages a multi-step flow.
+// PageFlow contains the ordered steps for a flow.
 type PageFlow struct {
-	Steps []FlowStep
+	Steps []Step
 }
 
-// FlowSessionData holds all data and validation info for a flow, to be stored in session.
-type FlowSessionData struct {
+// SessionData stores per-session progress and data for a PageFlow.
+type SessionData struct {
 	StepData  map[string]map[string]any
 	Validated map[string]bool
 	Current   string
 }
 
-// NewPageFlow creates a new PageFlow with the given steps.
-func NewPageFlow(steps []FlowStep) *PageFlow {
-	return &PageFlow{
-		Steps: steps,
-	}
+// New creates a PageFlow from an ordered set of steps.
+func New(steps []Step) *PageFlow {
+	return &PageFlow{Steps: steps}
 }
 
-// FirstStep returns the first FlowStep.
-func (f *PageFlow) FirstStep() *FlowStep {
+// FirstStep returns the first configured step.
+func (f *PageFlow) FirstStep() *Step {
 	if len(f.Steps) == 0 {
 		return nil
 	}
 	return &f.Steps[0]
 }
 
-// CurrentStep returns the FlowStep named by the session, or the first step when
-// the session does not have a current step yet.
-func (f *PageFlow) CurrentStep(session *FlowSessionData) *FlowStep {
+// CurrentStep returns the active step for a session.
+func (f *PageFlow) CurrentStep(session *SessionData) *Step {
 	if session == nil || session.Current == "" {
 		return f.FirstStep()
 	}
@@ -49,8 +51,8 @@ func (f *PageFlow) CurrentStep(session *FlowSessionData) *FlowStep {
 	return &f.Steps[idx]
 }
 
-// SetCurrentStep sets the current step in the session when the step exists.
-func (f *PageFlow) SetCurrentStep(session *FlowSessionData, stepName string) bool {
+// SetCurrentStep moves a session to a named step when it exists.
+func (f *PageFlow) SetCurrentStep(session *SessionData, stepName string) bool {
 	if session == nil || f.FindStep(stepName) == -1 {
 		return false
 	}
@@ -58,8 +60,8 @@ func (f *PageFlow) SetCurrentStep(session *FlowSessionData, stepName string) boo
 	return true
 }
 
-// Next advances to the next step if possible.
-func (f *PageFlow) Next(session *FlowSessionData) bool {
+// Next moves a session to the next step.
+func (f *PageFlow) Next(session *SessionData) bool {
 	if session == nil {
 		return false
 	}
@@ -75,8 +77,8 @@ func (f *PageFlow) Next(session *FlowSessionData) bool {
 	return false
 }
 
-// Prev goes back to the previous step if possible.
-func (f *PageFlow) Prev(session *FlowSessionData) bool {
+// Prev moves a session to the previous step.
+func (f *PageFlow) Prev(session *SessionData) bool {
 	if session == nil {
 		return false
 	}
@@ -92,7 +94,7 @@ func (f *PageFlow) Prev(session *FlowSessionData) bool {
 	return false
 }
 
-// FindStep returns the index of a step by name, or -1 if not found.
+// FindStep returns the index of a named step or -1 when absent.
 func (f *PageFlow) FindStep(name string) int {
 	for i, step := range f.Steps {
 		if step.Name == name {
@@ -102,8 +104,8 @@ func (f *PageFlow) FindStep(name string) int {
 	return -1
 }
 
-// AllPreviousValidated checks if all previous steps are validated.
-func (f *PageFlow) AllPreviousValidated(session *FlowSessionData) bool {
+// AllPreviousValidated reports whether every step before the current one passed validation.
+func (f *PageFlow) AllPreviousValidated(session *SessionData) bool {
 	if session == nil {
 		return false
 	}
@@ -120,32 +122,32 @@ func (f *PageFlow) AllPreviousValidated(session *FlowSessionData) bool {
 	return true
 }
 
-// SetStepValidated marks a step as validated in the session.
-func (session *FlowSessionData) SetStepValidated(stepName string, valid bool) {
+// SetStepValidated stores the validation state for a step.
+func (session *SessionData) SetStepValidated(stepName string, valid bool) {
 	if session.Validated == nil {
 		session.Validated = make(map[string]bool)
 	}
 	session.Validated[stepName] = valid
 }
 
-// SetStepData sets the data for a step in the session.
-func (session *FlowSessionData) SetStepData(stepName string, data map[string]any) {
+// SetStepData stores data for a step.
+func (session *SessionData) SetStepData(stepName string, data map[string]any) {
 	if session.StepData == nil {
 		session.StepData = make(map[string]map[string]any)
 	}
 	session.StepData[stepName] = data
 }
 
-// GetStepData gets the data for a step from the session.
-func (session *FlowSessionData) GetStepData(stepName string) map[string]any {
+// GetStepData returns stored data for a step.
+func (session *SessionData) GetStepData(stepName string) map[string]any {
 	if session.StepData == nil {
 		return nil
 	}
 	return session.StepData[stepName]
 }
 
-// GetAllData returns all step data as a single merged map.
-func (session *FlowSessionData) GetAllData() map[string]any {
+// GetAllData returns all step data merged into one map.
+func (session *SessionData) GetAllData() map[string]any {
 	merged := make(map[string]any)
 	for _, data := range session.StepData {
 		for k, v := range data {

@@ -68,7 +68,7 @@
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlContains</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Check whether the current path contains text.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlContains \"settings\" }}" }}</code></td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">joinPath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Join path parts into a clean path string.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ joinPath \"/docs\" \"api\" }}" }}</code></td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">urlPath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Join path parts and return a safe template URL.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ urlPath basePath \"users\" \"42\" }}" }}</code></td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the request render context object, including the raw Go context as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx.Context</code>.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ ctx.Locale }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Return the request render context object, including the raw Go context as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx.Context</code>.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ ctx.URL.Path }}" }}</code></td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">locale</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">csrf</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">basePath</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Request helpers that keep working when <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code> changes dot.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ request.Method }}" }}</code></td></tr>
         </tbody>
     </table>
@@ -119,22 +119,16 @@
 {{ "{{ end }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Custom template functions</h2>
-    <p class="leading-7 text-slate-400">Each scope has one registration path. Use the narrowest scope that owns the helper. go-partial protects its core helper names, so application helpers cannot replace functions such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">content</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">targetValue</code>.</p>
+    <p class="leading-7 text-slate-400">Each scope has one registration path. Use the narrowest scope that owns the helper. go-partial protects its core helper names, so application helpers cannot replace functions such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">content</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial</code>, or <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">runtime</code>.</p>
 
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Scope</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">API</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Package default</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.AddGlobalFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers every later service should receive.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers for one render pipeline or page shell.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers local to one component tree.</td></tr>
         </tbody>
     </table>
-
-    <p class="leading-7 text-slate-400">Package-level helpers are copied into services created after registration. This is useful for application-wide helpers in small apps, but service-level registration is usually clearer.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">err := partial.AddGlobalFunc("asset", func(path string) string {
-    return "/assets/" + strings.TrimPrefix(path, "/")
-})</code></pre>
 
     <p class="leading-7 text-slate-400">Create the service first, then register helpers owned by the application.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
@@ -150,6 +144,14 @@
         return strings.ToUpper(first[:1] + last[:1])
     },
 })</code></pre>
+
+    <p class="leading-7 text-slate-400">The optional template helper package is split into smaller maps. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">templatehelpers.FuncMap()</code> for every helper, or narrower maps when a page only needs one category.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(
+    templatehelpers.StringFuncMap(),
+    templatehelpers.CollectionFuncMap(),
+)</code></pre>
+
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">templatehelpers.HTMLFuncMap()</code> is separate because it includes helpers that mark content as trusted HTML.</p>
 
     <p class="leading-7 text-slate-400">Partial helpers stay local to that component tree. Use this for helpers that do not make sense globally.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">row := partial.NewID("row", "row.gohtml")
@@ -212,14 +214,13 @@ row.SetFunc(template.FuncMap{
     </table>
 
     <h2 class="text-xl font-bold text-slate-50">Debug output</h2>
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug</code> renders a styled diagnostic box with the default embedded debug template. Override it with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDebugRenderer</code> on a service, layout, or partial when you want diagnostics to match your application.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug</code> is provided by <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/debug.FuncMap()</code> and renders through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug.RenderKindDebug</code>. Register <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/debug.Renderer()</code> or an app renderer with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Use</code> when you want diagnostics to match your application.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime, value any) (template.HTML, error) {
-    return template.HTML("&lt;pre class=\"debug\"&gt;" + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + "&lt;/pre&gt;"), nil
-})</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(debug.FuncMap())
+svc.Use(debug.Renderer())</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Localization functions are provider-owned</h2>
-    <p class="leading-7 text-slate-400">Calls such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ tl .Loc \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">.Loc</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>
+    <p class="leading-7 text-slate-400">Calls such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ tl localizer \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>
 </article>
 
 

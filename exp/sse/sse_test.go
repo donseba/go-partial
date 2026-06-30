@@ -1,4 +1,4 @@
-package partial
+package sse
 
 import (
 	"context"
@@ -7,30 +7,33 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
+
+	partial "github.com/donseba/go-partial"
 )
 
-func TestSSEWriterAppliesExpectedHeaders(t *testing.T) {
+func TestWriterAppliesExpectedHeaders(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	NewSSEWriter(rec)
+	NewWriter(rec)
 
-	if got := rec.Header().Get(SSEHeaderContentType.String()); got != SSEContentTypeEventStream.String() {
-		t.Fatalf("expected content type %q, got %q", SSEContentTypeEventStream, got)
+	if got := rec.Header().Get(HeaderContentType.String()); got != ContentTypeEventStream.String() {
+		t.Fatalf("expected content type %q, got %q", ContentTypeEventStream, got)
 	}
-	if got := rec.Header().Get(SSEHeaderCacheControl.String()); got != SSECacheControlNoCache.String() {
-		t.Fatalf("expected cache control %q, got %q", SSECacheControlNoCache, got)
+	if got := rec.Header().Get(HeaderCacheControl.String()); got != CacheControlNoCache.String() {
+		t.Fatalf("expected cache control %q, got %q", CacheControlNoCache, got)
 	}
-	if got := rec.Header().Get(SSEHeaderConnection.String()); got != SSEConnectionKeepAlive.String() {
-		t.Fatalf("expected connection %q, got %q", SSEConnectionKeepAlive, got)
+	if got := rec.Header().Get(HeaderConnection.String()); got != ConnectionKeepAlive.String() {
+		t.Fatalf("expected connection %q, got %q", ConnectionKeepAlive, got)
 	}
-	if got := rec.Header().Get(SSEHeaderXAccelBuffering.String()); got != SSEXAccelBufferingNo.String() {
-		t.Fatalf("expected accel buffering %q, got %q", SSEXAccelBufferingNo, got)
+	if got := rec.Header().Get(HeaderXAccelBuffering.String()); got != XAccelBufferingNo.String() {
+		t.Fatalf("expected accel buffering %q, got %q", XAccelBufferingNo, got)
 	}
 }
 
-func TestSSEWriterPatchHTML(t *testing.T) {
+func TestWriterPatchHTML(t *testing.T) {
 	rec := httptest.NewRecorder()
-	writer := NewSSEWriter(rec)
+	writer := NewWriter(rec)
 
 	if err := writer.PatchHTML("#notice", template.HTML(`<div>Saved</div>`)); err != nil {
 		t.Fatalf("PatchHTML() error = %v", err)
@@ -45,9 +48,9 @@ func TestSSEWriterPatchHTML(t *testing.T) {
 	}
 }
 
-func TestSSEWriterSignal(t *testing.T) {
+func TestWriterSignal(t *testing.T) {
 	rec := httptest.NewRecorder()
-	writer := NewSSEWriter(rec)
+	writer := NewWriter(rec)
 
 	if err := writer.Signal("saved", true); err != nil {
 		t.Fatalf("Signal() error = %v", err)
@@ -62,19 +65,20 @@ func TestSSEWriterSignal(t *testing.T) {
 	}
 }
 
-func TestSSEWriterPatchPartial(t *testing.T) {
-	fsys := &inMemoryFS{}
-	fsys.AddFile("notice.gohtml", `<div>{{ .Message }}</div>`)
+func TestWriterPatchPartial(t *testing.T) {
+	fsys := fstest.MapFS{
+		"notice.gohtml": &fstest.MapFile{Data: []byte(`<div>{{ .Message }}</div>`)},
+	}
 
-	partial := NewID("notice", "notice.gohtml").
+	notice := partial.NewID("notice", "notice.gohtml").
 		SetFileSystem(fsys).
 		SetDot(map[string]any{"Message": "Saved"})
 
 	rec := httptest.NewRecorder()
-	writer := NewSSEWriter(rec)
+	writer := NewWriter(rec)
 	req := httptest.NewRequest(http.MethodGet, "/events", nil)
 
-	if err := writer.PatchPartial(context.Background(), req, "#notice", partial); err != nil {
+	if err := writer.PatchPartial(context.Background(), req, "#notice", notice); err != nil {
 		t.Fatalf("PatchPartial() error = %v", err)
 	}
 
@@ -84,11 +88,11 @@ func TestSSEWriterPatchPartial(t *testing.T) {
 	}
 }
 
-func TestSSEWriterMultilineData(t *testing.T) {
+func TestWriterMultilineData(t *testing.T) {
 	rec := httptest.NewRecorder()
-	writer := NewSSEWriter(rec)
+	writer := NewWriter(rec)
 
-	if err := writer.Event(SSEEventName("message"), "one\ntwo"); err != nil {
+	if err := writer.Event(EventName("message"), "one\ntwo"); err != nil {
 		t.Fatalf("Event() error = %v", err)
 	}
 

@@ -17,9 +17,8 @@ import (
 	"unicode"
 )
 
-var helperFuncMap = template.FuncMap{
-	"safeHTML": safeHTML,
-
+// go-doc:funcmap
+var stringFuncMap = template.FuncMap{
 	"upper":       strings.ToUpper,
 	"lower":       strings.ToLower,
 	"trimSpace":   strings.TrimSpace,
@@ -40,28 +39,95 @@ var helperFuncMap = template.FuncMap{
 	"upperFirst":  upperFirst,
 	"compare":     strings.Compare,
 	"equalFold":   strings.EqualFold,
-	"urlEncode":   url.QueryEscape,
-	"urlDecode":   url.QueryUnescape,
-	"safeURL":     safeURL,
+}
 
+// go-doc:funcmap
+var urlFuncMap = template.FuncMap{
+	"urlEncode": url.QueryEscape,
+	"urlDecode": url.QueryUnescape,
+	"safeURL":   safeURL,
+}
+
+// go-doc:funcmap
+var htmlFuncMap = template.FuncMap{
+	"safeHTML": safeHTML,
+}
+
+// go-doc:funcmap
+var timeFuncMap = template.FuncMap{
 	"now":        time.Now,
 	"formatDate": formatDate,
 	"parseDate":  parseDate,
+}
 
+// go-doc:funcmap
+var collectionFuncMap = template.FuncMap{
 	"first": first,
 	"last":  last,
 
 	"dict":   dict,
 	"hasKey": hasKey,
 	"keys":   keys,
+}
 
+// go-doc:funcmap
+var numberFuncMap = template.FuncMap{
 	"inc": inc,
 	"dec": dec,
 }
 
 // FuncMap returns a fresh copy of the optional helper function map.
 func FuncMap() template.FuncMap {
-	return maps.Clone(helperFuncMap)
+	return mergeFuncMaps(
+		StringFuncMap(),
+		URLFuncMap(),
+		HTMLFuncMap(),
+		TimeFuncMap(),
+		CollectionFuncMap(),
+		NumberFuncMap(),
+	)
+}
+
+// StringFuncMap returns string and text helper functions.
+func StringFuncMap() template.FuncMap {
+	return maps.Clone(stringFuncMap)
+}
+
+// URLFuncMap returns URL helper functions.
+func URLFuncMap() template.FuncMap {
+	return maps.Clone(urlFuncMap)
+}
+
+// HTMLFuncMap returns helpers that mark HTML as trusted.
+func HTMLFuncMap() template.FuncMap {
+	return maps.Clone(htmlFuncMap)
+}
+
+// TimeFuncMap returns time helper functions.
+func TimeFuncMap() template.FuncMap {
+	return maps.Clone(timeFuncMap)
+}
+
+// CollectionFuncMap returns map and slice helper functions.
+func CollectionFuncMap() template.FuncMap {
+	return maps.Clone(collectionFuncMap)
+}
+
+// NumberFuncMap returns numeric helper functions.
+func NumberFuncMap() template.FuncMap {
+	return maps.Clone(numberFuncMap)
+}
+
+func mergeFuncMaps(funcMaps ...template.FuncMap) template.FuncMap {
+	total := 0
+	for _, funcMap := range funcMaps {
+		total += len(funcMap)
+	}
+	out := make(template.FuncMap, total)
+	for _, funcMap := range funcMaps {
+		maps.Copy(out, funcMap)
+	}
+	return out
 }
 
 func safeHTML(s string) template.HTML {

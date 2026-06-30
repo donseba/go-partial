@@ -6,6 +6,7 @@ import (
 	"time"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/sse"
 )
 
 func (app *App) sse(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +16,7 @@ func (app *App) sse(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) sseStream(w http.ResponseWriter, r *http.Request) {
-	events := partial.NewSSEWriter(w)
+	events := sse.NewWriter(w)
 	_ = events.Comment("go-partial showcase stream")
 	events.Flush()
 

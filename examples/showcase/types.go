@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/pageflow"
 )
 
 type Row struct {
@@ -58,7 +59,7 @@ type DebugCustomPage struct {
 
 type FlowPage struct {
 	Title       string
-	Steps       []partial.FlowStep
+	Steps       []pageflow.Step
 	CurrentStep string
 	Validated   map[string]bool
 	Error       string
@@ -119,7 +120,6 @@ type LocalizationPage struct {
 	Locale  string
 	Locales []string
 	Count   int
-	Loc     partial.Localizer
 }
 
 type NoticePage struct {
@@ -208,5 +208,5 @@ type App struct {
 	carts        map[string]map[int]int
 	cartMu       sync.Mutex
 	counter      int
-	flowSessions map[string]*partial.FlowSessionData
+	flowSessions map[string]*pageflow.SessionData
 }

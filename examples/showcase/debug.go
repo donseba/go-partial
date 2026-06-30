@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -11,14 +10,21 @@ import (
 	"strings"
 
 	partial "github.com/donseba/go-partial"
+	extdebug "github.com/donseba/go-partial/ext/debug"
 )
 
 func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 	custom := partial.NewID("custom-debug", "templates/debug_custom.gohtml").
 		SetFileSystem(os.DirFS("examples/showcase")).
+		SetFunc(extdebug.FuncMap()).
 		SetDot(DebugCustomPage{Name: "Ada", Role: "Editor"}).
-		SetDebugRenderer(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime, value any) (template.HTML, error) {
-			return template.HTML(customDebugHTML(value)), nil
+		Use(partial.RendererHooks{
+			InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+				if ctx.Kind != extdebug.RenderKindDebug {
+					return next(ctx)
+				}
+				return template.HTML(customDebugHTML(ctx.Data)), nil
+			},
 		})
 	customHTML, err := custom.Render(app.requestContext(r))
 	if err != nil {

@@ -16,14 +16,22 @@
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Custom debug renderer</h2>
-        <p class="leading-7 text-stone-600">This partial uses <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">SetDebugRenderer</code> to render the same helper with application-specific markup before the page is written.</p>
+        <p class="leading-7 text-stone-600">This partial uses a <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">RendererHooks</code> extension for <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">debug.RenderKindDebug</code> to render the same helper with application-specific markup before the page is written.</p>
         {{ .CustomDebug }}
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">custom := partial.NewID("custom-debug", "debug_custom.gohtml").
-    SetDebugRenderer(customDebugRenderer)
+    SetFunc(debug.FuncMap()).
+    Use(partial.RendererHooks{
+        InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+            if ctx.Kind != debug.RenderKindDebug {
+                return next(ctx)
+            }
+            return template.HTML(customDebugHTML(ctx.Data)), nil
+        },
+    })
 
 html, err := service.NewLayout().Set(custom).RenderWithRequest(ctx, r)</code></pre>
     </article>

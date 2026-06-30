@@ -23,9 +23,7 @@ type (
 		UseTemplateCache bool
 		Logger           Logger
 		FS               fs.FS
-		ErrorRenderer    ErrorRenderer
-		DebugRenderer    DebugRenderer
-		ErrorMode        ErrorMode
+		Renderers        []Renderer
 	}
 
 	Service struct {
@@ -35,6 +33,7 @@ type (
 		hasCustomFunctions bool
 		connector          connector.Connector
 		templateCache      *templateStore
+		renderers          []Renderer
 		funcsLock          sync.RWMutex
 	}
 
@@ -48,6 +47,7 @@ type (
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
 		connector          connector.Connector
+		renderers          []Renderer
 		funcsLock          sync.RWMutex
 	}
 )
@@ -73,6 +73,7 @@ func NewService(cfg *Config) *Service {
 		staticFuncs:   functions,
 		customFuncs:   make(template.FuncMap),
 		connector:     cfg.Connector,
+		renderers:     append([]Renderer(nil), cfg.Renderers...),
 		templateCache: newTemplateStore(),
 	}
 }
@@ -86,6 +87,7 @@ func (svc *Service) NewLayout() *Layout {
 		service:            svc,
 		filesystem:         fsys,
 		connector:          svc.connector,
+		renderers:          append([]Renderer(nil), svc.renderers...),
 		staticFuncs:        functions,
 		customFuncs:        customFuncs,
 		hasCustomFunctions: svc.getHasCustomFunctions(),
@@ -97,18 +99,13 @@ func (svc *Service) SetConnector(conn connector.Connector) *Service {
 	return svc
 }
 
-func (svc *Service) SetErrorRenderer(renderer ErrorRenderer) *Service {
-	svc.config.ErrorRenderer = renderer
-	return svc
-}
-
-func (svc *Service) SetDebugRenderer(renderer DebugRenderer) *Service {
-	svc.config.DebugRenderer = renderer
-	return svc
-}
-
-func (svc *Service) SetErrorMode(mode ErrorMode) *Service {
-	svc.config.ErrorMode = mode
+// Use appends renderers to every layout created by this service.
+func (svc *Service) Use(renderers ...Renderer) *Service {
+	if svc == nil {
+		return nil
+	}
+	svc.renderers = append(svc.renderers, renderers...)
+	svc.config.Renderers = append(svc.config.Renderers, renderers...)
 	return svc
 }
 
@@ -169,35 +166,17 @@ func (l *Layout) Connector() connector.Connector {
 	return l.connector
 }
 
-func (l *Layout) SetErrorRenderer(renderer ErrorRenderer) *Layout {
-	l.service.config.ErrorRenderer = renderer
+// Use appends renderers to the layout render chain.
+func (l *Layout) Use(renderers ...Renderer) *Layout {
+	if l == nil {
+		return nil
+	}
+	l.renderers = append(l.renderers, renderers...)
 	if l.content != nil {
-		l.content.SetErrorRenderer(renderer)
+		l.content.Use(renderers...)
 	}
 	if l.wrapper != nil {
-		l.wrapper.SetErrorRenderer(renderer)
-	}
-	return l
-}
-
-func (l *Layout) SetDebugRenderer(renderer DebugRenderer) *Layout {
-	l.service.config.DebugRenderer = renderer
-	if l.content != nil {
-		l.content.SetDebugRenderer(renderer)
-	}
-	if l.wrapper != nil {
-		l.wrapper.SetDebugRenderer(renderer)
-	}
-	return l
-}
-
-func (l *Layout) SetErrorMode(mode ErrorMode) *Layout {
-	l.service.config.ErrorMode = mode
-	if l.content != nil {
-		l.content.SetErrorMode(mode)
-	}
-	if l.wrapper != nil {
-		l.wrapper.SetErrorMode(mode)
+		l.wrapper.Use(renderers...)
 	}
 	return l
 }
@@ -333,14 +312,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		p.logger = l.service.config.Logger
 	}
 	p.useCache = l.service.config.UseTemplateCache
-	if l.service.config.ErrorRenderer != nil {
-		p.errorRenderer = l.service.config.ErrorRenderer
+	if len(l.renderers) > 0 {
+		p.renderers = append(append([]Renderer(nil), l.renderers...), p.renderers...)
 	}
-	if l.service.config.DebugRenderer != nil {
-		p.debugRenderer = l.service.config.DebugRenderer
-	}
-	p.errorMode = l.service.config.ErrorMode
-	p.errorModeSet = true
 	p.templateCache = l.service.templateCache
 	p.request = l.request
 

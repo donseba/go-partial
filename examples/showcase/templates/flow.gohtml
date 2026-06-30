@@ -30,18 +30,18 @@
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Application-owned state</h2>
-        <p class="leading-7 text-stone-600">The flow object knows the ordered steps and validation rules. The example stores <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">FlowSessionData</code> behind a browser cookie, but a real app can use encrypted cookies, database state, or a server session package.</p>
+        <p class="leading-7 text-stone-600">The flow object knows the ordered steps and validation rules. The example stores <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">pageflow.SessionData</code> behind a browser cookie, but a real app can use encrypted cookies, database state, or a server session package.</p>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">steps := []partial.FlowStep{
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">steps := []pageflow.Step{
     {Name: "account", Partial: account, Validate: validateAccount},
     {Name: "details", Partial: details, Validate: validateDetails},
     {Name: "confirm", Partial: confirm},
 }
 
-flow := partial.NewPageFlow(steps)
+flow := pageflow.New(steps)
 session.SetStepData(step.Name, formData)
 session.SetStepValidated(step.Name, true)
 flow.Next(session)</code></pre>

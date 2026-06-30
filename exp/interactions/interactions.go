@@ -21,6 +21,9 @@ import (
 	"github.com/donseba/go-partial/connector"
 )
 
+// RenderKindInteraction is the renderer kind used for interaction markup.
+const RenderKindInteraction partial.RenderKind = "interaction"
+
 // Interaction is an optional builder for connector-aware client interactions.
 // Register values with partial.SetContract("interaction", ...).
 type Interaction struct {
@@ -28,58 +31,53 @@ type Interaction struct {
 	interaction  connector.Interaction
 }
 
-// Renderer renders connector interaction attributes into final HTML.
-type Renderer func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error)
-
-type config struct {
-	renderer Renderer
+// Data is the render payload for RenderKindInteraction.
+type Data struct {
+	Runtime     *partial.Runtime
+	Interaction connector.Interaction
+	Attrs       map[string]string
 }
 
-type Option func(*config)
+// MarkupRenderer renders connector interaction attributes into final HTML.
+type MarkupRenderer func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error)
 
 const (
+	// SwapInnerHTML replaces the target element's inner HTML.
 	SwapInnerHTML = string(connector.SwapInnerHTML)
+	// SwapOuterHTML replaces the target element itself.
 	SwapOuterHTML = string(connector.SwapOuterHTML)
 )
 
-// WithRenderer replaces the default interaction markup renderer.
-func WithRenderer(renderer Renderer) Option {
-	return func(cfg *config) {
-		if renderer != nil {
-			cfg.renderer = renderer
-		}
+// FuncMap returns the optional interaction template helpers.
+func FuncMap() template.FuncMap {
+	return template.FuncMap{
+		"async":    Async,
+		"reveal":   Reveal,
+		"poll":     Poll,
+		"on":       On,
+		"stream":   Stream,
+		"prefetch": Prefetch,
+		"refresh":  Refresh,
 	}
 }
 
-// FuncMap returns the optional interaction template helpers.
-func FuncMap(options ...Option) template.FuncMap {
-	cfg := config{renderer: DefaultRenderer()}
-	for _, option := range options {
-		if option != nil {
-			option(&cfg)
-		}
+// Renderer returns a partial renderer for interaction markup.
+func Renderer(markup ...MarkupRenderer) partial.Renderer {
+	renderer := DefaultMarkupRenderer()
+	if len(markup) > 0 && markup[0] != nil {
+		renderer = markup[0]
 	}
-	return template.FuncMap{
-		"async": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionAsync, value, args...)
-		},
-		"reveal": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionReveal, value, args...)
-		},
-		"poll": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionPoll, value, args...)
-		},
-		"on": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return renderOn(cfg, runtime, value, args...)
-		},
-		"stream": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionStream, value, args...)
-		},
-		"prefetch": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionPrefetch, value, args...)
-		},
-		"refresh": func(runtime *partial.Runtime, value any, args ...any) template.HTML {
-			return render(cfg, runtime, connector.InteractionRefresh, value, args...)
+
+	return partial.RendererHooks{
+		InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+			if ctx == nil || ctx.Kind != RenderKindInteraction {
+				return next(ctx)
+			}
+			data, ok := ctx.Data.(Data)
+			if !ok {
+				return "", fmt.Errorf("interaction renderer expected interactions.Data, got %T", ctx.Data)
+			}
+			return renderer(data.Runtime, data.Interaction, data.Attrs)
 		},
 	}
 }
@@ -132,6 +130,7 @@ func newInteraction(kind connector.InteractionKind, name string, endpoint string
 	}}
 }
 
+// Interaction returns the connector interaction represented by the builder.
 func (i Interaction) Interaction() connector.Interaction {
 	interaction := i.interaction
 	if interaction.Params == nil {
@@ -144,6 +143,7 @@ func (i Interaction) Interaction() connector.Interaction {
 	return normalize(interaction)
 }
 
+// ContractName returns the contract name used when registering the interaction.
 func (i Interaction) ContractName() string {
 	if i.contractName != "" {
 		return i.contractName
@@ -151,31 +151,37 @@ func (i Interaction) ContractName() string {
 	return nameFromEndpoint(i.interaction.URL)
 }
 
+// ID sets the element ID used by the rendered interaction.
 func (i Interaction) ID(id string) Interaction {
 	i.interaction.ID = id
 	return i
 }
 
+// As sets the contract name for this interaction.
 func (i Interaction) As(name string) Interaction {
 	i.contractName = strings.TrimSpace(name)
 	return i
 }
 
+// Target sets the client-side target selector.
 func (i Interaction) Target(target string) Interaction {
 	i.interaction.Target = target
 	return i
 }
 
+// Swap sets the connector swap strategy.
 func (i Interaction) Swap(swap string) Interaction {
 	i.interaction.Swap = swap
 	return i
 }
 
+// Trigger sets the browser event or connector trigger.
 func (i Interaction) Trigger(trigger string) Interaction {
 	i.interaction.Trigger = trigger
 	return i
 }
 
+// From sets the event source option for event-driven interactions.
 func (i Interaction) From(source string) Interaction {
 	if i.interaction.Options == nil {
 		i.interaction.Options = make(map[string]string)
@@ -184,16 +190,19 @@ func (i Interaction) From(source string) Interaction {
 	return i
 }
 
+// Every sets the polling interval.
 func (i Interaction) Every(interval time.Duration) Interaction {
 	i.interaction.Interval = interval.String()
 	return i
 }
 
+// EveryString sets the polling interval from a raw connector interval string.
 func (i Interaction) EveryString(interval string) Interaction {
 	i.interaction.Interval = interval
 	return i
 }
 
+// Placeholder sets the placeholder markup text rendered before content loads.
 func (i Interaction) Placeholder(placeholder string) Interaction {
 	i.interaction.Placeholder = placeholder
 	if i.interaction.Options == nil {
@@ -203,6 +212,7 @@ func (i Interaction) Placeholder(placeholder string) Interaction {
 	return i
 }
 
+// Param sets a URL/path parameter used when resolving the endpoint.
 func (i Interaction) Param(key string, value any) Interaction {
 	if i.interaction.Params == nil {
 		i.interaction.Params = make(map[string]string)
@@ -211,6 +221,7 @@ func (i Interaction) Param(key string, value any) Interaction {
 	return i
 }
 
+// Option sets a connector option.
 func (i Interaction) Option(key string, value any) Interaction {
 	if i.interaction.Options == nil {
 		i.interaction.Options = make(map[string]string)
@@ -225,7 +236,7 @@ func (i Interaction) Option(key string, value any) Interaction {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Async(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionAsync, value, args...)
+	return render(runtime, connector.InteractionAsync, value, args...)
 }
 
 // Reveal renders an interaction that loads when the element enters the viewport.
@@ -233,7 +244,7 @@ func Async(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Reveal(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionReveal, value, args...)
+	return render(runtime, connector.InteractionReveal, value, args...)
 }
 
 // Poll renders an interaction that refreshes on an interval. When an endpoint
@@ -242,7 +253,7 @@ func Reveal(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Poll(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionPoll, value, args...)
+	return render(runtime, connector.InteractionPoll, value, args...)
 }
 
 // On renders an interaction that refreshes when a browser event is dispatched.
@@ -251,7 +262,7 @@ func Poll(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, event string, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func On(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return renderOn(config{renderer: DefaultRenderer()}, runtime, value, args...)
+	return renderOn(runtime, value, args...)
 }
 
 // Stream renders an SSE-backed interaction placeholder.
@@ -259,7 +270,7 @@ func On(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Stream(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionStream, value, args...)
+	return render(runtime, connector.InteractionStream, value, args...)
 }
 
 // Prefetch renders a non-visual prefetch hint.
@@ -267,7 +278,7 @@ func Stream(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Prefetch(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionPrefetch, value, args...)
+	return render(runtime, connector.InteractionPrefetch, value, args...)
 }
 
 // Refresh renders a control that explicitly refreshes a target.
@@ -276,26 +287,26 @@ func Prefetch(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Refresh(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(config{renderer: DefaultRenderer()}, runtime, connector.InteractionRefresh, value, args...)
+	return render(runtime, connector.InteractionRefresh, value, args...)
 }
 
-func render(cfg config, runtime *partial.Runtime, kind connector.InteractionKind, value any, args ...any) template.HTML {
+func render(runtime *partial.Runtime, kind connector.InteractionKind, value any, args ...any) template.HTML {
 	interaction, err := fromValue(kind, value, args...)
 	if err != nil {
 		return escapedError(err)
 	}
-	return renderInteraction(cfg, runtime, interaction)
+	return renderInteraction(runtime, interaction)
 }
 
-func renderOn(cfg config, runtime *partial.Runtime, value any, args ...any) template.HTML {
+func renderOn(runtime *partial.Runtime, value any, args ...any) template.HTML {
 	interaction, err := on(value, args...)
 	if err != nil {
 		return escapedError(err)
 	}
-	return renderInteraction(cfg, runtime, interaction)
+	return renderInteraction(runtime, interaction)
 }
 
-func renderInteraction(cfg config, runtime *partial.Runtime, interaction connector.Interaction) template.HTML {
+func renderInteraction(runtime *partial.Runtime, interaction connector.Interaction) template.HTML {
 	if runtime == nil {
 		return escapedError(fmt.Errorf("go-partial interaction runtime is not configured"))
 	}
@@ -304,15 +315,18 @@ func renderInteraction(cfg config, runtime *partial.Runtime, interaction connect
 		conn = connector.NewPartial(nil)
 	}
 	attrs := conn.InteractionAttrs(interaction)
-	out, err := cfg.renderer(runtime, interaction, attrs)
+	data := Data{Runtime: runtime, Interaction: interaction, Attrs: attrs}
+	out, err := runtime.RenderWith(RenderKindInteraction, string(interaction.Kind), data, func(ctx *partial.RenderContext) (template.HTML, error) {
+		return DefaultMarkupRenderer()(runtime, interaction, attrs)
+	})
 	if err != nil {
 		return escapedError(err)
 	}
 	return out
 }
 
-// DefaultRenderer renders small, unstyled wrappers around connector attributes.
-func DefaultRenderer() Renderer {
+// DefaultMarkupRenderer renders small, unstyled wrappers around connector attributes.
+func DefaultMarkupRenderer() MarkupRenderer {
 	return func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
 		switch interaction.Kind {
 		case connector.InteractionPrefetch:

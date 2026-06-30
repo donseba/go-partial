@@ -7,8 +7,16 @@ import (
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/actions"
+	"github.com/donseba/go-partial/exp/csrf"
 	"github.com/donseba/go-partial/exp/interactions"
+	"github.com/donseba/go-partial/exp/localization"
+	"github.com/donseba/go-partial/exp/pageflow"
+	"github.com/donseba/go-partial/exp/selection"
+	"github.com/donseba/go-partial/exp/target"
 	"github.com/donseba/go-partial/exp/templatehelpers"
+	extdebug "github.com/donseba/go-partial/ext/debug"
+	exterrors "github.com/donseba/go-partial/ext/errors"
 )
 
 func main() {
@@ -16,7 +24,7 @@ func main() {
 		service: partial.NewService(&partial.Config{
 			Connector:        connector.NewHTMX(nil),
 			FS:               os.DirFS("examples/showcase"),
-			ErrorMode:        partial.ErrorModeDetailed,
+			Renderers:        showcaseRenderers(),
 			UseTemplateCache: false,
 		}),
 		rows: []Row{
@@ -26,9 +34,19 @@ func main() {
 		},
 		products:     fakeProducts(),
 		carts:        make(map[string]map[int]int),
-		flowSessions: make(map[string]*partial.FlowSessionData),
+		flowSessions: make(map[string]*pageflow.SessionData),
 	}
-	app.service.SetFunc(showcaseTranslationFunctions(), interactions.FuncMap(interactions.WithRenderer(showcaseInteractionRenderer())), templatehelpers.FuncMap())
+	app.service.SetFunc(
+		showcaseTranslationFunctions(),
+		actions.FuncMap(),
+		csrf.FuncMap(),
+		extdebug.FuncMap(),
+		interactions.FuncMap(),
+		localization.FuncMap(),
+		selection.FuncMap(),
+		target.FuncMap(),
+		templatehelpers.FuncMap(),
+	)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)
@@ -71,4 +89,17 @@ func main() {
 
 	log.Println("showcase running on http://localhost:8090")
 	log.Fatal(http.ListenAndServe(":8090", mux))
+}
+
+func showcaseRenderers() []partial.Renderer {
+	return []partial.Renderer{
+		exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
+		extdebug.Renderer(),
+		actions.Renderer(),
+		csrf.Renderer(),
+		interactions.Renderer(showcaseInteractionRenderer()),
+		localization.Renderer(),
+		selection.Renderer(),
+		target.Renderer(),
+	}
 }

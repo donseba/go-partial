@@ -17,6 +17,62 @@ func TestFuncMapReturnsCopy(t *testing.T) {
 	}
 }
 
+func TestFuncMapIncludesSubsets(t *testing.T) {
+	all := FuncMap()
+	for name := range StringFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing string helper %q", name)
+		}
+	}
+	for name := range URLFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing URL helper %q", name)
+		}
+	}
+	for name := range HTMLFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing HTML helper %q", name)
+		}
+	}
+	for name := range TimeFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing time helper %q", name)
+		}
+	}
+	for name := range CollectionFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing collection helper %q", name)
+		}
+	}
+	for name := range NumberFuncMap() {
+		if _, ok := all[name]; !ok {
+			t.Fatalf("FuncMap() missing number helper %q", name)
+		}
+	}
+}
+
+func TestSubsetsStayScoped(t *testing.T) {
+	if _, ok := StringFuncMap()["safeHTML"]; ok {
+		t.Fatalf("StringFuncMap() should not include safeHTML")
+	}
+	if _, ok := HTMLFuncMap()["upper"]; ok {
+		t.Fatalf("HTMLFuncMap() should not include string helpers")
+	}
+	if _, ok := CollectionFuncMap()["inc"]; ok {
+		t.Fatalf("CollectionFuncMap() should not include number helpers")
+	}
+}
+
+func TestSubsetFuncMapsReturnCopies(t *testing.T) {
+	funcs := StringFuncMap()
+	funcs["upper"] = func(string) string { return "changed" }
+
+	next := StringFuncMap()
+	if reflect.ValueOf(next["upper"]).Pointer() == reflect.ValueOf(funcs["upper"]).Pointer() {
+		t.Fatalf("StringFuncMap() should return a copy")
+	}
+}
+
 func TestSafeHTML(t *testing.T) {
 	input := "<p>Hello, World!</p>"
 	expected := template.HTML("<p>Hello, World!</p>")

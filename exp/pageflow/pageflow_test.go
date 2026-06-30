@@ -1,4 +1,4 @@
-package partial
+package pageflow
 
 import (
 	"errors"
@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	partial "github.com/donseba/go-partial"
 )
 
 func TestPageFlowBasicNavigationAndValidation(t *testing.T) {
-	steps := []FlowStep{
+	steps := []Step{
 		{Name: "info"},
 		{
 			Name: "form",
@@ -22,8 +24,8 @@ func TestPageFlowBasicNavigationAndValidation(t *testing.T) {
 		},
 		{Name: "confirm"},
 	}
-	flow := NewPageFlow(steps)
-	session := &FlowSessionData{}
+	flow := New(steps)
+	session := &SessionData{}
 
 	if !flow.AllPreviousValidated(session) {
 		t.Error("first step should not require previous validation")
@@ -60,14 +62,10 @@ func TestPageFlowBasicNavigationAndValidation(t *testing.T) {
 	}
 }
 
-func TestPageFlowStepFromURL(t *testing.T) {
-	steps := []FlowStep{
-		{Name: "one"},
-		{Name: "two"},
-		{Name: "three"},
-	}
-	flow := NewPageFlow(steps)
-	session := &FlowSessionData{}
+func TestStepFromURL(t *testing.T) {
+	steps := []Step{{Name: "one"}, {Name: "two"}, {Name: "three"}}
+	flow := New(steps)
+	session := &SessionData{}
 
 	for _, stepName := range []string{"two", "three"} {
 		if !flow.SetCurrentStep(session, stepName) {
@@ -87,68 +85,34 @@ func TestPageFlowStepFromURL(t *testing.T) {
 	}
 }
 
-func TestPageFlowRenderIntegration(t *testing.T) {
-	infoPartial := New().ID("info").SetDot(map[string]any{"msg": "Welcome!"})
-	formPartial := New().ID("form").SetDot(map[string]any{"prompt": "Enter value:"})
-	confirmPartial := New().ID("confirm").SetDot(map[string]any{"done": true})
+func TestPageFlowStoresPartials(t *testing.T) {
+	infoPartial := partial.New().ID("info").SetDot(map[string]any{"msg": "Welcome!"})
+	formPartial := partial.New().ID("form").SetDot(map[string]any{"prompt": "Enter value:"})
+	confirmPartial := partial.New().ID("confirm").SetDot(map[string]any{"done": true})
 
-	steps := []FlowStep{
+	flow := New([]Step{
 		{Name: "info", Partial: infoPartial},
-		{
-			Name:    "form",
-			Partial: formPartial,
-			Validate: func(r *http.Request, data map[string]any) error {
-				if data["field"] == "ok" {
-					return nil
-				}
-				return errors.New("invalid")
-			},
-		},
+		{Name: "form", Partial: formPartial},
 		{Name: "confirm", Partial: confirmPartial},
-	}
-	flow := NewPageFlow(steps)
+	})
 
-	renderStep := func(stepName string) map[string]any {
-		session := &FlowSessionData{}
+	session := &SessionData{}
+	for _, stepName := range []string{"info", "form", "confirm"} {
 		if !flow.SetCurrentStep(session, stepName) {
 			t.Fatalf("step %q not found", stepName)
 		}
 		step := flow.CurrentStep(session)
-		if step.Partial == nil {
-			t.Fatalf("step %q has no partial", stepName)
+		if step.Partial == nil || step.Partial.PartialID() != stepName {
+			t.Fatalf("step %q partial = %#v", stepName, step.Partial)
 		}
-		dot, ok := step.Partial.getDotContract()
-		if !ok {
-			t.Fatalf("step %q has no dot", stepName)
-		}
-		values, ok := dot.(map[string]any)
-		if !ok {
-			t.Fatalf("step %q dot = %T, want map[string]any", stepName, dot)
-		}
-		return values
-	}
-
-	if got := renderStep("info")["msg"]; got != "Welcome!" {
-		t.Errorf("expected info step msg, got %#v", got)
-	}
-	if got := renderStep("form")["prompt"]; got != "Enter value:" {
-		t.Errorf("expected form prompt, got %#v", got)
-	}
-	if got := renderStep("confirm")["done"]; got != true {
-		t.Errorf("expected confirm done, got %#v", got)
 	}
 }
 
 func TestPageFlowEndToEndHTTP(t *testing.T) {
-	infoPartial := New().ID("info").SetDot(map[string]any{"msg": "Welcome!"})
-	formPartial := New().ID("form").SetDot(map[string]any{"prompt": "Enter value:"})
-	confirmPartial := New().ID("confirm").SetDot(map[string]any{"done": true})
-
-	steps := []FlowStep{
-		{Name: "info", Partial: infoPartial},
+	steps := []Step{
+		{Name: "info"},
 		{
-			Name:    "form",
-			Partial: formPartial,
+			Name: "form",
 			Validate: func(r *http.Request, data map[string]any) error {
 				if data["field"] == "ok" {
 					return nil
@@ -156,17 +120,17 @@ func TestPageFlowEndToEndHTTP(t *testing.T) {
 				return errors.New("invalid")
 			},
 		},
-		{Name: "confirm", Partial: confirmPartial},
+		{Name: "confirm"},
 	}
-	flow := NewPageFlow(steps)
+	flow := New(steps)
 
-	sessionStore := map[string]*FlowSessionData{}
+	sessionStore := map[string]*SessionData{}
 	sessionID := "testsession"
 
-	getSession := func(r *http.Request) *FlowSessionData {
+	getSession := func(r *http.Request) *SessionData {
 		s, ok := sessionStore[sessionID]
 		if !ok {
-			s = &FlowSessionData{}
+			s = &SessionData{}
 			sessionStore[sessionID] = s
 		}
 		return s
@@ -206,9 +170,7 @@ func TestPageFlowEndToEndHTTP(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 		switch step.Name {
 		case "info":
-			dot, _ := step.Partial.getDotContract()
-			values := dot.(map[string]any)
-			_, _ = w.Write([]byte("<h1>" + values["msg"].(string) + "</h1>"))
+			_, _ = w.Write([]byte("<h1>Welcome!</h1>"))
 		case "form":
 			_, _ = w.Write([]byte("<form method='POST'><input name='field'><button>Submit</button></form>"))
 		case "confirm":

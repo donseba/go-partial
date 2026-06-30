@@ -8,7 +8,7 @@
     <p class="leading-7 text-slate-400">Use a flow when a page is split into a sequence of partials, such as onboarding, checkout, setup wizards, or multi-step forms. Each step can be a normal partial and can be rendered with HTMX into the same page region.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Define steps</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">steps := []partial.FlowStep{
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">steps := []pageflow.Step{
     {
         Name:    "account",
         Partial: partial.NewID("account", "flow/account.gohtml"),
@@ -23,10 +23,10 @@
     {Name: "confirm", Partial: partial.NewID("confirm", "flow/confirm.gohtml")},
 }
 
-flow := partial.NewPageFlow(steps)</code></pre>
+flow := pageflow.New(steps)</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Store session data yourself</h2>
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">FlowSessionData</code> is intentionally plain. Store it in your session system, encrypted cookie, database row, or in-memory map for a local demo. The package should not decide how users are identified.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData</code> is intentionally plain. Store it in your session system, encrypted cookie, database row, or in-memory map for a local demo. The package should not decide how users are identified.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">session.SetStepData("account", map[string]any{
     "email": r.FormValue("email"),
@@ -38,7 +38,7 @@ session.Current = "details"</code></pre>
     <p class="leading-7 text-slate-400">Register each step as a partial on the flow content partial when it needs its own ID for partial-request routing. The template can still render the current step with native Go template calls.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type FlowPage struct {
-    Steps       []partial.FlowStep
+    Steps       []pageflow.Step
     CurrentStep string
     Validated   map[string]bool
     Account     AccountStep

@@ -9,6 +9,5 @@ func (app *App) localization(w http.ResponseWriter, r *http.Request) {
 		Locale:  locale,
 		Locales: []string{"en_US", "nl_NL", "fr_FR"},
 		Count:   5,
-		Loc:     showcaseLocalizer{locale: locale},
 	})
 }

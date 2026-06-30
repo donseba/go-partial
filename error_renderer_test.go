@@ -2,7 +2,6 @@ package partial
 
 import (
 	"context"
-	"errors"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +15,7 @@ func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
-	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys)
+	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorRenderer(false))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
 
@@ -53,7 +52,7 @@ func TestWriteWithRequestRendersDetailedDefaultErrorPageOnTemplateError(t *testi
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
-	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).SetErrorMode(ErrorModeDetailed)
+	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorRenderer(true))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
 
@@ -77,20 +76,6 @@ func TestWriteWithRequestRendersDetailedDefaultErrorPageOnTemplateError(t *testi
 	}
 }
 
-func TestExtractTemplateErrorLocation(t *testing.T) {
-	tests := map[string]string{
-		"template: broken.gohtml:5: unexpected EOF":                                                "broken.gohtml:5",
-		`template: broken.gohtml:2:6: executing "broken.gohtml" at <fail>: error calling fail: no`: "broken.gohtml:2:6",
-		"plain error": "",
-	}
-
-	for input, want := range tests {
-		if got := extractTemplateErrorLocation(errors.New(input)); got != want {
-			t.Fatalf("extractTemplateErrorLocation(%q) = %q, want %q", input, got, want)
-		}
-	}
-}
-
 func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
@@ -98,8 +83,13 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	p := New("broken.gohtml").
 		ID("broken").
 		SetFileSystem(fsys).
-		SetErrorRenderer(func(ctx context.Context, p *Partial, r *http.Request, err error) (template.HTML, error) {
-			return template.HTML(`<div id="custom-error">` + p.id + `</div>`), nil
+		Use(RendererHooks{
+			InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+				if ctx.Kind != renderKindError {
+					return next(ctx)
+				}
+				return template.HTML(`<div id="custom-error">` + ctx.Partial.PartialID() + `</div>`), nil
+			},
 		})
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -122,7 +112,7 @@ func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 		ID("content").
 		SetFileSystem(fsys).
 		SetConnector(connector.NewHTMX(nil)).
-		SetErrorMode(ErrorModeDetailed)
+		Use(testErrorRenderer(true))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	req.Header.Set(connector.HTMXHeaderRequest.String(), "true")
 	req.Header.Set(connector.HTMXHeaderTarget.String(), "content")
@@ -136,9 +126,6 @@ func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 	body := rec.Body.String()
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected htmx-swappable 200, got %d", rec.Code)
-	}
-	if rec.Header().Get(HeaderGoPartialError) != "true" {
-		t.Fatalf("expected X-Go-Partial-Error header")
 	}
 	if strings.Contains(body, "<!doctype html>") {
 		t.Fatalf("expected fragment error output, got full document: %q", body)
@@ -157,7 +144,8 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	wrapper.WithOOB(NewID("header", "header.gohtml").SetFileSystem(fsys).SetAlwaysSwapOOB(true))
 	content := NewID("content", "broken.gohtml").
 		SetFileSystem(fsys).
-		SetConnector(connector.NewHTMX(nil))
+		SetConnector(connector.NewHTMX(nil)).
+		Use(testErrorRenderer(false))
 	wrapper.With(content)
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -190,7 +178,8 @@ func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
 	content := NewID("content", "broken.gohtml").
 		SetFileSystem(fsys).
-		SetConnector(connector.NewHTMX(nil))
+		SetConnector(connector.NewHTMX(nil)).
+		Use(testErrorRenderer(false))
 	wrapper.With(content)
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -212,5 +201,31 @@ func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 	}
 	if strings.Contains(body, "<!doctype html>") {
 		t.Fatalf("expected section fallback, got full error document: %q", body)
+	}
+}
+
+func testErrorRenderer(detailed bool) Renderer {
+	return RendererHooks{
+		InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+			if ctx.Kind != renderKindError {
+				return next(ctx)
+			}
+
+			templates := ctx.Partial.TemplatePaths()
+			label := "Templates"
+			if len(templates) == 1 {
+				label = "Template"
+			}
+
+			body := `Template render error Partial ID ` + ctx.Partial.PartialID() + ` <dt>` + label + `</dt> ` + strings.Join(templates, ", ")
+			if detailed && ctx.Error != nil {
+				body += " " + ctx.Error.Error()
+			}
+			if ctx.Name == "fragment" {
+				body = `<section class="go-partial-error">` + body + `</section>`
+			}
+
+			return template.HTML(body), nil
+		},
 	}
 }

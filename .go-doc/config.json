@@ -4,8 +4,15 @@
   "exclude": ["vendor", "references", "node_modules"],
   "writeIndex": false,
   "providers": [
+    "github.com/donseba/go-partial/exp/actions",
+    "github.com/donseba/go-partial/exp/csrf",
     "github.com/donseba/go-partial/exp/interactions",
-    "github.com/donseba/go-partial/exp/templatehelpers"
+    "github.com/donseba/go-partial/exp/localization",
+    "github.com/donseba/go-partial/exp/selection",
+    "github.com/donseba/go-partial/exp/sse",
+    "github.com/donseba/go-partial/exp/target",
+    "github.com/donseba/go-partial/exp/templatehelpers",
+    "github.com/donseba/go-partial/ext/debug"
   ],
   "symbolAnnotations": [
     {
@@ -14,12 +21,6 @@
     }
   ],
   "templateFunctions": [
-    {
-      "name": "runtime",
-      "signatures": [
-        "func() *github.com/donseba/go-partial.Runtime"
-      ]
-    },
     {
       "name": "async",
       "path": "github.com/donseba/go-partial/exp/interactions.Async"
@@ -49,18 +50,64 @@
       "path": "github.com/donseba/go-partial/exp/interactions.Refresh"
     },
     {
-      "name": "partial",
-      "signatures": [
-        "func(runtime *github.com/donseba/go-partial.Runtime, path string) html/template.HTML",
-        "func(runtime *github.com/donseba/go-partial.Runtime, path string, dot any) html/template.HTML",
-        "func(runtime *github.com/donseba/go-partial.Runtime, path string, pairs ...any) html/template.HTML"
-      ]
+      "name": "action",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionHTML"
+    },
+    {
+      "name": "actionHeader",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionHeader"
+    },
+    {
+      "name": "actionValue",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionValue"
+    },
+    {
+      "name": "actionIs",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionIs"
+    },
+    {
+      "name": "csrf",
+      "path": "github.com/donseba/go-partial/exp/csrf.CSRF"
+    },
+    {
+      "name": "locale",
+      "path": "github.com/donseba/go-partial/exp/localization.Locale"
+    },
+    {
+      "name": "localizer",
+      "path": "github.com/donseba/go-partial/exp/localization.LocalizerValue"
+    },
+    {
+      "name": "selection",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionHTML"
+    },
+    {
+      "name": "selectionHeader",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionHeader"
+    },
+    {
+      "name": "selectionValue",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionValue"
+    },
+    {
+      "name": "selectionIs",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionIs"
+    },
+    {
+      "name": "targetHeader",
+      "path": "github.com/donseba/go-partial/exp/target.TargetHeader"
+    },
+    {
+      "name": "targetValue",
+      "path": "github.com/donseba/go-partial/exp/target.TargetValue"
+    },
+    {
+      "name": "targetIs",
+      "path": "github.com/donseba/go-partial/exp/target.TargetIs"
     },
     {
       "name": "debug",
-      "signatures": [
-        "func(runtime *github.com/donseba/go-partial.Runtime, value any) html/template.HTML"
-      ]
+      "path": "github.com/donseba/go-partial/ext/debug.Debug"
     }
   ]
 }

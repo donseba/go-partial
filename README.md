@@ -23,6 +23,16 @@ go get github.com/donseba/go-partial
 ## Template functions
 Template-facing helpers and accessors are documented in [TEMPLATE_FUNCTIONS.md](TEMPLATE_FUNCTIONS.md).
 
+## Package Layout
+The root package is intentionally small: rendering lifecycle, partial trees, layouts, runtime context, connectors, and core template helpers.
+
+Optional packages are split by stability:
+
+- `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
+- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, target resolvers, template helpers, and SSE.
+
+Core does not import these packages. Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers.
+
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
 
@@ -50,46 +60,42 @@ Several integrations are available, detailed information can be found in the [IN
 - SSE writer, for streaming rendered HTML patches
 
 ## Embedded Error Page
-`WriteWithRequest` renders a built-in HTML error page when template parsing or execution fails. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
+`WriteWithRequest` can render an HTML error page when template parsing or execution fails. Register `ext/errors` to choose the fallback markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
 
-Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200` and `X-Go-Partial-Error: true`, because HTMX does not swap `500` responses by default.
+Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200`, because HTMX does not swap `500` responses by default.
 
-The default renderer does not show a Go stack trace. Template parse and execution errors already carry the useful template location, while a stack captured during fallback rendering mostly describes the application render wrapper path.
-
-You can replace the default renderer globally:
+Register the error renderer globally:
 
 ```go
-service := partial.NewService(&partial.Config{
-    ErrorRenderer: func(ctx context.Context, p *partial.Partial, r *http.Request, err error) (template.HTML, error) {
-        return template.HTML(`<div class="error">` + template.HTMLEscapeString(err.Error()) + `</div>`), nil
-    },
-})
+service := partial.NewService(nil).
+    Use(exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)))
 ```
 
 Or on one partial:
 
 ```go
-content.SetErrorRenderer(partial.DefaultErrorRenderer())
+content.Use(exterrors.Renderer())
 ```
 
 `RenderWithRequest` still returns the render error directly. The fallback page is written by `WriteWithRequest`.
 
 ## Localization
-Templates receive a request localizer as `.Loc`. The core interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:
+Templates receive a request localizer through the `localizer` and `locale` helpers from `exp/localization`. The interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:
 
 ```go
-service.SetFunc(translator.FuncMap())
+service.SetFunc(localization.FuncMap(), translator.FuncMap())
+service.Use(localization.Renderer())
 ```
 
 ```go
-ctx := context.WithValue(r.Context(), partial.LocalizerContextKey, localizer)
+ctx := localization.WithLocalizer(r.Context(), localizer)
 _ = content.WriteWithRequest(ctx, w, r)
 ```
 
 ```html
-<p>{{ tl .Loc "Hello, World!" }}</p>
-<p>{{ tn .Loc "You have one message." "You have %d messages." 5 5 }}</p>
-<button>{{ ctl .Loc "button" "save" }}</button>
+<p>{{ tl localizer "Hello, World!" }}</p>
+<p>{{ tn localizer "You have one message." "You have %d messages." 5 5 }}</p>
+<button>{{ ctl localizer "button" "save" }}</button>
 ```
 
 `tl`, `tn`, `ctl`, and `ctn` are not built into go-partial. For a fuller translation backend, [github.com/donseba/go-translator](https://github.com/donseba/go-translator) fits this pattern well because it exposes a compatible `FuncMap()`.
@@ -128,19 +134,18 @@ The `debug` template helper renders a styled diagnostic box using an embedded te
 {{ debug runtime . }}
 ```
 
-Override debug output globally, per layout, or per partial:
+Register the debug helper and renderer globally, per layout, or per partial:
 
 ```go
-service.SetDebugRenderer(func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime, value any) (template.HTML, error) {
-    return template.HTML(`<pre class="debug">` + template.HTMLEscapeString(fmt.Sprintf("%#v", value)) + `</pre>`), nil
-})
+service.SetFunc(debug.FuncMap())
+service.Use(debug.Renderer())
 ```
 
 ## Server-Sent Events
 SSE is a writer layer, not a connector. Use it after deciding which partials changed:
 
 ```go
-events := partial.NewSSEWriter(w)
+events := sse.NewWriter(w)
 
 notice := partial.NewID("notice", "notice.gohtml").
     SetDot(Notice{Message: "Saved"})
@@ -150,7 +155,7 @@ _ = events.Signal("saved", true)
 events.Flush()
 ```
 
-The writer declares constants for expected headers and event names, such as `SSEHeaderContentType`, `SSEContentTypeEventStream`, `SSEEventPatch`, `SSEEventSignal`, and `SSEEventError`.
+The writer declares constants for expected headers and event names, such as `HeaderContentType`, `ContentTypeEventStream`, `EventPatch`, `EventSignal`, and `EventError`.
 
 ## Basic Usage
 Here's a simple typed example. The template owns the contract, the handler supplies the model.
@@ -264,7 +269,7 @@ wrapper.SetModel(serviceInfo)
 When `SetDot` is used, request-specific values are available through helpers instead of fields on dot:
 
 ```gotemplate
-{{ ctx.Locale }}
+{{ ctx.URL.Path }}
 {{ ctx.URL.Path }}
 {{ request.Method }}
 {{ locale }}
@@ -379,7 +384,7 @@ Register the row partial on the parent so the parent parse can see the row templ
 ```go
 rowPartial := partial.NewID("row", "templates/row.html")
 table.With(rowPartial)
-table.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     row := findRowForTarget(target)
     return partial.NewID(target, "templates/row.html").SetDot(row), true
 })
@@ -459,7 +464,8 @@ import (
 
 service.SetFunc(
     interactions.FuncMap(),
-    templatehelpers.FuncMap(),
+    templatehelpers.StringFuncMap(),
+    templatehelpers.CollectionFuncMap(),
 )
 ```
 
@@ -532,7 +538,7 @@ tablePartial := partial.NewID("table", "templates/table.html").
     SetDot(TablePage{Rows: rows})
 tablePartial.With(rowPartial)
 
-tablePartial.WithTargetResolver(func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+target.WithResolver(tablePartial, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
     row, ok := findRowForTarget(target)
     if !ok {
         return nil, false

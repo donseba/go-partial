@@ -46,7 +46,7 @@
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
-        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">events := partial.NewSSEWriter(w)
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">events := sse.NewWriter(w)
 _ = events.PatchPartial(ctx, r, "#sse-status", statusPartial)
 _ = events.Signal("progress", map[string]any{"step": step})
 events.Flush()</code></pre>

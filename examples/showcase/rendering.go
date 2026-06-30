@@ -32,6 +32,7 @@ func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *p
 func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	content.SetConnector(connector.NewHTMX(nil))
 	content.SetFileSystem(os.DirFS("examples/showcase"))
+	content.Use(showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := content.WriteWithRequest(app.requestContext(r), w, r); err != nil {
 		log.Printf("render error: %v", err)
@@ -47,6 +48,7 @@ func (app *App) writeLayout(w http.ResponseWriter, r *http.Request, layout *part
 
 func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	content.SetFileSystem(os.DirFS("examples/showcase"))
+	content.Use(showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	out, err := content.Render(app.requestContext(r))
 	if err != nil {
@@ -73,7 +75,7 @@ func (app *App) wrapper() *partial.Partial {
 	return wrapper
 }
 
-func showcaseInteractionRenderer() interactions.Renderer {
+func showcaseInteractionRenderer() interactions.MarkupRenderer {
 	return func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
 		attrText := showcaseInteractionAttrs(attrs)
 		placeholder := template.HTMLEscapeString(interaction.Placeholder)
