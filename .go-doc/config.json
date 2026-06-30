@@ -9,6 +9,7 @@
     "github.com/donseba/go-partial/exp/interactions",
     "github.com/donseba/go-partial/exp/localization",
     "github.com/donseba/go-partial/exp/selection",
+    "github.com/donseba/go-partial/exp/slots",
     "github.com/donseba/go-partial/exp/sse",
     "github.com/donseba/go-partial/exp/target",
     "github.com/donseba/go-partial/exp/templatehelpers",
@@ -92,6 +93,14 @@
     {
       "name": "selectionIs",
       "path": "github.com/donseba/go-partial/exp/selection.SelectionIs"
+    },
+    {
+      "name": "slot",
+      "path": "github.com/donseba/go-partial/exp/slots.Slot"
+    },
+    {
+      "name": "hasSlot",
+      "path": "github.com/donseba/go-partial/exp/slots.HasSlot"
     },
     {
       "name": "targetHeader",

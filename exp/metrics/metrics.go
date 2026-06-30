@@ -17,7 +17,9 @@ type (
 		Name       string
 		RequestID  string
 		PartialID  string
+		ParentID   string
 		PartialTag string
+		SlotName   string
 		Templates  []string
 		OOB        bool
 		Method     string
@@ -38,10 +40,14 @@ type (
 	// SinkFunc adapts a function to a metrics sink.
 	SinkFunc func(Record)
 
+	// FanoutSink sends each record to multiple sinks.
+	FanoutSink []Sink
+
 	config struct {
-		sink Sink
-		now  func() time.Time
-		tags map[string]string
+		sink     Sink
+		now      func() time.Time
+		tags     map[string]string
+		slotName func(*partial.Partial) string
 	}
 
 	// Option configures the metrics renderer.
@@ -66,6 +72,20 @@ const (
 func (f SinkFunc) Record(record Record) {
 	if f != nil {
 		f(record)
+	}
+}
+
+// Fanout returns a sink that forwards each record to every non-nil sink.
+func Fanout(sinks ...Sink) FanoutSink {
+	return FanoutSink(sinks)
+}
+
+// Record sends record to every configured sink.
+func (sinks FanoutSink) Record(record Record) {
+	for _, sink := range sinks {
+		if sink != nil {
+			sink.Record(record)
+		}
 	}
 }
 
@@ -126,6 +146,13 @@ func WithClock(now func() time.Time) Option {
 		if now != nil {
 			cfg.now = now
 		}
+	}
+}
+
+// WithSlotName configures how metrics discovers a partial's slot name.
+func WithSlotName(slotName func(*partial.Partial) string) Option {
+	return func(cfg *config) {
+		cfg.slotName = slotName
 	}
 }
 
@@ -193,7 +220,11 @@ func buildRecord(ctx *partial.RenderContext, out template.HTML, renderErr error,
 	record.RequestID = requestID(ctx)
 	if ctx.Partial != nil {
 		record.PartialID = ctx.Partial.PartialID()
+		record.ParentID = ctx.Partial.ParentID()
 		record.PartialTag = PartialTag(ctx.Partial)
+		if cfg.slotName != nil {
+			record.SlotName = cfg.slotName(ctx.Partial)
+		}
 		record.Templates = ctx.Partial.TemplatePaths()
 		record.OOB = ctx.Partial.IsOOB()
 	}

@@ -88,6 +88,33 @@ func TestWriterPatchPartial(t *testing.T) {
 	}
 }
 
+func TestWriterPatchPartialUsesRenderers(t *testing.T) {
+	fsys := fstest.MapFS{
+		"notice.gohtml": &fstest.MapFile{Data: []byte(`<div>{{ marker }}</div>`)},
+	}
+
+	notice := partial.NewID("notice", "notice.gohtml").
+		SetFileSystem(fsys)
+
+	rec := httptest.NewRecorder()
+	writer := NewWriter(rec).Use(partial.RendererHooks{
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+			ctx.SetFunc("marker", func() string { return "rendered" })
+			return ctx, nil
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+
+	if err := writer.PatchPartial(context.Background(), req, "#notice", notice); err != nil {
+		t.Fatalf("PatchPartial() error = %v", err)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `data: {"target":"#notice","html":"<div>rendered</div>"}`+"\n\n") {
+		t.Fatalf("expected renderer-enhanced partial patch, got %q", body)
+	}
+}
+
 func TestWriterMultilineData(t *testing.T) {
 	rec := httptest.NewRecorder()
 	writer := NewWriter(rec)

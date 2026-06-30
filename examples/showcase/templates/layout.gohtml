@@ -13,7 +13,7 @@
 </head>
 <body class="m-0 bg-[#f5f5f1] font-sans text-stone-900">
     <div class="grid min-h-screen grid-cols-[248px_minmax(0,1fr)] bg-[#f5f5f1] text-stone-900">
-        {{ template "header.gohtml" .Header }}
+        {{ slot "header" }}
 
         <main id="content" class="w-full max-w-6xl px-8 py-9 pb-24">
             {{ content }}

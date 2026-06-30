@@ -29,9 +29,23 @@ The root package is intentionally small: rendering lifecycle, partial trees, lay
 Optional packages are split by stability:
 
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
-- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, target resolvers, template helpers, and SSE.
+- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, slots, target resolvers, template helpers, and SSE.
 
 Core does not import these packages. Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers.
+
+## Metrics Output
+`exp/metrics` records render lifecycle data through a small `Sink` interface. Use your own sink for storage, or write JSON lines to any `io.Writer`:
+
+```go
+sink := metrics.Fanout(
+    inMemoryStore,
+    metrics.NewWriterSink(os.Stdout),
+)
+
+service.Use(metrics.Renderer(sink, metrics.WithTag("chain", "web")))
+```
+
+The writer sink is intentionally plain: it works with stdout, files, buffers, pipes, or app-owned adapters that forward records to SSE, queues, or databases.
 
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).

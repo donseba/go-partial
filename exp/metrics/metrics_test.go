@@ -1,9 +1,12 @@
 package metrics
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"html/template"
+	"io"
 	"net/http/httptest"
 	"testing"
 	"testing/fstest"
@@ -49,6 +52,9 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 	}
 	if record.PartialID != "metrics-page" {
 		t.Fatalf("PartialID = %q", record.PartialID)
+	}
+	if record.ParentID != "" {
+		t.Fatalf("ParentID = %q", record.ParentID)
 	}
 	if record.PartialTag != "main panel" {
 		t.Fatalf("PartialTag = %q", record.PartialTag)
@@ -137,6 +143,9 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 		switch record.PartialID {
 		case "content":
 			seenContent = true
+			if record.ParentID != "layout" {
+				t.Fatalf("content ParentID = %q", record.ParentID)
+			}
 			if record.PartialTag != "main" {
 				t.Fatalf("content PartialTag = %q", record.PartialTag)
 			}
@@ -145,6 +154,9 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 			}
 		case "header":
 			seenHeader = true
+			if record.ParentID != "layout" {
+				t.Fatalf("header ParentID = %q", record.ParentID)
+			}
 			if record.PartialTag != "sidebar" {
 				t.Fatalf("header PartialTag = %q", record.PartialTag)
 			}
@@ -195,6 +207,81 @@ func TestRendererRecordsRenderErrors(t *testing.T) {
 	}
 }
 
+func TestWriterSinkWritesJSONLines(t *testing.T) {
+	var out bytes.Buffer
+	sink := NewWriterSink(&out)
+	startedAt := time.Date(2026, 6, 30, 10, 0, 0, 0, time.UTC)
+
+	sink.Record(Record{
+		Kind:      partial.RenderKindPartial,
+		RequestID: "req-json",
+		PartialID: "content",
+		Method:    "GET",
+		Path:      "/metrics",
+		Size:      12,
+		Rendered:  true,
+		StartedAt: startedAt,
+		Duration:  3 * time.Millisecond,
+		Error:     errors.New("boom"),
+		Tags:      map[string]string{"chain": "showcase"},
+	})
+
+	if err := sink.Err(); err != nil {
+		t.Fatalf("Err() = %v", err)
+	}
+	lines := bytes.Split(bytes.TrimSpace(out.Bytes()), []byte("\n"))
+	if len(lines) != 1 {
+		t.Fatalf("lines = %d, want 1: %q", len(lines), out.String())
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(lines[0], &got); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if got["kind"] != "partial" || got["requestID"] != "req-json" || got["partialID"] != "content" {
+		t.Fatalf("unexpected identity fields: %#v", got)
+	}
+	if got["duration"] != "3ms" || got["durationNS"] != float64((3*time.Millisecond).Nanoseconds()) {
+		t.Fatalf("unexpected duration fields: %#v", got)
+	}
+	if got["error"] != "boom" {
+		t.Fatalf("error = %#v", got["error"])
+	}
+}
+
+func TestWriterSinkStoresFirstError(t *testing.T) {
+	sink := NewWriterSink(failingWriter{})
+
+	sink.Record(Record{Kind: partial.RenderKindPartial})
+
+	if !errors.Is(sink.Err(), errWriteFailed) {
+		t.Fatalf("Err() = %v, want %v", sink.Err(), errWriteFailed)
+	}
+}
+
+func TestFanoutSinkRecordsToEverySink(t *testing.T) {
+	var first []Record
+	var second []Record
+	sink := Fanout(
+		SinkFunc(func(record Record) {
+			first = append(first, record)
+		}),
+		nil,
+		SinkFunc(func(record Record) {
+			second = append(second, record)
+		}),
+	)
+
+	sink.Record(Record{PartialID: "content"})
+
+	if len(first) != 1 || first[0].PartialID != "content" {
+		t.Fatalf("first = %#v", first)
+	}
+	if len(second) != 1 || second[0].PartialID != "content" {
+		t.Fatalf("second = %#v", second)
+	}
+}
+
 func tickingClock(start time.Time, step time.Duration) func() time.Time {
 	current := start.Add(-step)
 	return func() time.Time {
@@ -202,3 +289,13 @@ func tickingClock(start time.Time, step time.Duration) func() time.Time {
 		return current
 	}
 }
+
+var errWriteFailed = errors.New("write failed")
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
+
+var _ io.Writer = failingWriter{}

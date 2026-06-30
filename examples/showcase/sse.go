@@ -16,9 +16,10 @@ func (app *App) sse(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) sseStream(w http.ResponseWriter, r *http.Request) {
-	events := sse.NewWriter(w)
+	events := sse.NewWriter(w).Use(app.showcaseRenderers()...)
 	_ = events.Comment("go-partial showcase stream")
 	events.Flush()
+	ctx := app.requestContext(r)
 
 	for i := 1; i <= 5; i++ {
 		select {
@@ -34,7 +35,7 @@ func (app *App) sseStream(w http.ResponseWriter, r *http.Request) {
 				Time: time.Now().Format("15:04:05"),
 				Done: i == 5,
 			})
-		if err := events.PatchPartial(app.requestContext(r), r, "#sse-status", status); err != nil {
+		if err := events.PatchPartial(ctx, r, "#sse-status", status); err != nil {
 			_ = events.Error(err)
 			events.Flush()
 			return

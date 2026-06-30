@@ -14,6 +14,7 @@ import (
 	"github.com/donseba/go-partial/exp/metrics"
 	"github.com/donseba/go-partial/exp/pageflow"
 	"github.com/donseba/go-partial/exp/selection"
+	"github.com/donseba/go-partial/exp/slots"
 	"github.com/donseba/go-partial/exp/target"
 	"github.com/donseba/go-partial/exp/templatehelpers"
 	extdebug "github.com/donseba/go-partial/ext/debug"
@@ -27,10 +28,11 @@ func main() {
 			{ID: 2, Name: "Tea", Price: "4.25", Status: "Brewing", Owner: "Ada"},
 			{ID: 3, Name: "Cake", Price: "6.75", Status: "Queued", Owner: "Ada"},
 		},
-		products:     fakeProducts(),
-		carts:        make(map[string]map[int]int),
-		flowSessions: make(map[string]*pageflow.SessionData),
-		metrics:      newShowcaseMetrics(80),
+		products:      fakeProducts(),
+		carts:         make(map[string]map[int]int),
+		flowSessions:  make(map[string]*pageflow.SessionData),
+		metrics:       newShowcaseMetrics(80),
+		metricStreams: newMetricStreamHub(),
 	}
 	app.service = partial.NewService(&partial.Config{
 		Connector:        connector.NewHTMX(nil),
@@ -46,6 +48,7 @@ func main() {
 		interactions.FuncMap(),
 		localization.FuncMap(),
 		selection.FuncMap(),
+		slots.FuncMap(),
 		target.FuncMap(),
 		templatehelpers.FuncMap(),
 	)
@@ -79,6 +82,9 @@ func main() {
 	mux.HandleFunc("/sse", app.sse)
 	mux.HandleFunc("/sse/stream", app.sseStream)
 	mux.HandleFunc("/metrics", app.metricsPage)
+	mux.HandleFunc("/metrics/live", app.liveMetricsPage)
+	mux.HandleFunc("/metrics/live/stream", app.liveMetricsStream)
+	mux.HandleFunc("/metrics/live/ping", app.liveMetricsPing)
 	mux.HandleFunc("/infinite", app.infinite)
 	mux.HandleFunc("/infinite/load", app.infiniteLoad)
 	mux.HandleFunc("/shop", app.shop)
@@ -102,8 +108,9 @@ func (app *App) showcaseRenderers() []partial.Renderer {
 		csrf.Renderer(),
 		interactions.Renderer(showcaseInteractionRenderer()),
 		localization.Renderer(),
-		metrics.Renderer(app.metrics, metrics.WithTag("chain", "showcase")),
+		metrics.Renderer(metrics.Fanout(app.metrics, app.metricStreams), metrics.WithTag("chain", "showcase"), metrics.WithSlotName(slots.Name)),
 		selection.Renderer(),
+		slots.Renderer(),
 		target.Renderer(),
 	}
 }

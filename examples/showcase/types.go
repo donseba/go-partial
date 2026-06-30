@@ -135,17 +135,32 @@ type SSEStatus struct {
 type MetricsPage struct {
 	Title      string
 	Total      int
-	Latest     []MetricsRecordView
+	Latest     []MetricsTraceView
 	ChainTag   string
 	TraceLabel string
+}
+
+type MetricsTraceView struct {
+	RequestID string
+	Timestamp string
+	Method    string
+	Path      string
+	Records   []MetricsRecordView
 }
 
 type MetricsRecordView struct {
 	Kind       string
 	Name       string
 	RequestID  string
+	Timestamp  string
+	Label      string
 	PartialID  string
+	ParentID   string
+	Depth      int
+	Indent     string
+	Meta       []string
 	PartialTag string
+	SlotName   string
 	Templates  string
 	Swap       string
 	Method     string
@@ -154,6 +169,29 @@ type MetricsRecordView struct {
 	Duration   string
 	Error      string
 	Chain      string
+}
+
+type LiveMetricsPage struct {
+	Title string
+}
+
+type LiveMetricRow struct {
+	Timestamp string
+	Kind      string
+	Label     string
+	Meta      []string
+	Templates string
+	Swap      string
+	Method    string
+	Path      string
+	Duration  string
+	Size      string
+	Chain     string
+	Error     string
+}
+
+type LiveMetricPing struct {
+	Time string
 }
 
 type TabItem struct {
@@ -226,12 +264,13 @@ type ShellPage struct {
 }
 
 type App struct {
-	service      *partial.Service
-	rows         []Row
-	products     []Product
-	carts        map[string]map[int]int
-	cartMu       sync.Mutex
-	counter      int
-	flowSessions map[string]*pageflow.SessionData
-	metrics      *showcaseMetrics
+	service       *partial.Service
+	rows          []Row
+	products      []Product
+	carts         map[string]map[int]int
+	cartMu        sync.Mutex
+	counter       int
+	flowSessions  map[string]*pageflow.SessionData
+	metrics       *showcaseMetrics
+	metricStreams *metricStreamHub
 }

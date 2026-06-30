@@ -20,8 +20,9 @@ type (
 	EventName   string
 
 	Writer struct {
-		w       http.ResponseWriter
-		flusher http.Flusher
+		w         http.ResponseWriter
+		flusher   http.Flusher
+		renderers []partial.Renderer
 	}
 
 	Patch struct {
@@ -74,6 +75,15 @@ func NewWriter(w http.ResponseWriter) *Writer {
 	}
 	writer.ApplyHeaders()
 	return writer
+}
+
+// Use appends renderers to partials rendered by this writer.
+func (s *Writer) Use(renderers ...partial.Renderer) *Writer {
+	if s == nil {
+		return s
+	}
+	s.renderers = append(s.renderers, renderers...)
+	return s
 }
 
 func (s *Writer) ApplyHeaders() {
@@ -149,6 +159,10 @@ func (s *Writer) PatchHTML(target string, html template.HTML) error {
 func (s *Writer) PatchPartial(ctx context.Context, r *http.Request, target string, p *partial.Partial) error {
 	if p == nil {
 		return fmt.Errorf("partial is not initialized")
+	}
+	if len(s.renderers) > 0 {
+		p = p.Clone()
+		p.Use(s.renderers...)
 	}
 	html, err := p.RenderWithRequest(ctx, r)
 	if err != nil {

@@ -312,8 +312,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		p.logger = l.service.config.Logger
 	}
 	p.useCache = l.service.config.UseTemplateCache
-	if len(l.renderers) > 0 {
+	if len(l.renderers) > 0 && !p.renderersInherited {
 		p.renderers = append(append([]Renderer(nil), l.renderers...), p.renderers...)
+		p.renderersInherited = true
 	}
 	p.templateCache = l.service.templateCache
 	p.request = l.request

@@ -43,28 +43,29 @@ type (
 
 	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
-		id              string
-		parent          *Partial
-		request         *http.Request
-		layoutContentID string
-		renderOOB       bool
-		alwaysSwapOOB   bool
-		fs              fs.FS
-		logger          Logger
-		connector       connector.Connector
-		useCache        bool
-		templates       []string
-		staticFuncs     template.FuncMap
-		basePath        string
-		contracts       []contractInformation
-		extensions      map[any]any
-		responseHeaders map[string]string
-		response        connector.Response
-		renderers       []Renderer
-		templateCache   *templateStore
-		mu              sync.RWMutex
-		children        map[string]*Partial
-		oobChildren     map[string]struct{}
+		id                 string
+		parent             *Partial
+		request            *http.Request
+		layoutContentID    string
+		renderOOB          bool
+		alwaysSwapOOB      bool
+		fs                 fs.FS
+		logger             Logger
+		connector          connector.Connector
+		useCache           bool
+		templates          []string
+		staticFuncs        template.FuncMap
+		basePath           string
+		contracts          []contractInformation
+		extensions         map[any]any
+		responseHeaders    map[string]string
+		response           connector.Response
+		renderers          []Renderer
+		renderersInherited bool
+		templateCache      *templateStore
+		mu                 sync.RWMutex
+		children           map[string]*Partial
+		oobChildren        map[string]struct{}
 	}
 
 	// RenderContext contains request-scoped values exposed by the ctx template helper.
@@ -142,6 +143,14 @@ func (p *Partial) PartialID() string {
 	return p.id
 }
 
+// ParentID returns the ID of the parent partial, if one is attached.
+func (p *Partial) ParentID() string {
+	if p == nil || p.parent == nil {
+		return ""
+	}
+	return p.parent.PartialID()
+}
+
 func (p *Partial) TemplatePaths() []string {
 	if p == nil {
 		return nil
@@ -169,6 +178,14 @@ func (p *Partial) Reset() *Partial {
 	p.extensions = make(map[any]any)
 
 	return p
+}
+
+// Clone returns a copy of the partial configuration and child tree references.
+func (p *Partial) Clone() *Partial {
+	if p == nil {
+		return nil
+	}
+	return p.clone()
 }
 
 func (p *Partial) SetExtension(key any, value any) *Partial {
@@ -1581,27 +1598,28 @@ func (p *Partial) clone() *Partial {
 	defer p.mu.RUnlock()
 
 	clone := &Partial{
-		id:              p.id,
-		parent:          p.parent,
-		request:         p.request,
-		layoutContentID: p.layoutContentID,
-		renderOOB:       p.renderOOB,
-		alwaysSwapOOB:   p.alwaysSwapOOB,
-		fs:              p.fs,
-		logger:          p.logger,
-		connector:       p.connector,
-		useCache:        p.useCache,
-		templates:       slices.Clone(p.templates),
-		staticFuncs:     maps.Clone(p.staticFuncs),
-		basePath:        p.basePath,
-		contracts:       slices.Clone(p.contracts),
-		extensions:      maps.Clone(p.extensions),
-		responseHeaders: maps.Clone(p.responseHeaders),
-		response:        p.response,
-		renderers:       slices.Clone(p.renderers),
-		templateCache:   p.templateCache,
-		children:        maps.Clone(p.children),
-		oobChildren:     maps.Clone(p.oobChildren),
+		id:                 p.id,
+		parent:             p.parent,
+		request:            p.request,
+		layoutContentID:    p.layoutContentID,
+		renderOOB:          p.renderOOB,
+		alwaysSwapOOB:      p.alwaysSwapOOB,
+		fs:                 p.fs,
+		logger:             p.logger,
+		connector:          p.connector,
+		useCache:           p.useCache,
+		templates:          slices.Clone(p.templates),
+		staticFuncs:        maps.Clone(p.staticFuncs),
+		basePath:           p.basePath,
+		contracts:          slices.Clone(p.contracts),
+		extensions:         maps.Clone(p.extensions),
+		responseHeaders:    maps.Clone(p.responseHeaders),
+		response:           p.response,
+		renderers:          slices.Clone(p.renderers),
+		renderersInherited: p.renderersInherited,
+		templateCache:      p.templateCache,
+		children:           maps.Clone(p.children),
+		oobChildren:        maps.Clone(p.oobChildren),
 	}
 
 	return clone

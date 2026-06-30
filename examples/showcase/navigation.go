@@ -16,6 +16,7 @@ func (app *App) navItems() []NavItem {
 		{Path: "/async", Label: "Async rows", Group: "exp"},
 		{Path: "/sse", Label: "SSE", Group: "exp"},
 		{Path: "/metrics", Label: "Metrics", Group: "exp"},
+		{Path: "/metrics/live", Label: "Live metrics", Group: "exp"},
 		{Path: "/debug", Label: "Debug", Group: "ext"},
 		{Path: "/error", Label: "Error", Group: "ext"},
 		{Path: "/oob", Label: "OOB", Group: "Integrations"},

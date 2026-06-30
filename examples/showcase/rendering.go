@@ -15,6 +15,7 @@ import (
 	"github.com/donseba/go-partial/connector"
 	"github.com/donseba/go-partial/exp/interactions"
 	"github.com/donseba/go-partial/exp/metrics"
+	"github.com/donseba/go-partial/exp/slots"
 )
 
 func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
@@ -54,7 +55,7 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 	content.SetFileSystem(os.DirFS("examples/showcase"))
 	content.Use(app.showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	out, err := content.Render(app.requestContext(r))
+	out, err := content.RenderWithRequest(app.requestContext(r), r)
 	if err != nil {
 		log.Printf("render error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -75,7 +76,9 @@ func (app *App) wrapper() *partial.Partial {
 		AppName: "go-partial showcase",
 		Header:  header,
 	})
-	wrapper.WithOOB(metrics.WithPartialTag(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true), "sidebar"))
+	headerPartial := metrics.WithPartialTag(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true), "sidebar")
+	slots.Set(wrapper, "header", headerPartial)
+	wrapper.WithOOB(headerPartial)
 	return wrapper
 }
 

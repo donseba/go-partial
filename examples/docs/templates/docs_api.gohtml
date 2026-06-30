@@ -141,6 +141,16 @@ page.WithTemplate("templates/cart.gohtml")
 
     <p class="leading-7 text-slate-400">SSE header and event names are constants, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HeaderContentType</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ContentTypeEventStream</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventPatch</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventSignal</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventError</code>.</p>
 
+    <h2 class="text-xl font-bold text-slate-50">Metrics output</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Call</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">metrics.Renderer(sink)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Observe render timing, request, template, size, slot, and error information without changing the render result.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">metrics.NewWriterSink(w)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Write metrics records as JSON lines to any <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">io.Writer</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">metrics.Fanout(...)</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Send the same record to multiple sinks, such as in-memory storage plus stdout or an application-owned database adapter.</td></tr>
+        </tbody>
+    </table>
+
     <h2 class="text-xl font-bold text-slate-50">Template context</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Field</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Meaning</th></tr></thead>

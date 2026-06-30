@@ -145,7 +145,10 @@ func (r *Runtime) preparePartial(p *Partial) (*Partial, error) {
 	}
 	child := p.clone()
 	child.parent = r.partial
-	child.renderers = append(append([]Renderer(nil), r.partial.getRenderers()...), child.renderers...)
+	if !child.renderersInherited {
+		child.renderers = append(append([]Renderer(nil), r.partial.getRenderers()...), child.renderers...)
+		child.renderersInherited = true
+	}
 	return child, nil
 }
 
