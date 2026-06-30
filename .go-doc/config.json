@@ -6,6 +6,7 @@
   "providers": [
     "github.com/donseba/go-partial/exp/actions",
     "github.com/donseba/go-partial/exp/csrf",
+    "github.com/donseba/go-partial/exp/flash",
     "github.com/donseba/go-partial/exp/interactions",
     "github.com/donseba/go-partial/exp/localization",
     "github.com/donseba/go-partial/exp/selection",
@@ -69,6 +70,22 @@
     {
       "name": "csrf",
       "path": "github.com/donseba/go-partial/exp/csrf.CSRF"
+    },
+    {
+      "name": "flash",
+      "path": "github.com/donseba/go-partial/exp/flash.Flash"
+    },
+    {
+      "name": "flashTarget",
+      "path": "github.com/donseba/go-partial/exp/flash.FlashTarget"
+    },
+    {
+      "name": "flashes",
+      "path": "github.com/donseba/go-partial/exp/flash.Flashes"
+    },
+    {
+      "name": "hasFlashes",
+      "path": "github.com/donseba/go-partial/exp/flash.HasFlashes"
     },
     {
       "name": "locale",

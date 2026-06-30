@@ -10,6 +10,7 @@ import (
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/flash"
 )
 
 func (app *App) shop(w http.ResponseWriter, r *http.Request) {
@@ -83,11 +84,11 @@ func (app *App) shopCartOpen(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) writeCartUpdate(w http.ResponseWriter, r *http.Request, sessionID string, message string) {
+	ctx := flash.Add(r.Context(), flash.Success(message))
+	r = r.WithContext(ctx)
+
 	wrapper := app.wrapper()
 	wrapper.WithOOB(app.shopCartButtonPartial(sessionID))
-	wrapper.WithOOB(partial.NewID("toast", "templates/toast.gohtml").SetDot(NoticePage{
-		Message: message,
-	}).SetAlwaysSwapOOB(true))
 
 	content := app.shopCartPopupPartial(sessionID, true)
 	layout := app.service.NewLayout().Set(content).Wrap(wrapper)

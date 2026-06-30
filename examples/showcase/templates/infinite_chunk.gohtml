@@ -1,6 +1,7 @@
 {{/*
 @dot github.com/donseba/go-partial/examples/showcase.InfinitePage
 */}}
+{{ flash }}
 {{ range .Rows }}
     {{ template "infinite_row.gohtml" . }}
 {{ end }}
@@ -18,5 +19,3 @@
         Loading more rows after {{ .Next }}...
     </div>
 {{ end }}
-
-{{ template "infinite_toast.gohtml" . }}

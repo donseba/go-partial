@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/flash"
 )
 
 func (app *App) infinite(w http.ResponseWriter, r *http.Request) {
@@ -33,6 +35,8 @@ func (app *App) infiniteLoad(w http.ResponseWriter, r *http.Request) {
 
 	start := current + 1
 	content := app.infinitePartial("infinite-chunk", start, 25)
+	ctx := flash.Add(r.Context(), flash.Info(fmt.Sprintf("Loaded rows %d-%d", start, min(start+24, 150))))
+	r = r.WithContext(ctx)
 	app.writeStandalone(w, r, content)
 }
 
@@ -63,6 +67,5 @@ func (app *App) infinitePartial(id string, start int, count int) *partial.Partia
 	})
 	content.With(partial.NewID("infinite-row", "templates/infinite_row.gohtml"))
 	content.With(partial.NewID("rickroll", "templates/rickroll.gohtml"))
-	content.With(partial.NewID("infinite-toast", "templates/infinite_toast.gohtml"))
 	return content
 }

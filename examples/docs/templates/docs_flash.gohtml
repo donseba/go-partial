@@ -1,0 +1,45 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">exp</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Flash messages</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/flash</code> renders request-scoped messages for SSR and HTMX responses. It stays deliberately small: your app owns persistence, while the package owns message shape, helpers, and default markup.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Register helpers</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.SetFunc(flash.FuncMap())
+service.Use(flash.Renderer())</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Add messages</h2>
+    <p class="leading-7 text-slate-400">Flash messages live on context. In handlers, start from <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">r.Context()</code>, add messages, then render with the derived request context.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">ctx := flash.Add(r.Context(),
+    flash.Success("Saved"),
+    flash.Info("Profile refreshed"),
+    flash.Warn("Using cached data"),
+    flash.Error("Payment failed"),
+)
+
+r = r.WithContext(ctx)
+_ = layout.WriteWithRequest(ctx, w, r)</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Render in templates</h2>
+    <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ flashTarget }}" }}</code> once in the page shell when HTMX fragments should append messages to a stable place. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ flash }}" }}</code> where the current request should render its messages.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ flash }}" }}
+
+{{ "{{ if hasFlashes }}" }}
+    {{ "{{ range flashes }}" }}{{ "{{ .Level }}" }}: {{ "{{ .Text }}" }}{{ "{{ end }}" }}
+{{ "{{ end }}" }}</code></pre>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;body&gt;
+    {{ "{{ content }}" }}
+    {{ "{{ flashTarget }}" }}
+&lt;/body&gt;</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Override markup</h2>
+    <p class="leading-7 text-slate-400">The default message and target templates are embedded. Applications can replace either one with templates from their own filesystem or fully configured partials.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.Use(flash.Renderer(
+    flash.WithTemplate("templates/flash.gohtml"),
+    flash.WithTargetTemplate("templates/flash_target.gohtml"),
+    flash.WithTargetID("flash-messages"),
+))</code></pre>
+
+    <p class="leading-7 text-slate-400">Templates receive <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">flash.Data</code> with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Messages []flash.Message</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">TargetID</code>. Built-in levels are <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">success</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">info</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">warn</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">error</code>. Custom levels and target IDs are normalized into lowercase CSS-friendly tokens so templates can safely use them in classes, attributes, and OOB selectors.</p>
+</article>

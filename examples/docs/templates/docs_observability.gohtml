@@ -46,6 +46,10 @@ service := partial.NewService(&partial.Config{
     })
 }</code></pre>
     <p class="leading-7 text-slate-400">Calling <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithEventSink</code> more than once appends sinks. Middleware can layer collectors without overwriting earlier ones.</p>
+    <p class="leading-7 text-slate-400">Pass the same request-derived context to rendering. Template helpers and render lifecycle events use the active render context, so request-owned collectors see helper breadcrumbs, parse and execute errors, target misses, and extension signals for that request only.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Event scope and concurrency</h2>
+    <p class="leading-7 text-slate-400">Service events are shared process wiring. Request events are context values. A concurrent render of the same configured partial tree will not move one request's event sink, URL, target, or renderer values onto another request. Keep custom sinks concurrency-safe when they are shared, or attach a fresh sink per request.</p>
 
     <h2 class="text-xl font-bold text-slate-50">OpenTelemetry</h2>
     <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/otel</code> adds go-partial events to the active OpenTelemetry span. It does not create spans, tracer providers, exporters, or samplers; those stay in your app or platform wiring.</p>

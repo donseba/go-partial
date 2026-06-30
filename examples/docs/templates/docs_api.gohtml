@@ -66,6 +66,13 @@ page.WithTemplate("templates/cart.gohtml")
         </tbody>
     </table>
 
+    <h2 class="text-xl font-bold text-slate-50">Concurrency contract</h2>
+    <div class="grid gap-4 rounded-xl border border-slate-700 bg-slate-800/70 p-5">
+        <p class="leading-7 text-slate-400">Configure services, layouts, partial trees, function maps, renderers, response metadata, connectors, and filesystems before serving traffic. Once configured, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest</code> can render the same tree concurrently.</p>
+        <p class="leading-7 text-slate-400">Request-specific values live on the active render context, not on the reusable partial. That includes <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">url</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctx</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">runtime</code>, selected targets, renderer values, helper bindings, and request event sinks.</p>
+        <p class="leading-7 text-slate-400">Mutable builder values such as connector triggers and swaps, an <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">sse.Writer</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData</code> are single-owner values unless your application wraps them with synchronization.</p>
+    </div>
+
     <h2 class="text-xl font-bold text-slate-50">Service methods</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Method</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>

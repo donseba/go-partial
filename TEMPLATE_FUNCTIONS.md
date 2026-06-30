@@ -12,7 +12,7 @@ The current model is intentionally close to normal Go templates:
 
 ## Naming Rules
 
-Avoid user-defined helper or model names that collide with Go template actions or go-partial helpers, such as `range`, `if`, `len`, `ctx`, `request`, `url`, `locale`, `csrf`, `content`, `partial`, `selection`, and `action`.
+Avoid user-defined helper or model names that collide with Go template actions or go-partial helpers, such as `range`, `if`, `len`, `ctx`, `request`, `url`, `locale`, `csrf`, `content`, `partial`, `selection`, `action`, `flash`, `flashTarget`, `flashes`, and `hasFlashes`.
 
 When a template uses `SetDot`, request-specific values are still available through helper functions instead of fields on dot.
 
@@ -24,6 +24,9 @@ When a template uses `SetDot`, request-specific values are still available throu
 | `partial` | Composition helper | Render a template path through go-partial's render path. Prefer native `template` for typed rows. |
 | `selection` | Helper | Render the selected partial from a `selection.WithSelectMap` registration. |
 | `action` | Helper | Render the partial returned by an action callback. |
+| `flash` | Helper | Render request-scoped flash messages from `exp/flash`. |
+| `flashTarget` | Helper | Render the stable target container used by flash message templates. |
+| `flashes`, `hasFlashes` | Helper | Read request-scoped flash messages for custom markup. |
 | `async` | Interaction helper | Render connector-aware deferred loading markup for an endpoint. |
 | `reveal` | Interaction helper | Load an endpoint when the generated area enters the viewport. |
 | `poll` | Interaction helper | Refresh an endpoint on an interval. |
@@ -170,6 +173,51 @@ Rules:
 - keys must be strings
 - odd argument counts are errors
 - when passed as one argument to `partial`, the map becomes the callee's dot value
+
+## Flash Helpers
+
+Flash helpers live in `github.com/donseba/go-partial/exp/flash` and are opt-in:
+
+```go
+service.SetFunc(flash.FuncMap())
+service.Use(flash.Renderer())
+```
+
+Add messages to the request context before rendering:
+
+```go
+ctx := flash.Add(r.Context(), flash.Success("Saved"))
+_ = layout.WriteWithRequest(ctx, w, r.WithContext(ctx))
+```
+
+Render them with the embedded default template:
+
+```gotemplate
+{{ flash }}
+```
+
+Render a stable destination in a layout when fragments should append messages
+out-of-band:
+
+```gotemplate
+{{ flashTarget }}
+```
+
+Use `flashes` and `hasFlashes` when a template wants to own the markup directly:
+
+```gotemplate
+{{ if hasFlashes }}
+    {{ range flashes }}
+        {{ .Level }}: {{ .Text }}
+    {{ end }}
+{{ end }}
+```
+
+Applications can override the default message template with `flash.WithTemplate(...)`
+or `flash.WithPartial(...)`, and the target with `flash.WithTargetTemplate(...)`,
+`flash.WithTargetPartial(...)`, or `flash.WithTargetID(...)`.
+Custom levels and target IDs are normalized into lowercase CSS-friendly tokens
+before templates receive them.
 
 ## Interaction Helpers
 

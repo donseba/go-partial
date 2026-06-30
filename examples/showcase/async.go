@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/exp/flash"
 )
 
 func (app *App) asyncPage(w http.ResponseWriter, r *http.Request) {
@@ -32,11 +34,14 @@ func (app *App) asyncRow(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, row := range app.rows {
 		if row.ID == id {
-			time.Sleep(time.Duration(row.ID*2) * time.Second)
+			delay := time.Duration(row.ID*2) * time.Second
+			time.Sleep(delay)
 			content := partial.NewID("async-row", "templates/async_row.gohtml").SetDot(AsyncRow{
 				Row:        row,
 				RenderedAt: time.Now().Format("15:04:05"),
 			})
+			ctx := flash.Add(r.Context(), flash.Success(fmt.Sprintf("Row %d loaded after %s", row.ID, delay)))
+			r = r.WithContext(ctx)
 			app.writeStandalone(w, r, content)
 			return
 		}

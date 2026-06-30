@@ -21,5 +21,39 @@
     </div>
 
     <aside id="cart-popup" class="fixed bottom-5 right-5 z-50 hidden w-[420px] max-w-[min(420px,calc(100vw-40px))] gap-3.5 rounded-lg border border-stone-300 bg-white p-4 shadow-2xl" aria-live="polite"></aside>
+    {{ flashTarget }}
+    <script>
+        (() => {
+            const bindFlash = (node) => {
+                if (!(node instanceof HTMLElement) || !node.matches("[data-flash-message]") || node.dataset.flashBound) {
+                    return
+                }
+                node.dataset.flashBound = "true"
+                node.style.transition = "opacity 180ms ease, transform 180ms ease"
+                const timeout = Number.parseInt(node.dataset.flashTimeout || "4200", 10)
+                window.setTimeout(() => {
+                    node.style.opacity = "0"
+                    node.style.transform = "translateY(-4px)"
+                    window.setTimeout(() => node.remove(), 220)
+                }, Number.isFinite(timeout) ? timeout : 4200)
+            }
+
+            const bindTree = (root) => {
+                bindFlash(root)
+                if (root instanceof Element) {
+                    root.querySelectorAll("[data-flash-message]").forEach(bindFlash)
+                }
+            }
+
+            const target = document.getElementById("flash-messages")
+            if (!target) {
+                return
+            }
+            bindTree(target)
+            new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => mutation.addedNodes.forEach(bindTree))
+            }).observe(target, { childList: true, subtree: true })
+        })()
+    </script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+{{/*
+@dot github.com/donseba/go-partial/exp/flash.Data
+*/}}
+{{ if .Messages }}
+<div hx-swap-oob="beforeend:#{{ .TargetID }}">
+    {{ range .Messages }}
+        <div data-flash-message data-flash-timeout="4200" role="status" class="rounded-lg border px-3.5 py-3 text-sm font-bold shadow-xl {{ if eq .Level "success" }}border-emerald-300 bg-emerald-50 text-emerald-950{{ else if eq .Level "warn" }}border-amber-300 bg-amber-50 text-amber-950{{ else if eq .Level "error" }}border-rose-300 bg-rose-50 text-rose-950{{ else }}border-sky-300 bg-sky-50 text-sky-950{{ end }}">
+            {{ .Text }}
+        </div>
+    {{ end }}
+</div>
+{{ end }}

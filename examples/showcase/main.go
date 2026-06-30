@@ -12,6 +12,7 @@ import (
 	"github.com/donseba/go-partial/connector"
 	"github.com/donseba/go-partial/exp/actions"
 	"github.com/donseba/go-partial/exp/csrf"
+	"github.com/donseba/go-partial/exp/flash"
 	"github.com/donseba/go-partial/exp/interactions"
 	"github.com/donseba/go-partial/exp/localization"
 	"github.com/donseba/go-partial/exp/metrics"
@@ -56,6 +57,7 @@ func main() {
 		actions.FuncMap(),
 		csrf.FuncMap(),
 		extdebug.FuncMap(),
+		flash.FuncMap(),
 		extlogger.FuncMap(),
 		interactions.FuncMap(),
 		localization.FuncMap(),
@@ -149,6 +151,10 @@ func (app *App) showcaseRenderers() []partial.Renderer {
 		extlogger.Renderer(),
 		actions.Renderer(),
 		csrf.Renderer(),
+		flash.Renderer(
+			flash.WithTemplate("templates/flash.gohtml"),
+			flash.WithTargetTemplate("templates/flash_target.gohtml"),
+		),
 		interactions.Renderer(showcaseInteractionRenderer()),
 		localization.Renderer(),
 		metrics.Renderer(metrics.Fanout(app.metrics, app.metricStreams), metrics.WithTag("chain", "showcase"), metrics.WithSlotName(slots.Name)),

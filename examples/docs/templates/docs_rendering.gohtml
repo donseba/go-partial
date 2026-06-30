@@ -33,6 +33,21 @@ layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
         <li>For a partial render, go-partial renders the requested target and appends any out-of-band ancestors that should update too.</li>
     </ol>
 
+    <h2 class="text-xl font-bold text-slate-50">Request context</h2>
+    <p class="leading-7 text-slate-400">HTTP handlers should pass <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">r.Context()</code>, or a context derived from it, into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest</code>. That is how cancellation, deadlines, localization, CSRF values, request event sinks, metrics IDs, and renderer values travel through the render.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">ctx := metrics.WithRequestID(r.Context(), requestID)
+ctx = partial.WithEventSink(ctx, requestEvents)
+
+if err := layout.WriteWithRequest(ctx, w, r); err != nil {
+    http.Error(w, "render failed", http.StatusInternalServerError)
+    return
+}</code></pre>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Render(ctx)</code> is still useful for tests, offline rendering, and utilities that do not have an HTTP request. Request-aware helpers such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">request</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">url</code>, and connector values are naturally empty on that path.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Concurrency contract</h2>
+    <p class="leading-7 text-slate-400">Shared services and already-configured partial trees can be rendered concurrently. Configure them before serving requests, then treat methods such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetDot</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">With</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Use</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetFunc</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetResponseHeaders</code> as configuration methods, not live request mutation.</p>
+    <p class="leading-7 text-slate-400">Per-render values are kept on the active render context. The request, URL, runtime object, selected target, helper bindings, renderer values, and event sinks are not stored back onto reusable partials. When a route needs different dot data or children for each request, build those partials and the layout inside the handler.</p>
+
     <h2 class="text-xl font-bold text-slate-50">Dynamic targets</h2>
     <p class="leading-7 text-slate-400">Use a target resolver when DOM IDs are dynamic, such as table rows. The resolver maps a browser target like <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code> back to the row template and fresh dot data.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {

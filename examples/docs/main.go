@@ -57,6 +57,7 @@ func main() {
 	mux.HandleFunc("/docs/selection-action", app.selectionAction)
 	mux.HandleFunc("/docs/interactions", app.interactions)
 	mux.HandleFunc("/docs/deferred", app.deferred)
+	mux.HandleFunc("/docs/flash", app.flash)
 	mux.HandleFunc("/docs/flow", app.flow)
 	mux.HandleFunc("/docs/localization", app.localization)
 	mux.HandleFunc("/docs/integrations", app.integrations)
@@ -113,6 +114,10 @@ func (app *App) interactions(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) deferred(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "templates/docs_deferred.gohtml")
+}
+
+func (app *App) flash(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "templates/docs_flash.gohtml")
 }
 
 func (app *App) flow(w http.ResponseWriter, r *http.Request) {
@@ -201,6 +206,7 @@ func (app *App) navItems() []NavItem {
 		{Path: "/docs/deferred", Label: "Deferred partials", Group: "Guide"},
 		{Path: "/docs/error-boundaries", Label: "Error boundaries", Group: "ext"},
 		{Path: "/docs/observability", Label: "Observability", Group: "ext"},
+		{Path: "/docs/flash", Label: "Flash messages", Group: "exp"},
 		{Path: "/docs/selection-action", Label: "Selection and action", Group: "exp"},
 		{Path: "/docs/interactions", Label: "Interaction helpers", Group: "exp"},
 		{Path: "/docs/flow", Label: "Page flows", Group: "exp"},

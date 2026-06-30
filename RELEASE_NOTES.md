@@ -27,13 +27,34 @@ interaction styles:
 ```
 
 Use endpoint strings for simple, local interactions. Use named
-`partial.Interaction` values with `SetInteraction` when Go should own stable
-IDs, targets, polling intervals, events, placeholders, or reuse.
+`interactions.Interaction` values with `SetContract("interaction", ...)` when
+Go should own stable IDs, targets, polling intervals, events, placeholders, or
+reuse.
 
 ## Showcase Cleanup
 
 The interaction showcase now uses the typed named interaction form for the
 default async example instead of an intentionally-invalid placeholder call.
+
+The showcase also demonstrates `exp/flash` for transient SSR/HTMX messages.
+Async rows, infinite-scroll chunks, and webshop cart actions append flash
+messages into a stable `flashTarget` container and remove them after a short
+delay.
+
+## Flash Messages
+
+go-partial now includes an experimental flash helper package:
+
+```text
+github.com/donseba/go-partial/exp/flash
+```
+
+Register it with `service.SetFunc(flash.FuncMap())` and
+`service.Use(flash.Renderer())`. Templates can render `{{ flashTarget }}` once
+in a layout and `{{ flash }}` in request or fragment templates. Message and
+target templates are embedded by default and can be replaced with
+`flash.WithTemplate`, `flash.WithPartial`, `flash.WithTargetTemplate`,
+`flash.WithTargetPartial`, and `flash.WithTargetID`.
 
 ## Helper Provider Split
 
@@ -46,5 +67,5 @@ ordinary template helpers and can be provided through:
 github.com/donseba/go-partial/exp/templatehelpers
 ```
 
-The repository `.go-doc/config.json` now advertises both optional providers:
-`exp/interactions` and `exp/templatehelpers`.
+The repository `.go-doc/config.json` now advertises optional providers such as
+`exp/flash`, `exp/interactions`, and `exp/templatehelpers`.

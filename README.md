@@ -29,7 +29,7 @@ The root package is intentionally small: rendering lifecycle, partial trees, lay
 Optional packages are split by stability:
 
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
-- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, OpenTelemetry, slots, target resolvers, template helpers, and SSE.
+- `exp/...` contains experimental opt-in features, such as localization, CSRF, flash messages, selection, actions, pageflow, interactions, metrics, OpenTelemetry, slots, target resolvers, template helpers, and SSE.
 
 Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A renderer follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
 
@@ -85,7 +85,7 @@ An htmx-backed feature showcase with real template files is available in [exampl
 go run ./examples/showcase
 ```
 
-Open http://localhost:8090 to see pages for typed rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, live metrics, infinite scroll with cursor-style `X-Action` values, and the optional error page.
+Open http://localhost:8090 to see pages for typed rows, selection partials, actions, flash messages, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, live metrics, infinite scroll with cursor-style `X-Action` values, and the optional error page.
 
 ## Integrations
 Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file.
@@ -215,11 +215,11 @@ service.SetFunc(template.FuncMap{
 
 ```
 
-## 2. Create a Layout
-The `Layout` manages the overall structure of your templates.
-```go
-layout := service.NewLayout()
-```
+## 2. Create Layouts Per Request
+The `Layout` manages the overall structure of one render. Create it inside the
+handler when the content, wrapper, dot data, or registered children are
+request-specific. Shared services and already-configured partial trees can be
+reused across requests; per-request wiring should stay per request.
 
 ### 3. Define Partials
 Create `Partial` instances for the content and any other components.
@@ -246,8 +246,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
     wrapper := partial.NewID("wrapper", "templates/layout.html").
         SetDot(LayoutPage{AppName: "My Application"})
     
-    layout.Set(content)
-    layout.Wrap(wrapper)
+    layout := service.NewLayout().
+        Set(content).
+        Wrap(wrapper)
     
     output, err := layout.RenderWithRequest(r.Context(), r)
     if err != nil {
@@ -495,11 +496,13 @@ Optional helper providers live under `exp/`:
 
 ```go
 import (
+    "github.com/donseba/go-partial/exp/flash"
     "github.com/donseba/go-partial/exp/interactions"
     "github.com/donseba/go-partial/exp/templatehelpers"
 )
 
 service.SetFunc(
+    flash.FuncMap(),
     interactions.FuncMap(),
     templatehelpers.StringFuncMap(),
     templatehelpers.CollectionFuncMap(),
@@ -511,6 +514,7 @@ For go-doc, point provider discovery at the same packages:
 ```json
 {
   "providers": [
+    "github.com/donseba/go-partial/exp/flash",
     "github.com/donseba/go-partial/exp/interactions",
     "github.com/donseba/go-partial/exp/templatehelpers"
   ]
@@ -607,6 +611,8 @@ go-partial does not wrap your model in `.Data`, `.Service`, `.Layout`, or `.Glob
 
 ## Concurrency and Template Caching
 Configure services, layouts, partial trees, functions, renderers, headers, and filesystems before serving requests. After configuration, `RenderWithRequest` and `WriteWithRequest` can be called concurrently on the same partial or layout tree. Request-specific values such as `request`, `url`, `ctx`, `runtime`, renderer values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
+
+In HTTP handlers, pass the request context, normally `r.Context()` or a context derived from it. That lets cancellation, deadlines, localization, CSRF state, event sinks, metrics IDs, and other middleware values follow the render. `Render(ctx)` without a request is for tests, offline rendering, and small utilities.
 
 Do not call configuration methods such as `SetFunc`, `Use`, `With`, `SetDot`, `SetFileSystem`, `SetConnector`, or `SetResponseHeaders` while the same tree is being rendered. Build or clone a separate tree when configuration needs to change at runtime.
 

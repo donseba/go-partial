@@ -91,5 +91,7 @@ for _, step := range flow.Steps {
 
     <h2 class="text-xl font-bold text-slate-50">Why session owns current</h2>
     <p class="leading-7 text-slate-400">A flow definition is usually stable enough to create once and reuse. Current step is not stable; it belongs to a browser session, user, request, or persisted draft. Keeping it in <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">pageflow.SessionData</code> prevents one user's progress from mutating another user's flow.</p>
+
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SessionData</code> is mutable session state. Load it for the current user or draft, update it in one request flow, then persist it. If an application shares the same session value between goroutines, it must provide its own locking or copy-on-write behavior.</p>
 </article>
 
