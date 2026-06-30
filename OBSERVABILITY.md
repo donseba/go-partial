@@ -43,6 +43,39 @@ production logs:
 logger.Sink(slog.Default(), logger.WithMinLevel(partial.EventWarn))
 ```
 
+## Request-Scoped Events
+
+You can also attach an event sink to a request context:
+
+```go
+func observability(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        events := partial.NewAsyncEvents(
+            partial.EventsConfig{Buffer: 64},
+            otel.Sink(otel.WithMinLevel(partial.EventInfo)),
+        )
+        defer func() {
+            ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+            defer cancel()
+            _ = events.Close(ctx)
+        }()
+
+        ctx := partial.WithEventSink(r.Context(), events)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+Renders started with that context fan out to both the request-scoped sink and
+the service/partial sink, if one is configured.
+
+Calling `WithEventSink` more than once appends sinks; it does not replace the
+previous request-scoped sink.
+
+Do not close a shared service-level dispatcher from a request. A service-level
+`AsyncEvents` belongs to the server lifecycle. A request-level `AsyncEvents`
+belongs to the request/middleware lifecycle.
+
 ## Stdout Or JSON Logs
 
 `ext/logger` adapts events to `log/slog`, so stdout, JSON logs, files, and any
@@ -149,41 +182,27 @@ If your producer can block, keep it behind its own queue or use
 
 ## OpenTelemetry
 
-OpenTelemetry is a good fit as an external sink because events already describe
-facts. A sink can add go-partial events to the active span:
+OpenTelemetry is a good fit because events already describe facts.
+`exp/otel` adds go-partial events to the active span in the render context:
 
 ```go
-type OTelSink struct{}
-
-func (OTelSink) Emit(ctx *partial.RenderContext, event partial.Event) {
-    if ctx == nil || ctx.Context == nil {
-        return
-    }
-    span := trace.SpanFromContext(ctx.Context)
-    if !span.IsRecording() {
-        return
-    }
-
-    attrs := []attribute.KeyValue{
-        attribute.String("partial.event", event.Kind),
-        attribute.String("partial.level", string(event.Level)),
-        attribute.String("partial.id", event.PartialID),
-        attribute.String("partial.parent", event.ParentID),
-        attribute.String("partial.name", event.Name),
-    }
-    for key, value := range event.Fields {
-        attrs = append(attrs, attribute.String("partial."+key, fmt.Sprint(value)))
-    }
-    if event.Error != nil {
-        span.RecordError(event.Error)
-    }
-    span.AddEvent(event.Message, trace.WithAttributes(attrs...))
-}
+events := partial.NewAsyncEvents(
+    partial.EventsConfig{Buffer: 256},
+    otel.Sink(otel.WithMinLevel(partial.EventInfo)),
+)
 ```
 
 In an HTTP app, create the request span in middleware and render with the request
 context. go-partial does not create spans by itself; it only emits events into
 the context you provide.
+
+`exp/otel` writes attributes with the `partial.` prefix by default, such as
+`partial.event`, `partial.level`, `partial.partial_id`, and `partial.size`.
+Use `otel.WithAttributePrefix("go_partial.")` if your telemetry naming scheme
+needs a different prefix.
+
+You can still write your own `partial.EventSink` when you need a different span
+shape, exporter policy, or attribute naming convention.
 
 ## Metrics
 
@@ -212,3 +231,20 @@ _ = layout.WriteWithRequest(ctx, w, r)
 
 That lets `/metrics`, `/logger`, stdout logs, and external telemetry correlate
 without coupling core to any backend.
+
+## Core Event Kinds
+
+| Kind | Level | Meaning |
+| --- | --- | --- |
+| `render.start` | `debug` | A render lifecycle started. |
+| `render.finish` | `debug` | A render lifecycle finished successfully. Includes `size`. |
+| `render.error` | `error` | Rendering failed. Includes the error. |
+| `render.write_error` | `error` | Writing the render response failed. |
+| `render.oob_error` | `error` | Rendering an out-of-band child failed. |
+| `template.missing` | `warn` | A template helper referenced a missing template. |
+| `template.parse_error` | `error` | Template parsing or cache lookup failed. |
+| `template.execute_error` | `error` | Template execution failed. |
+| `func.protected` | `warn` | A user function tried to overwrite a protected helper. |
+| `content.missing_layout` | `warn` | `content` was called outside a layout wrapper. |
+| `target.missing` | `warn` | A requested target could not be resolved. |
+| `contract.invalid` | `warn` | Template contract data or helper arguments were invalid. |

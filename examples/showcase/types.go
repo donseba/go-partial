@@ -281,9 +281,13 @@ type App struct {
 }
 
 type LoggerPage struct {
-	Title  string
-	Total  int
-	Latest []LogRecordView
+	Title       string
+	Total       int
+	Visible     int
+	Latest      []LogRecordView
+	LevelFilter string
+	DebugURL    string
+	InfoURL     string
 }
 
 type LogRecordView struct {

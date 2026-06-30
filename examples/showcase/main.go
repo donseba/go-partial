@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"time"
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
@@ -114,8 +117,29 @@ func main() {
 	if len(displayAddr) > 0 && displayAddr[0] == ':' {
 		displayAddr = "localhost" + displayAddr
 	}
+	server := &http.Server{Addr: addr, Handler: mux}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("showcase shutdown error: %v", err)
+		}
+	}()
+
 	log.Printf("showcase running on http://%s", displayAddr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+
+	closeCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := app.events.Close(closeCtx); err != nil {
+		log.Printf("event shutdown error: %v", err)
+	}
 }
 
 func (app *App) showcaseRenderers() []partial.Renderer {

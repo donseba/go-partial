@@ -14,7 +14,7 @@ Examples of consumers:
 - `ext/logger` writes events to `log/slog`.
 - `exp/metrics` can optionally record event breadcrumbs, although the showcase
   keeps render metrics and diagnostic logs separate.
-- `exp/trace` builds a request/render call tree.
+- `exp/otel` adds events to the active OpenTelemetry span.
 - A showcase or devtools page streams events over SSE.
 - Application code forwards events to Sentry, Honeycomb, stdout, JSONL, or a
   custom channel.
@@ -106,9 +106,9 @@ ctx.Emit(partial.Event{
 Implemented attachment points:
 
 - `RenderContext.Emit(event)` is convenient for renderers.
-- Package-level helpers such as `partial.Emit(ctx, event)` may be useful when
-  the context can be nil.
 - `Config.Events` attaches sinks at the service boundary.
+- `partial.WithEventSink(ctx, sink)` attaches request-scoped sinks. Repeated
+  calls append with fanout.
 
 ## Initial Vocabulary
 
@@ -180,8 +180,8 @@ understands and ignore the rest.
 
 ## Trace And Debug
 
-A trace consumer can use `TraceID`, `SpanID`, and `ParentSpanID` to build a
-request tree:
+Trace consumers can use request context, `TraceID`, `SpanID`, and
+`ParentSpanID` to build or enrich a request tree:
 
 ```text
 GET /metrics
@@ -194,6 +194,9 @@ GET /metrics
 
 Renderer lifecycle events are best for call-stack timing. Extension events are
 best for semantic breadcrumbs.
+
+`exp/otel` keeps OpenTelemetry policy outside core. It records go-partial events
+on the active span but does not create spans, exporters, or providers.
 
 ## Async Dispatch
 

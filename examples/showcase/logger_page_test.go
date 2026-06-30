@@ -30,11 +30,28 @@ func TestShowcaseLogsKeepsLatestRecords(t *testing.T) {
 		t.Fatalf("records = %#v, want latest first", records)
 	}
 
-	views := logRecordViews(records)
+	views := logRecordViews(records, partial.EventInfo)
 	if views[0].Request != "GET /logger" {
 		t.Fatalf("request = %q, want GET /logger", views[0].Request)
 	}
 	if views[0].TraceID != "trace-test" {
 		t.Fatalf("trace = %q, want trace-test", views[0].TraceID)
+	}
+}
+
+func TestLogRecordViewsFilterDebugByDefault(t *testing.T) {
+	records := []showcaseLogRecord{
+		{event: partial.Event{Kind: "debug", Level: partial.EventDebug}},
+		{event: partial.Event{Kind: "info", Level: partial.EventInfo}},
+	}
+
+	views := logRecordViews(records, partial.EventInfo)
+	if len(views) != 1 || views[0].Kind != "info" {
+		t.Fatalf("views = %#v, want only info event", views)
+	}
+
+	views = logRecordViews(records, partial.EventDebug)
+	if len(views) != 2 {
+		t.Fatalf("views = %d, want 2", len(views))
 	}
 }

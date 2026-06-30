@@ -67,19 +67,28 @@ func (logs *showcaseLogs) Snapshot(limit int) ([]showcaseLogRecord, int) {
 }
 
 func (app *App) loggerPage(w http.ResponseWriter, r *http.Request) {
-	records, total := app.logs.Snapshot(24)
+	filter := loggerLevelFilter(r)
+	records, total := app.logs.Snapshot(120)
+	views := logRecordViews(records, filter)
 	data := LoggerPage{
-		Title:  "Diagnostic logger",
-		Total:  total,
-		Latest: logRecordViews(records),
+		Title:       "Diagnostic logger",
+		Total:       total,
+		Visible:     len(views),
+		Latest:      limitLogViews(views, 24),
+		LevelFilter: string(filter),
+		DebugURL:    "/logger?level=debug",
+		InfoURL:     "/logger",
 	}
 	app.render(w, r, "content", "templates/logger.gohtml", data)
 }
 
-func logRecordViews(records []showcaseLogRecord) []LogRecordView {
+func logRecordViews(records []showcaseLogRecord, minLevel partial.EventLevel) []LogRecordView {
 	out := make([]LogRecordView, 0, len(records))
 	for _, record := range records {
 		event := record.event
+		if eventLevelRank(event.Level) < eventLevelRank(minLevel) {
+			continue
+		}
 		out = append(out, LogRecordView{
 			Timestamp: formatTimestamp(event.Time),
 			Level:     string(event.Level),
@@ -93,6 +102,35 @@ func logRecordViews(records []showcaseLogRecord) []LogRecordView {
 		})
 	}
 	return out
+}
+
+func loggerLevelFilter(r *http.Request) partial.EventLevel {
+	if r != nil && r.URL != nil && r.URL.Query().Get("level") == "debug" {
+		return partial.EventDebug
+	}
+	return partial.EventInfo
+}
+
+func limitLogViews(views []LogRecordView, limit int) []LogRecordView {
+	if limit <= 0 || len(views) <= limit {
+		return views
+	}
+	return views[:limit]
+}
+
+func eventLevelRank(level partial.EventLevel) int {
+	switch level {
+	case partial.EventDebug:
+		return 0
+	case partial.EventInfo:
+		return 1
+	case partial.EventWarn:
+		return 2
+	case partial.EventError:
+		return 3
+	default:
+		return 1
+	}
 }
 
 func formatLogRequest(method, path string) string {

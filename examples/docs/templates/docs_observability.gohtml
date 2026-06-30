@@ -1,0 +1,90 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">ext and exp</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Observability</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">go-partial emits small diagnostic events, but it does not own logging, metrics storage, tracing providers, queues, or exporters. Applications attach sinks and decide where events go.</p>
+
+    <div class="grid gap-4 rounded-xl border border-slate-700 bg-slate-800/70 p-5">
+        <h2 class="text-xl font-bold text-slate-50">Two paths</h2>
+        <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/metrics</code> measures render work: duration, size, request IDs, trace IDs, partial labels, slots, and render tree shape.</p>
+        <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.Event</code> records diagnostic facts: render lifecycle, failures, missing templates, protected helper attempts, target misses, and extension signals.</p>
+        <p class="leading-7 text-slate-400">The showcase keeps these separate: the metrics pages show measurements, while the logger page shows diagnostic events.</p>
+    </div>
+
+    <h2 class="text-xl font-bold text-slate-50">Service-scoped events</h2>
+    <p class="leading-7 text-slate-400">Attach long-lived consumers through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Config.Events</code>. This is the right place for application logs, shared in-memory debug stores, or process-wide telemetry.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">events := partial.NewAsyncEvents(
+    partial.EventsConfig{
+        Buffer:     256,
+        DropPolicy: partial.DropNewest,
+    },
+    logger.Sink(slog.Default(), logger.WithMinLevel(partial.EventWarn)),
+    app.logs,
+)
+
+service := partial.NewService(&partial.Config{
+    Events: events,
+})</code></pre>
+    <p class="leading-7 text-slate-400">A service-scoped dispatcher belongs to the server lifecycle. Close it during graceful shutdown, not at the end of every request.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Request-scoped events</h2>
+    <p class="leading-7 text-slate-400">Request-owned collectors can be attached to context. Renders started with that context fan out to both the request sink and the configured service or partial sink.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">func observability(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        events := partial.NewAsyncEvents(
+            partial.EventsConfig{Buffer: 64},
+            otel.Sink(otel.WithMinLevel(partial.EventInfo)),
+        )
+        defer func() {
+            ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+            defer cancel()
+            _ = events.Close(ctx)
+        }()
+
+        ctx := partial.WithEventSink(r.Context(), events)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}</code></pre>
+    <p class="leading-7 text-slate-400">Calling <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WithEventSink</code> more than once appends sinks. Middleware can layer collectors without overwriting earlier ones.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">OpenTelemetry</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/otel</code> adds go-partial events to the active OpenTelemetry span. It does not create spans, tracer providers, exporters, or samplers; those stay in your app or platform wiring.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">events := partial.NewAsyncEvents(
+    partial.EventsConfig{Buffer: 256},
+    otel.Sink(
+        otel.WithMinLevel(partial.EventInfo),
+        otel.WithAttributePrefix("partial."),
+    ),
+)</code></pre>
+    <p class="leading-7 text-slate-400">The sink records attributes such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.event</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.level</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.partial_id</code>, and structured event fields. String, bool, integer, float, and duration fields are kept typed where possible.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Template logging</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/logger</code> can install a template helper for lightweight breadcrumbs. It emits an <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext.logger.template</code> event and renders no visible HTML.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.SetFunc(logger.FuncMap())
+service.Use(logger.Renderer())</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ logger \"cart sidebar rendered\" \"items\" .Cart.Count \"template\" \"cart.gohtml\" }}" }}</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">External collectors</h2>
+    <p class="leading-7 text-slate-400">DynamoDB, Kafka, Sentry, Honeycomb, files, and queues should be app-owned sinks. Keep the sink cheap: convert the event into your shape and enqueue or write through your own client.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">kafkaSink := partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
+    payload, _ := json.Marshal(eventDTO(event))
+    _ = producer.Produce(&kafka.Message{
+        TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+        Value:          payload,
+    }, nil)
+})</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Core event kinds</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Kind</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Level</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Meaning</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">render.start</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">debug</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">A render lifecycle started.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">render.finish</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">debug</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">A render lifecycle finished successfully. Includes size.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">render.error</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">error</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Rendering failed.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template.parse_error</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">error</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Template parsing or cache lookup failed.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template.execute_error</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">error</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Template execution failed.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">func.protected</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">warn</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">A user function tried to overwrite a protected helper.</td></tr>
+            <tr><td class="px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.missing</code></td><td class="px-3 py-2.5 align-middle">warn</td><td class="px-3 py-2.5 align-middle">A requested target could not be resolved.</td></tr>
+        </tbody>
+    </table>
+</article>

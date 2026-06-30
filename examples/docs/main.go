@@ -71,6 +71,7 @@ func main() {
 	mux.HandleFunc("/docs/template-functions", app.templateFunctions)
 	mux.HandleFunc("/docs/htmx", app.htmx)
 	mux.HandleFunc("/docs/error-boundaries", app.errorBoundaries)
+	mux.HandleFunc("/docs/observability", app.observability)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("examples/docs/static"))))
 
 	log.Println("docs running on http://localhost:8091")
@@ -163,6 +164,10 @@ func (app *App) errorBoundaries(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "templates/docs_error_boundaries.gohtml")
 }
 
+func (app *App) observability(w http.ResponseWriter, r *http.Request) {
+	app.render(w, r, "templates/docs_observability.gohtml")
+}
+
 func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string, configure ...func(*partial.Partial)) {
 	content := partial.NewID("content", tmpl).SetDot(DocsPage{})
 	for _, fn := range configure {
@@ -196,6 +201,7 @@ func (app *App) navItems() []NavItem {
 		{Path: "/docs/data-context", Label: "Data and context", Group: "Guide"},
 		{Path: "/docs/deferred", Label: "Deferred partials", Group: "Guide"},
 		{Path: "/docs/error-boundaries", Label: "Error boundaries", Group: "ext"},
+		{Path: "/docs/observability", Label: "Observability", Group: "ext"},
 		{Path: "/docs/selection-action", Label: "Selection and action", Group: "exp"},
 		{Path: "/docs/interactions", Label: "Interaction helpers", Group: "exp"},
 		{Path: "/docs/flow", Label: "Page flows", Group: "exp"},

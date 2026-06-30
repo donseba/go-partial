@@ -64,34 +64,55 @@ type (
 		ctx   *RenderContext
 		event Event
 	}
+
+	eventSinkContextKey struct{}
 )
 
 const (
+	// EventDebug is useful for local tracing and lifecycle views.
 	EventDebug EventLevel = "debug"
-	EventInfo  EventLevel = "info"
-	EventWarn  EventLevel = "warn"
+	// EventInfo describes normal diagnostic breadcrumbs.
+	EventInfo EventLevel = "info"
+	// EventWarn describes recoverable problems or ignored configuration.
+	EventWarn EventLevel = "warn"
+	// EventError describes render failures or other errors.
 	EventError EventLevel = "error"
 )
 
 const (
+	// DropNewest drops the incoming event when the queue is full.
 	DropNewest DropPolicy = "drop_newest"
+	// DropOldest drops one queued event to make room for the incoming event.
 	DropOldest DropPolicy = "drop_oldest"
-	Block      DropPolicy = "block"
+	// Block waits for queue space or Close. Use only when event loss is worse than render latency.
+	Block DropPolicy = "block"
 )
 
 const (
-	EventRenderStart          = "render.start"
-	EventRenderFinish         = "render.finish"
-	EventRenderError          = "render.error"
-	EventRenderWriteError     = "render.write_error"
-	EventRenderOOBError       = "render.oob_error"
-	EventTemplateMissing      = "template.missing"
-	EventTemplateParseError   = "template.parse_error"
+	// EventRenderStart is emitted before a render chain runs.
+	EventRenderStart = "render.start"
+	// EventRenderFinish is emitted after a render chain succeeds.
+	EventRenderFinish = "render.finish"
+	// EventRenderError is emitted after a render chain fails.
+	EventRenderError = "render.error"
+	// EventRenderWriteError is emitted when writing a render response fails.
+	EventRenderWriteError = "render.write_error"
+	// EventRenderOOBError is emitted when an out-of-band child render fails.
+	EventRenderOOBError = "render.oob_error"
+	// EventTemplateMissing is emitted when a helper references a missing template.
+	EventTemplateMissing = "template.missing"
+	// EventTemplateParseError is emitted when parsing or loading templates fails.
+	EventTemplateParseError = "template.parse_error"
+	// EventTemplateExecuteError is emitted when template execution fails.
 	EventTemplateExecuteError = "template.execute_error"
-	EventFuncProtected        = "func.protected"
+	// EventFuncProtected is emitted when a user function tries to overwrite a protected helper.
+	EventFuncProtected = "func.protected"
+	// EventContentMissingLayout is emitted when content is called outside a layout wrapper.
 	EventContentMissingLayout = "content.missing_layout"
-	EventTargetMissing        = "target.missing"
-	EventContractInvalid      = "contract.invalid"
+	// EventTargetMissing is emitted when a requested target cannot be resolved.
+	EventTargetMissing = "target.missing"
+	// EventContractInvalid is emitted when contract data or helper arguments are invalid.
+	EventContractInvalid = "contract.invalid"
 )
 
 func timeNow() time.Time {
@@ -115,6 +136,33 @@ func (sinks FanoutEventSink) Emit(ctx *RenderContext, event Event) {
 	for _, sink := range sinks {
 		emitSafely(sink, ctx, event)
 	}
+}
+
+// WithEventSink attaches a request-scoped event sink to ctx.
+//
+// Request-scoped sinks are fanned out with service or partial sinks for renders
+// started with this context. If the sink owns goroutines, the caller still owns
+// closing it, usually with defer in middleware.
+//
+// If ctx already has a request-scoped sink, the new sink is appended with fanout.
+func WithEventSink(ctx context.Context, sink EventSink) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if sink == nil {
+		return ctx
+	}
+	sink = mergeEventSinks(EventSinkFromContext(ctx), sink)
+	return context.WithValue(ctx, eventSinkContextKey{}, sink)
+}
+
+// EventSinkFromContext returns the request-scoped event sink attached to ctx.
+func EventSinkFromContext(ctx context.Context) EventSink {
+	if ctx == nil {
+		return nil
+	}
+	sink, _ := ctx.Value(eventSinkContextKey{}).(EventSink)
+	return sink
 }
 
 // NewAsyncEvents returns a non-blocking dispatcher for diagnostic events.
@@ -260,6 +308,17 @@ func emitSafely(sink EventSink, ctx *RenderContext, event Event) {
 		_ = recover()
 	}()
 	sink.Emit(ctx, event)
+}
+
+func mergeEventSinks(a, b EventSink) EventSink {
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	default:
+		return FanoutEvents(a, b)
+	}
 }
 
 func emitOnPartial(p *Partial, event Event) {

@@ -110,6 +110,70 @@ func TestRenderEmitsLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestRequestContextEventSinkReceivesLifecycleEvents(t *testing.T) {
+	files := fstest.MapFS{
+		"page.gohtml": {Data: []byte(`hello`)},
+	}
+	var events []Event
+	ctx := WithEventSink(context.Background(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		events = append(events, event)
+	}))
+	page := NewID("page", "page.gohtml").SetFileSystem(files)
+
+	if _, err := page.RenderWithRequest(ctx, httptestRequest("GET", "/page")); err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	if !hasEvent(events, EventRenderStart) || !hasEvent(events, EventRenderFinish) {
+		t.Fatalf("request context events = %#v, want lifecycle events", events)
+	}
+}
+
+func TestRequestContextEventSinkFansOutWithPartialSink(t *testing.T) {
+	files := fstest.MapFS{
+		"page.gohtml": {Data: []byte(`hello`)},
+	}
+	var partialCount atomic.Int64
+	var requestCount atomic.Int64
+	ctx := WithEventSink(context.Background(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		if event.Kind == EventRenderFinish {
+			requestCount.Add(1)
+		}
+	}))
+	page := NewID("page", "page.gohtml").
+		SetFileSystem(files).
+		SetEventSink(EventSinkFunc(func(ctx *RenderContext, event Event) {
+			if event.Kind == EventRenderFinish {
+				partialCount.Add(1)
+			}
+		}))
+
+	if _, err := page.RenderWithRequest(ctx, httptestRequest("GET", "/page")); err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	if partialCount.Load() != 1 || requestCount.Load() != 1 {
+		t.Fatalf("partialCount = %d requestCount = %d, want 1/1", partialCount.Load(), requestCount.Load())
+	}
+}
+
+func TestWithEventSinkAppendsRequestScopedSinks(t *testing.T) {
+	var first atomic.Int64
+	var second atomic.Int64
+	ctx := WithEventSink(context.Background(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		first.Add(1)
+	}))
+	ctx = WithEventSink(ctx, EventSinkFunc(func(ctx *RenderContext, event Event) {
+		second.Add(1)
+	}))
+
+	EventSinkFromContext(ctx).Emit(nil, Event{Kind: "test"})
+
+	if first.Load() != 1 || second.Load() != 1 {
+		t.Fatalf("first = %d second = %d, want 1/1", first.Load(), second.Load())
+	}
+}
+
 func httptestRequest(method, target string) *http.Request {
 	req, _ := http.NewRequest(method, target, nil)
 	return req

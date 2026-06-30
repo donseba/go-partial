@@ -29,7 +29,7 @@ The root package is intentionally small: rendering lifecycle, partial trees, lay
 Optional packages are split by stability:
 
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
-- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, slots, target resolvers, template helpers, and SSE.
+- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, OpenTelemetry, slots, target resolvers, template helpers, and SSE.
 
 Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A renderer follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
 
@@ -67,6 +67,8 @@ service := partial.NewService(&partial.Config{
 ```
 
 `ext/logger` adapts events to `log/slog`. App-owned sinks can forward the same events to DynamoDB, Kafka, OpenTelemetry, SSE debug pages, files, or any other collector. See [OBSERVABILITY.md](OBSERVABILITY.md) for concrete sink examples.
+
+For request-owned collectors, attach a sink with `partial.WithEventSink(r.Context(), sink)` and close request-owned async dispatchers in middleware.
 
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
