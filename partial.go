@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
@@ -38,8 +37,8 @@ type (
 		renderOOB          bool
 		alwaysSwapOOB      bool
 		fs                 fs.FS
-		logger             Logger
 		connector          connector.Connector
+		events             EventSink
 		useCache           bool
 		templates          []string
 		staticFuncs        template.FuncMap
@@ -71,6 +70,7 @@ type (
 		Error    error
 		Response *RenderResponse
 		Funcs    template.FuncMap
+		Events   EventSink
 	}
 
 	contractKind string
@@ -276,7 +276,7 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 	}
 	annotation = strings.TrimSpace(annotation)
 	if annotation == "" {
-		p.getLogger().Warn("contract annotation cannot be empty")
+		p.emit(Event{Kind: EventContractInvalid, Level: EventWarn, Message: "contract annotation cannot be empty"})
 		return p
 	}
 
@@ -287,7 +287,12 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 		if named, ok := value.(NamedContract); ok {
 			name = strings.TrimSpace(named.ContractName())
 			if name == "" {
-				p.getLogger().Warn("contract name cannot be derived", "annotation", annotation)
+				p.emit(Event{
+					Kind:    EventContractInvalid,
+					Level:   EventWarn,
+					Message: "contract name cannot be derived",
+					Fields:  map[string]any{"annotation": annotation},
+				})
 				continue
 			}
 		}
@@ -414,15 +419,15 @@ func (p *Partial) SetFunc(funcMaps ...template.FuncMap) *Partial {
 	return p
 }
 
-// SetLogger sets the logger for the partial.
-func (p *Partial) SetLogger(logger Logger) *Partial {
+// SetEventSink configures diagnostic events for the partial.
+func (p *Partial) SetEventSink(events EventSink) *Partial {
 	if p == nil {
 		return nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.logger = logger
+	p.events = events
 	return p
 }
 
@@ -535,7 +540,12 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 
 	result := p.renderWithRequestResult(ctx, r)
 	if result.Err != nil {
-		p.getLogger().Error("error rendering partial", "error", result.Err)
+		p.emit(Event{
+			Kind:    EventRenderError,
+			Level:   EventError,
+			Message: "error rendering partial",
+			Error:   result.Err,
+		})
 		return p.writeRenderFailure(ctx, w, r, result.Err)
 	}
 
@@ -554,7 +564,12 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 
 	_, err := w.Write([]byte(result.HTML))
 	if err != nil {
-		p.getLogger().Error("error writing partial to response", "error", err)
+		p.emit(Event{
+			Kind:    EventRenderWriteError,
+			Level:   EventError,
+			Message: "error writing partial to response",
+			Error:   err,
+		})
 		return err
 	}
 
@@ -589,7 +604,12 @@ func (p *Partial) writeRenderFailure(ctx context.Context, w http.ResponseWriter,
 	if isPartialRequest {
 		oobOut, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
 		if oobErr != nil {
-			p.getLogger().Error("error rendering OOB regions for failure response", "error", oobErr)
+			p.emit(Event{
+				Kind:    EventRenderOOBError,
+				Level:   EventError,
+				Message: "error rendering OOB regions for failure response",
+				Error:   oobErr,
+			})
 			return fmt.Errorf("error rendering OOB regions for failure response: %w; original render error: %v", oobErr, renderErr)
 		}
 		result.HTML += oobOut
@@ -690,7 +710,12 @@ func (p *Partial) contractFuncMapLocked() template.FuncMap {
 func (p *Partial) setFuncMapLocked(funcMap template.FuncMap) {
 	for name, fn := range funcMap {
 		if isProtectedFunctionName(name) {
-			p.getLogger().Warn("function name is protected and cannot be overwritten", "function", name)
+			p.emit(Event{
+				Kind:    EventFuncProtected,
+				Level:   EventWarn,
+				Message: "function name is protected and cannot be overwritten",
+				Fields:  map[string]any{"function": name},
+			})
 			continue
 		}
 
@@ -935,20 +960,25 @@ func (p *Partial) getFS() fs.FS {
 	return os.DirFS("./")
 }
 
-func (p *Partial) getLogger() Logger {
+func (p *Partial) getEventSink() EventSink {
 	if p == nil {
-		return slog.Default().WithGroup("partial")
+		return nil
 	}
-
-	if p.logger != nil {
-		return p.logger
+	if p.events != nil {
+		return p.events
 	}
-
 	if p.parent != nil {
-		return p.parent.getLogger()
+		return p.parent.getEventSink()
 	}
+	return nil
+}
 
-	return slog.Default().WithGroup("partial")
+func (p *Partial) emit(event Event) {
+	if p == nil {
+		return
+	}
+	ctx := newRenderContext(context.Background(), p, p.getRequest(), RenderKindPartial)
+	ctx.Emit(event)
 }
 
 func (p *Partial) getRenderers() []Renderer {
@@ -973,7 +1003,12 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 		// Render OOB regions from the parent tree when necessary.
 		oobOutAll, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
 		if oobErr != nil {
-			p.getLogger().Error("error rendering OOB regions from ancestors", "error", oobErr)
+			p.emit(Event{
+				Kind:    EventRenderOOBError,
+				Level:   EventError,
+				Message: "error rendering OOB regions from ancestors",
+				Error:   oobErr,
+			})
 			result.Err = fmt.Errorf("error rendering OOB regions from ancestors: %w", oobErr)
 			return result
 		}
@@ -989,7 +1024,12 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 			if ok {
 				oobOutAll, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
 				if oobErr != nil {
-					p.getLogger().Error("error rendering OOB regions from ancestors", "error", oobErr)
+					p.emit(Event{
+						Kind:    EventRenderOOBError,
+						Level:   EventError,
+						Message: "error rendering OOB regions from ancestors",
+						Error:   oobErr,
+					})
 					result.Err = fmt.Errorf("error rendering OOB regions from ancestors: %w", oobErr)
 					return result
 				}
@@ -997,7 +1037,12 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 				return result
 			}
 
-			p.getLogger().Error("requested partial not found in parent", "id", requestedTarget, "parent", p.id)
+			p.emit(Event{
+				Kind:    EventTargetMissing,
+				Level:   EventWarn,
+				Message: "requested partial not found in parent",
+				Fields:  map[string]any{"target": requestedTarget, "parent": p.id},
+			})
 			return renderResult{Err: fmt.Errorf("requested partial %s not found in parent %s", requestedTarget, p.id)}
 		}
 		return c.renderWithTargetResult(ctx, r)
@@ -1052,7 +1097,12 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string) (template.H
 	child, ok := p.children[id]
 	p.mu.RUnlock()
 	if !ok {
-		p.getLogger().Warn("child partial not found", "id", id)
+		p.emit(Event{
+			Kind:    EventTemplateMissing,
+			Level:   EventWarn,
+			Message: "child partial not found",
+			Fields:  map[string]any{"id": id},
+		})
 		return "", nil
 	}
 
@@ -1064,7 +1114,13 @@ func (p *Partial) renderChildPartial(ctx context.Context, id string) (template.H
 
 	result := childClone.renderSelfResult(ctx, p.getRequest())
 	if result.Err != nil {
-		childClone.getLogger().Error("error rendering child partial", "id", id, "error", result.Err)
+		childClone.emit(Event{
+			Kind:    EventRenderError,
+			Level:   EventError,
+			Message: "error rendering child partial",
+			Error:   result.Err,
+			Fields:  map[string]any{"id": id},
+		})
 		fallback, fallbackErr := childClone.renderErrorFragment(ctx, p.getRequest(), result.Err)
 		if fallbackErr != nil {
 			return "", fallbackErr
@@ -1118,7 +1174,11 @@ func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
 		return "", errors.New("partial is not initialized")
 	}
 	if len(p.templates) == 0 {
-		p.getLogger().Error("no templates provided for rendering")
+		p.emit(Event{
+			Kind:    EventTemplateMissing,
+			Level:   EventError,
+			Message: "no templates provided for rendering",
+		})
 		return "", errors.New("no templates provided for rendering")
 	}
 	if state == nil {
@@ -1142,7 +1202,12 @@ func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
 
 	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache, renderTemplates)
 	if err != nil {
-		p.getLogger().Error("error getting or parsing template", "error", err)
+		p.emit(Event{
+			Kind:    EventTemplateParseError,
+			Level:   EventError,
+			Message: "error getting or parsing template",
+			Error:   err,
+		})
 		return "", err
 	}
 	if releaseTemplate != nil {
@@ -1160,7 +1225,13 @@ func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
 		root = dot
 	}
 	if err = tmpl.Execute(&buf, root); err != nil {
-		p.getLogger().Error("error executing template", "template", p.templates[0], "error", err)
+		p.emit(Event{
+			Kind:    EventTemplateExecuteError,
+			Level:   EventError,
+			Message: "error executing template",
+			Error:   err,
+			Fields:  map[string]any{"template": p.templates[0]},
+		})
 		return "", fmt.Errorf("error executing template '%s': %w", p.templates[0], err)
 	}
 
@@ -1376,8 +1447,8 @@ func (p *Partial) clone() *Partial {
 		renderOOB:          p.renderOOB,
 		alwaysSwapOOB:      p.alwaysSwapOOB,
 		fs:                 p.fs,
-		logger:             p.logger,
 		connector:          p.connector,
+		events:             p.events,
 		useCache:           p.useCache,
 		templates:          slices.Clone(p.templates),
 		staticFuncs:        maps.Clone(p.staticFuncs),

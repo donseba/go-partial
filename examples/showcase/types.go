@@ -268,6 +268,7 @@ type ShellPage struct {
 
 type App struct {
 	service       *partial.Service
+	events        *partial.AsyncEvents
 	rows          []Row
 	products      []Product
 	carts         map[string]map[int]int
@@ -276,4 +277,23 @@ type App struct {
 	flowSessions  map[string]*pageflow.SessionData
 	metrics       *showcaseMetrics
 	metricStreams *metricStreamHub
+	logs          *showcaseLogs
+}
+
+type LoggerPage struct {
+	Title  string
+	Total  int
+	Latest []LogRecordView
+}
+
+type LogRecordView struct {
+	Timestamp string
+	Level     string
+	Kind      string
+	Message   string
+	PartialID string
+	Request   string
+	TraceID   string
+	Fields    []string
+	Error     string
 }

@@ -64,6 +64,9 @@ func (app *App) metricsPage(w http.ResponseWriter, r *http.Request) {
 func metricsRecordViews(records []metrics.Record) []MetricsTraceView {
 	groupRecords := make(map[string][]metrics.Record)
 	for _, record := range records {
+		if isMetricEventRecord(record) {
+			continue
+		}
 		requestID := shortRequestID(record.RequestID)
 		if requestID == "" {
 			requestID = "-"
@@ -213,6 +216,10 @@ func metricMeta(record metrics.Record) []string {
 		meta = append(meta, "task: "+record.Name)
 	}
 	return meta
+}
+
+func isMetricEventRecord(record metrics.Record) bool {
+	return record.Kind == "event" || record.EventKind != ""
 }
 
 func metricIndent(depth int) string {

@@ -151,6 +151,7 @@ func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind Ren
 		Values:   make(RenderValues),
 		Response: &RenderResponse{Headers: make(map[string]string)},
 		Funcs:    make(template.FuncMap),
+		Events:   p.getEventSink(),
 	}
 	state.Runtime = newRuntime(p, state)
 	return state
@@ -203,9 +204,29 @@ func renderWithChainResult(state *RenderContext, renderers []Renderer, terminal 
 		}
 	}
 
+	state.Emit(Event{
+		Kind:    EventRenderStart,
+		Level:   EventDebug,
+		Message: "render started",
+	})
 	out, renderErr := next(state)
 	for i := len(active) - 1; i >= 0; i-- {
 		out, renderErr = active[i].Finalize(state, out, renderErr)
+	}
+	if renderErr != nil {
+		state.Emit(Event{
+			Kind:    EventRenderError,
+			Level:   EventError,
+			Message: "render failed",
+			Error:   renderErr,
+		})
+	} else {
+		state.Emit(Event{
+			Kind:    EventRenderFinish,
+			Level:   EventDebug,
+			Message: "render finished",
+			Fields:  map[string]any{"size": len([]byte(out))},
+		})
 	}
 
 	return renderResult{HTML: out, Response: state.Response, Err: renderErr}

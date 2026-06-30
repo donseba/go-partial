@@ -27,7 +27,7 @@ layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
     <h2 class="text-xl font-bold text-slate-50">Request rendering flow</h2>
     <ol>
         <li>The route creates the content partial and any registered regions needed for that request.</li>
-        <li>The layout applies service configuration: filesystem, connector, function map, logger, cache, and renderer chain.</li>
+        <li>The layout applies service configuration: filesystem, connector, function map, diagnostic events, cache, and renderer chain.</li>
         <li>The connector decides whether this is a full render or a partial render.</li>
         <li>For a full render, the wrapper renders the page shell and calls the configured content partial.</li>
         <li>For a partial render, go-partial renders the requested target and appends any out-of-band ancestors that should update too.</li>

@@ -19,6 +19,7 @@ import (
 	"github.com/donseba/go-partial/exp/templatehelpers"
 	extdebug "github.com/donseba/go-partial/ext/debug"
 	exterrors "github.com/donseba/go-partial/ext/errors"
+	extlogger "github.com/donseba/go-partial/ext/logger"
 )
 
 func main() {
@@ -33,9 +34,16 @@ func main() {
 		flowSessions:  make(map[string]*pageflow.SessionData),
 		metrics:       newShowcaseMetrics(80),
 		metricStreams: newMetricStreamHub(),
+		logs:          newShowcaseLogs(120),
 	}
+	app.events = partial.NewAsyncEvents(
+		partial.EventsConfig{Buffer: 256, DropPolicy: partial.DropNewest},
+		extlogger.Sink(nil, extlogger.WithMinLevel(partial.EventWarn)),
+		app.logs,
+	)
 	app.service = partial.NewService(&partial.Config{
 		Connector:        connector.NewHTMX(nil),
+		Events:           app.events,
 		FS:               os.DirFS("examples/showcase"),
 		Renderers:        app.showcaseRenderers(),
 		UseTemplateCache: false,
@@ -45,6 +53,7 @@ func main() {
 		actions.FuncMap(),
 		csrf.FuncMap(),
 		extdebug.FuncMap(),
+		extlogger.FuncMap(),
 		interactions.FuncMap(),
 		localization.FuncMap(),
 		selection.FuncMap(),
@@ -85,6 +94,7 @@ func main() {
 	mux.HandleFunc("/metrics/live", app.liveMetricsPage)
 	mux.HandleFunc("/metrics/live/stream", app.liveMetricsStream)
 	mux.HandleFunc("/metrics/live/ping", app.liveMetricsPing)
+	mux.HandleFunc("/logger", app.loggerPage)
 	mux.HandleFunc("/infinite", app.infinite)
 	mux.HandleFunc("/infinite/load", app.infiniteLoad)
 	mux.HandleFunc("/shop", app.shop)
@@ -96,14 +106,23 @@ func main() {
 	mux.HandleFunc("/error/section", app.errorSection)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("examples/showcase/static"))))
 
-	log.Println("showcase running on http://localhost:8090")
-	log.Fatal(http.ListenAndServe(":8090", mux))
+	addr := os.Getenv("SHOWCASE_ADDR")
+	if addr == "" {
+		addr = ":8090"
+	}
+	displayAddr := addr
+	if len(displayAddr) > 0 && displayAddr[0] == ':' {
+		displayAddr = "localhost" + displayAddr
+	}
+	log.Printf("showcase running on http://%s", displayAddr)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
 func (app *App) showcaseRenderers() []partial.Renderer {
 	return []partial.Renderer{
 		exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
 		extdebug.Renderer(),
+		extlogger.Renderer(),
 		actions.Renderer(),
 		csrf.Renderer(),
 		interactions.Renderer(showcaseInteractionRenderer()),

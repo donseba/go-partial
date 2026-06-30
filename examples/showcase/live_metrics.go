@@ -84,7 +84,7 @@ func (app *App) liveMetricsStream(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			if record.Path == "/metrics/live/stream" {
+			if record.Path == "/metrics/live/stream" || isMetricEventRecord(record) {
 				continue
 			}
 			html, err := app.renderLiveMetricRow(r.Context(), record)

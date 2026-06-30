@@ -35,6 +35,10 @@ type (
 		Duration        string            `json:"duration,omitempty"`
 		DurationNS      int64             `json:"durationNS,omitempty"`
 		Error           string            `json:"error,omitempty"`
+		EventKind       string            `json:"eventKind,omitempty"`
+		EventLevel      string            `json:"eventLevel,omitempty"`
+		EventMessage    string            `json:"eventMessage,omitempty"`
+		EventFields     map[string]any    `json:"eventFields,omitempty"`
 		Tags            map[string]string `json:"tags,omitempty"`
 	}
 )
@@ -98,6 +102,10 @@ func toJSONRecord(record Record) jsonRecord {
 		StartedAt:       record.StartedAt,
 		Duration:        record.Duration.String(),
 		DurationNS:      record.Duration.Nanoseconds(),
+		EventKind:       record.EventKind,
+		EventLevel:      string(record.EventLevel),
+		EventMessage:    record.EventMessage,
+		EventFields:     record.EventFields,
 		Tags:            record.Tags,
 	}
 	if record.Error != nil {

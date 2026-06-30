@@ -4,7 +4,6 @@ import (
 	"context"
 	"html/template"
 	"io/fs"
-	"log/slog"
 	"maps"
 	"net/http"
 	"sync"
@@ -14,17 +13,11 @@ import (
 )
 
 type (
-	// Logger is the logging interface used by go-partial.
-	Logger interface {
-		Warn(msg string, args ...any)
-		Error(msg string, args ...any)
-	}
-
 	// Config configures a Service.
 	Config struct {
 		Connector        connector.Connector
 		UseTemplateCache bool
-		Logger           Logger
+		Events           EventSink
 		FS               fs.FS
 		Renderers        []Renderer
 	}
@@ -36,6 +29,7 @@ type (
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
 		connector          connector.Connector
+		events             EventSink
 		templateCache      *templateutil.Store
 		renderers          []Renderer
 		funcsLock          sync.RWMutex
@@ -52,6 +46,7 @@ type (
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
 		connector          connector.Connector
+		events             EventSink
 		renderers          []Renderer
 		funcsLock          sync.RWMutex
 	}
@@ -61,10 +56,6 @@ type (
 func NewService(cfg *Config) *Service {
 	if cfg == nil {
 		cfg = &Config{}
-	}
-
-	if cfg.Logger == nil {
-		cfg.Logger = slog.Default().WithGroup("partial")
 	}
 
 	if cfg.Connector == nil {
@@ -78,6 +69,7 @@ func NewService(cfg *Config) *Service {
 		staticFuncs:   functions,
 		customFuncs:   make(template.FuncMap),
 		connector:     cfg.Connector,
+		events:        cfg.Events,
 		renderers:     append([]Renderer(nil), cfg.Renderers...),
 		templateCache: templateutil.NewStore(),
 	}
@@ -92,6 +84,7 @@ func (svc *Service) NewLayout() *Layout {
 		service:            svc,
 		filesystem:         fsys,
 		connector:          svc.connector,
+		events:             svc.events,
 		renderers:          append([]Renderer(nil), svc.renderers...),
 		staticFuncs:        functions,
 		customFuncs:        customFuncs,
@@ -117,7 +110,7 @@ func (svc *Service) SetFunc(funcMaps ...template.FuncMap) *Service {
 	svc.funcsLock.Lock()
 	defer svc.funcsLock.Unlock()
 
-	if mergeFuncMapsInto(svc.staticFuncs, svc.customFuncs, svc.config.Logger, funcMaps...) {
+	if mergeFuncMapsInto(svc.staticFuncs, svc.customFuncs, svc.events, funcMaps...) {
 		svc.hasCustomFunctions = true
 	}
 	return svc
@@ -141,13 +134,17 @@ func (svc *Service) getHasCustomFunctions() bool {
 	return svc.hasCustomFunctions
 }
 
-func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, logger Logger) template.FuncMap {
+func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, events EventSink) template.FuncMap {
 	merged := make(template.FuncMap, len(src))
 	for k, v := range src {
 		if isProtectedFunctionName(k) {
-			if logger != nil {
-				logger.Warn("function name is protected and cannot be overwritten", "function", k)
-			}
+			emitSafely(events, nil, Event{
+				Time:    timeNow(),
+				Kind:    EventFuncProtected,
+				Level:   EventWarn,
+				Message: "function name is protected and cannot be overwritten",
+				Fields:  map[string]any{"function": k},
+			})
 			continue
 		}
 		dst[k] = v
@@ -203,16 +200,16 @@ func (l *Layout) SetFunc(funcMaps ...template.FuncMap) *Layout {
 	l.funcsLock.Lock()
 	defer l.funcsLock.Unlock()
 
-	if mergeFuncMapsInto(l.staticFuncs, l.customFuncs, l.service.config.Logger, funcMaps...) {
+	if mergeFuncMapsInto(l.staticFuncs, l.customFuncs, l.events, funcMaps...) {
 		l.hasCustomFunctions = true
 	}
 	return l
 }
 
-func mergeFuncMapsInto(staticFuncs, customFuncs template.FuncMap, logger Logger, funcMaps ...template.FuncMap) bool {
+func mergeFuncMapsInto(staticFuncs, customFuncs template.FuncMap, events EventSink, funcMaps ...template.FuncMap) bool {
 	changed := false
 	for _, funcMap := range funcMaps {
-		merged := mergeStaticFuncMap(staticFuncs, funcMap, logger)
+		merged := mergeStaticFuncMap(staticFuncs, funcMap, events)
 		if len(merged) == 0 {
 			continue
 		}
@@ -263,9 +260,13 @@ func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r 
 		}
 		err := l.content.WriteWithRequest(ctx, w, r)
 		if err != nil {
-			if l.service.config.Logger != nil {
-				l.service.config.Logger.Error("error rendering layout", "error", err)
-			}
+			emitSafely(l.events, nil, Event{
+				Time:    timeNow(),
+				Kind:    EventRenderError,
+				Level:   EventError,
+				Message: "error rendering layout",
+				Error:   err,
+			})
 			return err
 		}
 		return nil
@@ -274,9 +275,13 @@ func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r 
 	if l.wrapper != nil {
 		err := l.wrapper.WriteWithRequest(ctx, w, r)
 		if err != nil {
-			if l.service.config.Logger != nil {
-				l.service.config.Logger.Error("error rendering layout", "error", err)
-			}
+			emitSafely(l.events, nil, Event{
+				Time:    timeNow(),
+				Kind:    EventRenderError,
+				Level:   EventError,
+				Message: "error rendering layout",
+				Error:   err,
+			})
 			return err
 		}
 	}
@@ -295,11 +300,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	p.mergeFuncMapInternal(staticFuncs, customFuncs)
 
 	p.connector = l.service.connector
+	p.events = l.events
 	if l.filesystem != nil {
 		p.fs = l.filesystem
-	}
-	if l.service.config.Logger != nil {
-		p.logger = l.service.config.Logger
 	}
 	p.useCache = l.service.config.UseTemplateCache
 	if len(l.renderers) > 0 && !p.renderersInherited {

@@ -243,6 +243,10 @@ func TestWriterSinkWritesJSONLines(t *testing.T) {
 		StartedAt:       startedAt,
 		Duration:        3 * time.Millisecond,
 		Error:           errors.New("boom"),
+		EventKind:       "render.error",
+		EventLevel:      partial.EventError,
+		EventMessage:    "render failed",
+		EventFields:     map[string]any{"template": "page.gohtml"},
 		Tags:            map[string]string{"chain": "showcase"},
 	})
 
@@ -269,6 +273,56 @@ func TestWriterSinkWritesJSONLines(t *testing.T) {
 	}
 	if got["error"] != "boom" {
 		t.Fatalf("error = %#v", got["error"])
+	}
+	if got["eventKind"] != "render.error" || got["eventLevel"] != "error" || got["eventMessage"] != "render failed" {
+		t.Fatalf("unexpected event fields: %#v", got)
+	}
+}
+
+func TestEventSinkRecordsDiagnosticEvents(t *testing.T) {
+	var records []Record
+	ctx := &partial.RenderContext{
+		Context: context.Background(),
+		Kind:    partial.RenderKindPartial,
+		Request: httptest.NewRequest("GET", "/events", nil),
+		Partial: partial.NewID("content", "content.gohtml").
+			SetFileSystem(fstest.MapFS{"content.gohtml": &fstest.MapFile{Data: []byte("ok")}}),
+	}
+	ctx.Context = WithRequestID(ctx.Context, "req-event")
+	ctx.Context = WithTraceID(ctx.Context, "trace-event")
+
+	sink := EventSink(SinkFunc(func(record Record) {
+		records = append(records, record)
+	}), WithTag("chain", "events"))
+	sink.Emit(ctx, partial.Event{
+		Time:    time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC),
+		Kind:    partial.EventTemplateMissing,
+		Level:   partial.EventWarn,
+		Message: "partial template path not found",
+		Fields:  map[string]any{"path": "missing.gohtml"},
+	})
+
+	if len(records) != 1 {
+		t.Fatalf("records = %d, want 1", len(records))
+	}
+	record := records[0]
+	if record.Kind != "event" || record.EventKind != partial.EventTemplateMissing {
+		t.Fatalf("event identity = kind %q event %q", record.Kind, record.EventKind)
+	}
+	if record.RequestID != "req-event" || record.TraceID != "trace-event" {
+		t.Fatalf("correlation = %q %q", record.RequestID, record.TraceID)
+	}
+	if record.PartialID != "content" || record.Method != "GET" || record.Path != "/events" {
+		t.Fatalf("context fields = %#v", record)
+	}
+	if record.EventLevel != partial.EventWarn || record.EventMessage != "partial template path not found" {
+		t.Fatalf("event fields = %#v", record)
+	}
+	if record.EventFields["path"] != "missing.gohtml" {
+		t.Fatalf("EventFields = %#v", record.EventFields)
+	}
+	if record.Tags["chain"] != "events" {
+		t.Fatalf("Tags = %#v", record.Tags)
 	}
 }
 

@@ -1,0 +1,91 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.LoggerPage
+*/}}
+<section class="grid gap-5">
+    {{ logger "logger page rendered from template" "template" "templates/logger.gohtml" "records" .Total }}
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Extension observability</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This page reads diagnostic events emitted by core and extensions. Metrics stay focused on render measurements; logs show event level, message, request, trace, and structured fields.</p>
+    </header>
+
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+        <article class="rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-sm font-extrabold uppercase text-stone-600">Stored logs</h2>
+            <p class="mt-2 text-3xl font-extrabold text-stone-950">{{ .Total }}</p>
+        </article>
+        <article class="rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-sm font-extrabold uppercase text-stone-600">Source</h2>
+            <p class="mt-2 text-3xl font-extrabold text-stone-950">events</p>
+        </article>
+        <article class="rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-sm font-extrabold uppercase text-stone-600">Dispatch</h2>
+            <p class="mt-2 text-3xl font-extrabold text-stone-950">async</p>
+        </article>
+    </div>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-lg font-bold text-stone-950">Latest diagnostic events</h2>
+                <p class="leading-7 text-stone-600">Trigger debug or error pages, then return here or refresh this panel to inspect event flow without mixing it into render metrics.</p>
+            </div>
+            <button type="button" class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-bold text-stone-950 hover:border-teal-700 hover:text-teal-900" hx-get="/logger" hx-target="#content">Refresh</button>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-stone-300">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-stone-100 text-[12px] uppercase text-stone-600">
+                    <tr>
+                        <th class="border-b border-stone-300 px-3 py-2">Time</th>
+                        <th class="border-b border-stone-300 px-3 py-2">Level</th>
+                        <th class="border-b border-stone-300 px-3 py-2">Event</th>
+                        <th class="border-b border-stone-300 px-3 py-2">Partial</th>
+                        <th class="border-b border-stone-300 px-3 py-2">Request</th>
+                        <th class="border-b border-stone-300 px-3 py-2">Trace</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ if .Latest }}
+                        {{ range .Latest }}
+                            <tr class="align-top">
+                                <td class="border-b border-stone-200 px-3 py-2 font-mono text-[13px] text-stone-700">{{ .Timestamp }}</td>
+                                <td class="border-b border-stone-200 px-3 py-2 font-mono text-[13px] font-bold text-stone-950">{{ .Level }}</td>
+                                <td class="border-b border-stone-200 px-3 py-2">
+                                    <div class="font-bold text-stone-950">{{ .Kind }}</div>
+                                    {{ if .Message }}<div class="text-xs text-stone-600">{{ .Message }}</div>{{ end }}
+                                    {{ range .Fields }}<div class="text-xs text-stone-600">{{ . }}</div>{{ end }}
+                                    {{ if .Error }}<div class="mt-2 max-w-full break-words text-xs font-bold text-amber-900">{{ .Error }}</div>{{ end }}
+                                </td>
+                                <td class="border-b border-stone-200 px-3 py-2 font-mono text-[13px] text-stone-700">{{ .PartialID }}</td>
+                                <td class="border-b border-stone-200 px-3 py-2 font-mono text-[13px] text-stone-700">{{ .Request }}</td>
+                                <td class="border-b border-stone-200 px-3 py-2 font-mono text-[13px] text-stone-700">{{ .TraceID }}</td>
+                            </tr>
+                        {{ end }}
+                    {{ else }}
+                        <tr>
+                            <td class="px-3 py-5 text-stone-600" colspan="6">No diagnostic events recorded yet.</td>
+                        </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">events := partial.NewAsyncEvents(
+    partial.EventsConfig{Buffer: 256},
+    logger.Sink(slog.Default(), logger.WithMinLevel(partial.EventWarn)),
+    app.logs,
+    dynamoSink,
+)
+
+service := partial.NewService(&partial.Config{Events: events})</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template logging</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ logger \"logger page rendered from template\" \"template\" \"templates/logger.gohtml\" \"records\" .Total }}" }}</code></pre>
+    </article>
+</section>

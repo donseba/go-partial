@@ -69,6 +69,7 @@ func (app *App) standaloneService(conn connector.Connector) *partial.Service {
 	}
 	return partial.NewService(&partial.Config{
 		Connector:        conn,
+		Events:           app.events,
 		FS:               os.DirFS("examples/showcase"),
 		Renderers:        app.showcaseRenderers(),
 		UseTemplateCache: false,

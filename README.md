@@ -51,6 +51,23 @@ The writer sink is intentionally plain: it works with stdout, files, buffers, pi
 
 Metrics records distinguish request identity from flow identity. `WithRequestID` labels the current HTTP request. `WithTraceID` can group related browser work such as a page request and later async or SSE requests. `WithParentRequestID` can link a spawned request back to the request that caused it.
 
+## Diagnostic Events
+Core and extensions can emit diagnostic events without owning logging, tracing, or queues. Attach consumers through `Config.Events`:
+
+```go
+events := partial.NewAsyncEvents(
+    partial.EventsConfig{Buffer: 256, DropPolicy: partial.DropNewest},
+    logger.Sink(slog.Default(), logger.WithMinLevel(partial.EventWarn)),
+    mySink,
+)
+
+service := partial.NewService(&partial.Config{
+    Events: events,
+})
+```
+
+`ext/logger` adapts events to `log/slog`. App-owned sinks can forward the same events to DynamoDB, Kafka, OpenTelemetry, SSE debug pages, files, or any other collector. See [OBSERVABILITY.md](OBSERVABILITY.md) for concrete sink examples.
+
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
 
@@ -186,7 +203,7 @@ cfg := &partial.Config{
     Connector:        connector.NewHTMX(nil), // Choose how request headers are read
     FS:               os.DirFS("web"),        // Template filesystem
     UseTemplateCache: true,                   // Enable parsed template caching
-    Logger:           myLogger,               // Implement the Logger interface or use nil
+    Events:           events,                 // Optional diagnostic event sink
 }
 
 service := partial.NewService(cfg)

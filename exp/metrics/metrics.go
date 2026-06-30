@@ -31,6 +31,10 @@ type (
 		StartedAt       time.Time
 		Duration        time.Duration
 		Error           error
+		EventKind       string
+		EventLevel      partial.EventLevel
+		EventMessage    string
+		EventFields     map[string]any
 		Tags            map[string]string
 	}
 
@@ -239,6 +243,73 @@ func Renderer(sink Sink, options ...Option) partial.Renderer {
 	}
 }
 
+// EventSink returns a diagnostic event consumer that records events as metrics records.
+func EventSink(sink Sink, options ...Option) partial.EventSink {
+	cfg := config{
+		sink: sink,
+		now:  time.Now,
+	}
+	for _, option := range options {
+		if option != nil {
+			option(&cfg)
+		}
+	}
+	return partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
+		if cfg.sink == nil {
+			return
+		}
+		record := Record{
+			Kind:         partial.RenderKind("event"),
+			Name:         event.Kind,
+			RequestID:    requestID(ctx),
+			TraceID:      traceID(ctx),
+			StartedAt:    event.Time,
+			Duration:     0,
+			Rendered:     false,
+			Error:        event.Error,
+			EventKind:    event.Kind,
+			EventLevel:   event.Level,
+			EventMessage: event.Message,
+			EventFields:  cloneEventFields(event.Fields),
+			Tags:         cloneTags(cfg.tags),
+		}
+		if record.StartedAt.IsZero() {
+			record.StartedAt = cfg.now()
+		}
+		if event.PartialID != "" {
+			record.PartialID = event.PartialID
+		}
+		if event.ParentID != "" {
+			record.ParentID = event.ParentID
+		}
+		if event.Name != "" {
+			record.Name = event.Name
+		}
+		if ctx != nil {
+			record.ParentRequestID = parentRequestID(ctx)
+			if ctx.Request != nil {
+				record.Method = ctx.Request.Method
+				record.Path = requestPath(ctx.Request)
+			}
+		}
+		if ctx != nil && ctx.Partial != nil {
+			if record.PartialID == "" {
+				record.PartialID = ctx.Partial.PartialID()
+			}
+			if record.ParentID == "" {
+				record.ParentID = ctx.Partial.ParentID()
+			}
+			record.PartialLabel = PartialLabel(ctx.Partial)
+			if cfg.slotName != nil {
+				record.SlotName = cfg.slotName(ctx.Partial)
+			}
+			record.Templates = ctx.Partial.TemplatePaths()
+			record.OOB = ctx.Partial.IsOOB()
+		}
+		cfg.sink.Record(record)
+	})
+}
+
 func buildRecord(ctx *partial.RenderContext, out template.HTML, renderErr error, cfg config) Record {
 	finishedAt := cfg.now()
 	startedAt := finishedAt
@@ -352,6 +423,17 @@ func cloneTags(tags map[string]string) map[string]string {
 	}
 	out := make(map[string]string, len(tags))
 	for key, value := range tags {
+		out[key] = value
+	}
+	return out
+}
+
+func cloneEventFields(fields map[string]any) map[string]any {
+	if len(fields) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(fields))
+	for key, value := range fields {
 		out[key] = value
 	}
 	return out

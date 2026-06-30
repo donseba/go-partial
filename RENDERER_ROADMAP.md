@@ -74,6 +74,8 @@ finalize C -> finalize B -> finalize A
   lifecycle.
 - `exp/interactions` is positioned as experimental helper sugar for connector
   attributes and wrapper markup, not as core rendering behavior.
+- Diagnostic events should become the replacement for core-owned logging. See
+  `DIAGNOSTIC_EVENTS.md` for the guideline.
 
 ## Later Discussion
 

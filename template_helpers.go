@@ -21,7 +21,13 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 
 			result := child.renderSelfResult(state.Context, p.getRequest())
 			if result.Err != nil {
-				child.getLogger().Error("error rendering template partial", "path", templatePath, "error", result.Err)
+				child.emit(Event{
+					Kind:    EventRenderError,
+					Level:   EventError,
+					Message: "error rendering template partial",
+					Error:   result.Err,
+					Fields:  map[string]any{"path": templatePath},
+				})
 				fallback, fallbackErr := child.renderErrorFragment(state.Context, p.getRequest(), result.Err)
 				if fallbackErr != nil {
 					return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, fallbackErr))
@@ -32,7 +38,12 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 			return result.HTML
 		}
 
-		p.getLogger().Warn("partial template path not found", "path", id)
+		p.emit(Event{
+			Kind:    EventTemplateMissing,
+			Level:   EventWarn,
+			Message: "partial template path not found",
+			Fields:  map[string]any{"path": id},
+		})
 		return template.HTML(template.HTMLEscapeString(fmt.Sprintf("partial template '%s' not found", id)))
 	}
 }
@@ -72,13 +83,24 @@ func applyPartialTemplateArgs(p *Partial, id string, args ...any) bool {
 func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 	return func() template.HTML {
 		if p.layoutContentID == "" {
-			p.getLogger().Warn("content helper used outside layout wrapper", "id", p.id)
+			p.emit(Event{
+				Kind:    EventContentMissingLayout,
+				Level:   EventWarn,
+				Message: "content helper used outside layout wrapper",
+				Fields:  map[string]any{"id": p.id},
+			})
 			return template.HTML("content is only available on layout wrappers")
 		}
 
 		html, err := p.renderChildPartial(state.Context, p.layoutContentID)
 		if err != nil {
-			p.getLogger().Error("error rendering layout content", "id", p.layoutContentID, "error", err)
+			p.emit(Event{
+				Kind:    EventRenderError,
+				Level:   EventError,
+				Message: "error rendering layout content",
+				Error:   err,
+				Fields:  map[string]any{"id": p.layoutContentID},
+			})
 			return template.HTML(fmt.Sprintf("error rendering content: %v", err))
 		}
 
@@ -88,7 +110,12 @@ func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 
 func partialDotMapArg(p *Partial, id string, args ...any) (map[string]any, bool) {
 	if len(args)%2 != 0 {
-		p.getLogger().Warn("invalid dot data for partial, pass key/value pairs", "id", id)
+		p.emit(Event{
+			Kind:    EventContractInvalid,
+			Level:   EventWarn,
+			Message: "invalid dot data for partial, pass key/value pairs",
+			Fields:  map[string]any{"id": id},
+		})
 		return nil, false
 	}
 
@@ -96,7 +123,12 @@ func partialDotMapArg(p *Partial, id string, args ...any) (map[string]any, bool)
 	for i := 0; i < len(args); i += 2 {
 		key, ok := args[i].(string)
 		if !ok {
-			p.getLogger().Warn("invalid dot data key for partial", "id", id, "type", fmt.Sprintf("%T", args[i]))
+			p.emit(Event{
+				Kind:    EventContractInvalid,
+				Level:   EventWarn,
+				Message: "invalid dot data key for partial",
+				Fields:  map[string]any{"id": id, "type": fmt.Sprintf("%T", args[i])},
+			})
 			return nil, false
 		}
 		dot[key] = args[i+1]

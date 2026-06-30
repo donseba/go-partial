@@ -19,6 +19,7 @@ func (app *App) navItems() []NavItem {
 		{Path: "/metrics/live", Label: "Live metrics", Group: "exp"},
 		{Path: "/debug", Label: "Debug", Group: "ext"},
 		{Path: "/error", Label: "Error", Group: "ext"},
+		{Path: "/logger", Label: "Logger", Group: "ext"},
 		{Path: "/oob", Label: "OOB", Group: "Integrations"},
 		{Path: "/headers", Label: "Headers", Group: "Integrations"},
 	}
