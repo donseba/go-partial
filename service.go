@@ -24,31 +24,29 @@ type (
 
 	// Service stores shared rendering configuration for layouts.
 	Service struct {
-		config             *Config
-		staticFuncs        template.FuncMap
-		customFuncs        template.FuncMap
-		hasCustomFunctions bool
-		connector          connector.Connector
-		events             EventSink
-		templateCache      *templateutil.Store
-		renderers          []Renderer
-		funcsLock          sync.RWMutex
+		config        *Config
+		staticFuncs   template.FuncMap
+		customFuncs   template.FuncMap
+		connector     connector.Connector
+		events        EventSink
+		templateCache *templateutil.Store
+		renderers     []Renderer
+		funcsLock     sync.RWMutex
 	}
 
 	// Layout binds a content partial to an optional wrapper partial.
 	Layout struct {
-		service            *Service
-		filesystem         fs.FS
-		content            *Partial
-		wrapper            *Partial
-		request            *http.Request
-		staticFuncs        template.FuncMap
-		customFuncs        template.FuncMap
-		hasCustomFunctions bool
-		connector          connector.Connector
-		events             EventSink
-		renderers          []Renderer
-		funcsLock          sync.RWMutex
+		service     *Service
+		filesystem  fs.FS
+		content     *Partial
+		wrapper     *Partial
+		request     *http.Request
+		staticFuncs template.FuncMap
+		customFuncs template.FuncMap
+		connector   connector.Connector
+		events      EventSink
+		renderers   []Renderer
+		funcsLock   sync.RWMutex
 	}
 )
 
@@ -81,14 +79,13 @@ func (svc *Service) NewLayout() *Layout {
 	functions := svc.getStaticFuncMap()
 	customFuncs := svc.getCustomFuncMap()
 	return &Layout{
-		service:            svc,
-		filesystem:         fsys,
-		connector:          svc.connector,
-		events:             svc.events,
-		renderers:          append([]Renderer(nil), svc.renderers...),
-		staticFuncs:        functions,
-		customFuncs:        customFuncs,
-		hasCustomFunctions: svc.getHasCustomFunctions(),
+		service:     svc,
+		filesystem:  fsys,
+		connector:   svc.connector,
+		events:      svc.events,
+		renderers:   append([]Renderer(nil), svc.renderers...),
+		staticFuncs: functions,
+		customFuncs: customFuncs,
 	}
 }
 
@@ -110,9 +107,7 @@ func (svc *Service) SetFunc(funcMaps ...template.FuncMap) *Service {
 	svc.funcsLock.Lock()
 	defer svc.funcsLock.Unlock()
 
-	if mergeFuncMapsInto(svc.staticFuncs, svc.customFuncs, svc.events, funcMaps...) {
-		svc.hasCustomFunctions = true
-	}
+	mergeFuncMapsInto(svc.staticFuncs, svc.customFuncs, svc.events, funcMaps...)
 	return svc
 }
 
@@ -126,12 +121,6 @@ func (svc *Service) getCustomFuncMap() template.FuncMap {
 	svc.funcsLock.RLock()
 	defer svc.funcsLock.RUnlock()
 	return maps.Clone(svc.customFuncs)
-}
-
-func (svc *Service) getHasCustomFunctions() bool {
-	svc.funcsLock.RLock()
-	defer svc.funcsLock.RUnlock()
-	return svc.hasCustomFunctions
 }
 
 func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, events EventSink) template.FuncMap {
@@ -200,23 +189,18 @@ func (l *Layout) SetFunc(funcMaps ...template.FuncMap) *Layout {
 	l.funcsLock.Lock()
 	defer l.funcsLock.Unlock()
 
-	if mergeFuncMapsInto(l.staticFuncs, l.customFuncs, l.events, funcMaps...) {
-		l.hasCustomFunctions = true
-	}
+	mergeFuncMapsInto(l.staticFuncs, l.customFuncs, l.events, funcMaps...)
 	return l
 }
 
-func mergeFuncMapsInto(staticFuncs, customFuncs template.FuncMap, events EventSink, funcMaps ...template.FuncMap) bool {
-	changed := false
+func mergeFuncMapsInto(staticFuncs, customFuncs template.FuncMap, events EventSink, funcMaps ...template.FuncMap) {
 	for _, funcMap := range funcMaps {
 		merged := mergeStaticFuncMap(staticFuncs, funcMap, events)
 		if len(merged) == 0 {
 			continue
 		}
 		maps.Copy(customFuncs, merged)
-		changed = true
 	}
-	return changed
 }
 
 func (l *Layout) getStaticFuncMap() template.FuncMap {
@@ -284,6 +268,21 @@ func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r 
 			})
 			return err
 		}
+		return nil
+	}
+
+	if l.content != nil {
+		err := l.content.WriteWithRequest(ctx, w, r)
+		if err != nil {
+			emitSafely(l.events, nil, Event{
+				Time:    timeNow(),
+				Kind:    EventRenderError,
+				Level:   EventError,
+				Message: "error rendering layout",
+				Error:   err,
+			})
+			return err
+		}
 	}
 
 	return nil
@@ -303,6 +302,7 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 	p.events = l.events
 	if l.filesystem != nil {
 		p.fs = l.filesystem
+		p.fsSet = true
 	}
 	p.useCache = l.service.config.UseTemplateCache
 	if len(l.renderers) > 0 && !p.renderersInherited {

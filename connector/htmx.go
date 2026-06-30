@@ -59,6 +59,9 @@ func NewHTMX(c *Config) Connector {
 }
 
 func (h *HTMX) RenderPartial(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	hxRequest := r.Header.Get(h.requestHeader)
 	hxBoosted := r.Header.Get(h.boostedHeader)
 	hxHistoryRestoreRequest := r.Header.Get(h.historyRestoreRequestHeader)

@@ -42,7 +42,7 @@ func FuncMap() template.FuncMap {
 // go-doc:sig func() github.com/donseba/go-partial/exp/csrf.Token
 func CSRF(ctx ...*partial.RenderContext) Token {
 	if len(ctx) == 0 || ctx[0] == nil {
-		return FromContext(nil)
+		return FromContext(context.Background())
 	}
 	return FromContext(ctx[0].Context)
 }

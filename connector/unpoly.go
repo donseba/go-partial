@@ -28,6 +28,9 @@ func NewUnpoly(c *Config) Connector {
 }
 
 func (u *Unpoly) RenderPartial(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	return r.Header.Get(u.targetHeader) != ""
 }
 

@@ -77,6 +77,9 @@ func (h HeaderKey) String() string {
 }
 
 func (x *base) RenderPartial(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
 	return r.Header.Get(x.targetHeader) != ""
 }
 
@@ -110,11 +113,14 @@ func (x *base) InteractionAttrs(interaction Interaction) map[string]string {
 }
 
 func (x *base) GetTargetValue(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
 	if targetValue := r.Header.Get(x.targetHeader); targetValue != "" {
 		return targetValue
 	}
 
-	if x.config.useURLQuery() {
+	if x.config.useURLQuery() && r.URL != nil {
 		return r.URL.Query().Get("target")
 	}
 
@@ -122,11 +128,14 @@ func (x *base) GetTargetValue(r *http.Request) string {
 }
 
 func (x *base) GetSelectValue(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
 	if selectValue := r.Header.Get(x.selectHeader); selectValue != "" {
 		return selectValue
 	}
 
-	if x.config.useURLQuery() {
+	if x.config.useURLQuery() && r.URL != nil {
 		return r.URL.Query().Get("select")
 	}
 
@@ -134,11 +143,14 @@ func (x *base) GetSelectValue(r *http.Request) string {
 }
 
 func (x *base) GetActionValue(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
 	if actionValue := r.Header.Get(x.actionHeader); actionValue != "" {
 		return actionValue
 	}
 
-	if x.config.useURLQuery() {
+	if x.config.useURLQuery() && r.URL != nil {
 		return r.URL.Query().Get("action")
 	}
 

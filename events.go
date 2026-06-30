@@ -320,11 +320,3 @@ func mergeEventSinks(a, b EventSink) EventSink {
 		return FanoutEvents(a, b)
 	}
 }
-
-func emitOnPartial(p *Partial, event Event) {
-	if p == nil {
-		return
-	}
-	ctx := newRenderContext(context.Background(), p, p.getRequest(), RenderKindPartial)
-	ctx.Emit(event)
-}

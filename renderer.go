@@ -27,6 +27,7 @@ type (
 	renderResult struct {
 		HTML     template.HTML
 		Response *RenderResponse
+		Headers  map[string]string
 		Err      error
 	}
 

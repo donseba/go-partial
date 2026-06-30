@@ -37,6 +37,7 @@ type (
 		renderOOB          bool
 		alwaysSwapOOB      bool
 		fs                 fs.FS
+		fsSet              bool
 		connector          connector.Connector
 		events             EventSink
 		useCache           bool
@@ -316,9 +317,6 @@ func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
 	if p == nil {
 		return nil
 	}
-	if p.parent != nil {
-		p.parent.SetResponseHeaders(headers)
-	}
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -370,12 +368,17 @@ func (p *Partial) GetBasePath() string {
 		return ""
 	}
 
-	if p.basePath != "" {
-		return p.basePath
+	p.mu.RLock()
+	basePath := p.basePath
+	parent := p.parent
+	p.mu.RUnlock()
+
+	if basePath != "" {
+		return basePath
 	}
 
-	if p.parent != nil {
-		return p.parent.GetBasePath()
+	if parent != nil {
+		return parent.GetBasePath()
 	}
 
 	return ""
@@ -440,6 +443,7 @@ func (p *Partial) SetFileSystem(fs fs.FS) *Partial {
 	defer p.mu.Unlock()
 
 	p.fs = fs
+	p.fsSet = true
 	return p
 }
 
@@ -550,7 +554,10 @@ func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r
 	}
 
 	// get headers
-	headers := p.getResponseHeaders()
+	headers := result.Headers
+	if headers == nil {
+		headers = p.getResponseHeaders()
+	}
 	for k, v := range headers {
 		w.Header().Set(k, v)
 	}
@@ -913,13 +920,7 @@ func isProtectedFunctionName(name string) bool {
 }
 
 func (p *Partial) getBasePath() string {
-	if p.parent != nil {
-		bp := p.parent.getBasePath()
-		if bp != "" {
-			return bp
-		}
-	}
-	return p.basePath
+	return p.GetBasePath()
 }
 
 func (p *Partial) getConnector() connector.Connector {
@@ -949,13 +950,22 @@ func (p *Partial) getFS() fs.FS {
 	if p == nil {
 		return os.DirFS("./")
 	}
-	if p.parent != nil {
-		if parentFS := p.parent.getFS(); parentFS != nil {
+	p.mu.RLock()
+	fsys := p.fs
+	fsSet := p.fsSet
+	parent := p.parent
+	p.mu.RUnlock()
+
+	if fsSet && fsys != nil {
+		return fsys
+	}
+	if parent != nil {
+		if parentFS := parent.getFS(); parentFS != nil {
 			return parentFS
 		}
 	}
-	if p.fs != nil {
-		return p.fs
+	if fsys != nil {
+		return fsys
 	}
 	return os.DirFS("./")
 }
@@ -1161,9 +1171,11 @@ func (p *Partial) renderSelfResult(ctx context.Context, r *http.Request) renderR
 	state := newRenderContext(ctx, p, r, RenderKindPartial)
 
 	renderers := append(p.getRenderers(), templateRenderer())
-	return renderWithChainResult(state, renderers, func(state *RenderContext) (template.HTML, error) {
+	result := renderWithChainResult(state, renderers, func(state *RenderContext) (template.HTML, error) {
 		return "", errors.New("template renderer did not produce output")
 	})
+	result.Headers = p.getResponseHeaders()
+	return result
 }
 
 func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
@@ -1447,6 +1459,7 @@ func (p *Partial) clone() *Partial {
 		renderOOB:          p.renderOOB,
 		alwaysSwapOOB:      p.alwaysSwapOOB,
 		fs:                 p.fs,
+		fsSet:              p.fsSet,
 		connector:          p.connector,
 		events:             p.events,
 		useCache:           p.useCache,

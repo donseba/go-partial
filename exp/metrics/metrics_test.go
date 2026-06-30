@@ -205,7 +205,7 @@ func TestRendererRecordsRenderErrors(t *testing.T) {
 	out, err := renderer.Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return template.HTML("partial output"), renderErr
 	})
-	out, err = renderer.Finalize(ctx, out, err)
+	_, err = renderer.Finalize(ctx, out, err)
 	if !errors.Is(err, renderErr) {
 		t.Fatalf("Finalize() error = %v, want %v", err, renderErr)
 	}
