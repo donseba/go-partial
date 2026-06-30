@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -201,6 +202,141 @@ func TestRegisteredTargetTemplateErrorRendersSectionFailureResponse(t *testing.T
 	}
 	if strings.Contains(body, "<!doctype html>") {
 		t.Fatalf("expected section failure response, got full error document: %q", body)
+	}
+}
+
+func TestWriteWithRequestAppliesFluentConnectorResponse(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("notice.gohtml", `<div id="notice">Saved</div>`)
+
+	p := NewID("notice", "notice.gohtml").
+		SetFileSystem(fsys).
+		SetConnector(connector.NewHTMX(nil))
+	p.Response().
+		Retarget("#notice").
+		TriggerWith(connector.NewTrigger().AddEvent("saved"))
+
+	req := httptest.NewRequest(http.MethodGet, "/notice", nil)
+	rec := httptest.NewRecorder()
+
+	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
+		t.Fatalf("write partial: %v", err)
+	}
+
+	if got := rec.Header().Get(connector.HTMXHeaderRetarget.String()); got != "#notice" {
+		t.Fatalf("expected HX-Retarget header, got %q", got)
+	}
+	if got := rec.Header().Get(connector.HTMXHeaderTrigger.String()); got != `{"saved":null}` {
+		t.Fatalf("expected HX-Trigger header, got %q", got)
+	}
+}
+
+func TestWriteWithRequestAppliesStructConnectorResponse(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("notice.gohtml", `<div id="notice">Saved</div>`)
+
+	p := NewID("notice", "notice.gohtml").
+		SetFileSystem(fsys).
+		SetConnector(connector.NewHTMX(nil)).
+		SetResponse(connector.Response{
+			Retarget: "#notice",
+			Trigger:  connector.NewTrigger().AddEvent("saved").String(),
+		})
+
+	req := httptest.NewRequest(http.MethodGet, "/notice", nil)
+	rec := httptest.NewRecorder()
+
+	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
+		t.Fatalf("write partial: %v", err)
+	}
+
+	if got := rec.Header().Get(connector.HTMXHeaderRetarget.String()); got != "#notice" {
+		t.Fatalf("expected HX-Retarget header, got %q", got)
+	}
+	if got := rec.Header().Get(connector.HTMXHeaderTrigger.String()); got != `{"saved":null}` {
+		t.Fatalf("expected HX-Trigger header, got %q", got)
+	}
+}
+
+func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("page.gohtml", `ok`)
+
+	p := New("page.gohtml").
+		SetFileSystem(fsys).
+		Use(RendererHooks{
+			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
+				ctx.Response.Status = http.StatusAccepted
+				ctx.Response.Headers["X-Render-Response"] = "applied"
+				return out, err
+			},
+		})
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
+		t.Fatalf("WriteWithRequest() error = %v", err)
+	}
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+	if got := rec.Header().Get("X-Render-Response"); got != "applied" {
+		t.Fatalf("X-Render-Response = %q", got)
+	}
+	if rec.Body.String() != "ok" {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
+	type row struct {
+		ID   int
+		Name string
+	}
+
+	rows := []row{
+		{ID: 1, Name: "Coffee"},
+		{ID: 2, Name: "Tea"},
+	}
+
+	fsys := &inMemoryFS{}
+	fsys.AddFile("table.gohtml", `<table><tbody>{{ range .Rows }}{{ template "row.gohtml" . }}{{ end }}</tbody></table>`)
+	fsys.AddFile("row.gohtml", `<tr id="row-{{ .ID }}"><td>{{ .Name }}</td></tr>`)
+
+	table := NewID("content", "table.gohtml").
+		SetFileSystem(fsys).
+		SetDot(map[string]any{"Rows": rows}).
+		SetFunc(testTargetFuncMap()).
+		Use(testTargetRenderer())
+	rowPartial := NewID("row", "row.gohtml").SetFileSystem(fsys)
+	table.With(rowPartial)
+	testUseTargetResolver(table, func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
+		if !strings.HasPrefix(target, "row-") {
+			return nil, false
+		}
+		id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
+		if err != nil {
+			return nil, false
+		}
+		for _, candidate := range rows {
+			if candidate.ID == id {
+				return NewID(target, "row.gohtml").SetFileSystem(fsys).SetDot(candidate), true
+			}
+		}
+		return nil, false
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/rows", nil)
+	req.Header.Set(connector.HeaderTarget.String(), "row-2")
+
+	out, err := table.RenderWithRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("render with dynamic target: %v", err)
+	}
+
+	if string(out) != `<tr id="row-2"><td>Tea</td></tr>` {
+		t.Fatalf("unexpected row output: %q", out)
 	}
 }
 

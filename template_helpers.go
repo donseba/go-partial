@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-func copyFuncMap() template.FuncMap {
-	return make(template.FuncMap)
-}
-
 func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) template.HTML {
 	return func(id string, args ...any) template.HTML {
 		if templatePath, ok := partialTemplatePath(p, id); ok {

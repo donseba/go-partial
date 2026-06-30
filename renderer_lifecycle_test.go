@@ -115,38 +115,6 @@ func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
-	fsys := fstest.MapFS{
-		"page.gohtml": &fstest.MapFile{Data: []byte(`ok`)},
-	}
-
-	p := New("page.gohtml").
-		SetFileSystem(fsys).
-		Use(RendererHooks{
-			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
-				ctx.Response.Status = http.StatusAccepted
-				ctx.Response.Headers["X-Render-Response"] = "applied"
-				return out, err
-			},
-		})
-
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rec := httptest.NewRecorder()
-	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
-		t.Fatalf("WriteWithRequest() error = %v", err)
-	}
-
-	if rec.Code != http.StatusAccepted {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
-	}
-	if got := rec.Header().Get("X-Render-Response"); got != "applied" {
-		t.Fatalf("X-Render-Response = %q", got)
-	}
-	if rec.Body.String() != "ok" {
-		t.Fatalf("body = %q", rec.Body.String())
-	}
-}
-
 func TestRendererCanHandleErrorKind(t *testing.T) {
 	fsys := fstest.MapFS{
 		"broken.gohtml": &fstest.MapFile{Data: []byte(`{{ if .Missing }}missing`)},

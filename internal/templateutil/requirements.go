@@ -1,7 +1,8 @@
-package partial
+package templateutil
 
 import (
 	"fmt"
+	"html/template"
 	"io/fs"
 	"regexp"
 	"sort"
@@ -24,12 +25,12 @@ var (
 	templateCommentPattern = regexp.MustCompile(`(?s)\{\{/\*(.*?)\*/\}\}`)
 )
 
-type typedRootContract struct {
+type RootContract struct {
 	Annotation string
 	Type       string
 }
 
-func requiredFuncs(name, src string) ([]string, error) {
+func RequiredFuncs(name, src string) ([]string, error) {
 	tree := parse.New(name)
 	tree.Mode = parse.SkipFuncCheck
 
@@ -56,7 +57,7 @@ func requiredFuncs(name, src string) ([]string, error) {
 	return funcs, nil
 }
 
-func referencedTemplates(name, src string) ([]string, error) {
+func ReferencedTemplates(name, src string) ([]string, error) {
 	tree := parse.New(name)
 	tree.Mode = parse.SkipFuncCheck
 
@@ -80,7 +81,7 @@ func referencedTemplates(name, src string) ([]string, error) {
 	return names, nil
 }
 
-func definedTemplates(name, src string) ([]string, error) {
+func DefinedTemplates(name, src string) ([]string, error) {
 	tree := parse.New(name)
 	tree.Mode = parse.SkipFuncCheck
 
@@ -103,14 +104,14 @@ func definedTemplates(name, src string) ([]string, error) {
 	return names, nil
 }
 
-func requiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error) {
+func RequiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error) {
 	found := make(map[string]struct{})
 	for _, name := range names {
 		content, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return nil, err
 		}
-		funcs, err := requiredFuncs(name, string(content))
+		funcs, err := RequiredFuncs(name, string(content))
 		if err != nil {
 			return nil, err
 		}
@@ -121,14 +122,14 @@ func requiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error
 	return found, nil
 }
 
-func referencedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
+func ReferencedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 	found := make(map[string]struct{})
 	for _, name := range names {
 		content, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			continue
 		}
-		refs, err := referencedTemplates(name, string(content))
+		refs, err := ReferencedTemplates(name, string(content))
 		if err != nil {
 			continue
 		}
@@ -139,12 +140,12 @@ func referencedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 	return found
 }
 
-func definedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
+func DefinedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 	found := make(map[string]struct{})
 	for _, name := range names {
 		found[name] = struct{}{}
-		found[pathBase(name)] = struct{}{}
-		for _, alias := range templatePathAliases(name) {
+		found[PathBase(name)] = struct{}{}
+		for _, alias := range PathAliases(name) {
 			found[alias] = struct{}{}
 		}
 
@@ -152,7 +153,7 @@ func definedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 		if err != nil {
 			continue
 		}
-		defined, err := definedTemplates(name, string(content))
+		defined, err := DefinedTemplates(name, string(content))
 		if err != nil {
 			continue
 		}
@@ -163,8 +164,8 @@ func definedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
 	return found
 }
 
-func typedRootContractsFromFS(fsys fs.FS, names []string) (map[string]typedRootContract, error) {
-	contracts := make(map[string]typedRootContract)
+func RootContractsFromFS(fsys fs.FS, names []string) (map[string]RootContract, error) {
+	contracts := make(map[string]RootContract)
 	for _, name := range names {
 		content, err := fs.ReadFile(fsys, name)
 		if err != nil {
@@ -176,17 +177,68 @@ func typedRootContractsFromFS(fsys fs.FS, names []string) (map[string]typedRootC
 				continue
 			}
 			rootName := strings.TrimSpace(match[2])
-			typeName := normalizeContractType(strings.TrimSpace(match[3]))
+			typeName := NormalizeContractType(strings.TrimSpace(match[3]))
 			if previous, exists := contracts[rootName]; exists && previous.Type != typeName {
 				return nil, fmt.Errorf("@%s %s is declared as both %s and %s", annotation, rootName, previous.Type, typeName)
 			}
-			contracts[rootName] = typedRootContract{
+			contracts[rootName] = RootContract{
 				Annotation: annotation,
 				Type:       typeName,
 			}
 		}
 	}
 	return contracts, nil
+}
+
+func NormalizeContractType(typeName string) string {
+	lastSlash := strings.LastIndex(typeName, "/")
+	lastDot := strings.LastIndex(typeName, ".")
+	if lastSlash > lastDot {
+		return typeName[:lastSlash] + "." + typeName[lastSlash+1:]
+	}
+	return typeName
+}
+
+func PathBase(name string) string {
+	for i := len(name) - 1; i >= 0; i-- {
+		if name[i] == '/' || name[i] == '\\' {
+			return name[i+1:]
+		}
+	}
+	return name
+}
+
+func PathAliases(name string) []string {
+	trimmed := strings.TrimLeft(name, `/\`)
+	if trimmed == "" {
+		return nil
+	}
+	aliases := []string{trimmed}
+	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) {
+		return aliases
+	}
+	return append(aliases, "/"+trimmed)
+}
+
+func AddPathAliases(tmpl *template.Template, names []string) error {
+	if tmpl == nil {
+		return nil
+	}
+	for _, name := range names {
+		base := PathBase(name)
+		if name == "" || name == base || tmpl.Lookup(base) == nil {
+			continue
+		}
+		for _, alias := range PathAliases(name) {
+			if tmpl.Lookup(alias) != nil {
+				continue
+			}
+			if _, err := tmpl.New(alias).Parse(fmt.Sprintf(`{{ template %q . }}`, base)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func reservedContractAnnotation(name string) bool {
@@ -218,15 +270,6 @@ func contractScanText(src string) string {
 	return out.String()
 }
 
-func normalizeContractType(typeName string) string {
-	lastSlash := strings.LastIndex(typeName, "/")
-	lastDot := strings.LastIndex(typeName, ".")
-	if lastSlash > lastDot {
-		return typeName[:lastSlash] + "." + typeName[lastSlash+1:]
-	}
-	return typeName
-}
-
 func walk(n parse.Node, found map[string]bool) {
 	if n == nil {
 		return
@@ -240,70 +283,52 @@ func walk(n parse.Node, found map[string]bool) {
 		for _, node := range x.Nodes {
 			walk(node, found)
 		}
-
 	case *parse.ActionNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Pipe, found)
 		}
-		walk(x.Pipe, found)
-
 	case *parse.IfNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Pipe, found)
+			walk(x.List, found)
+			walk(x.ElseList, found)
 		}
-		walk(x.Pipe, found)
-		walk(x.List, found)
-		walk(x.ElseList, found)
-
 	case *parse.RangeNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Pipe, found)
+			walk(x.List, found)
+			walk(x.ElseList, found)
 		}
-		walk(x.Pipe, found)
-		walk(x.List, found)
-		walk(x.ElseList, found)
-
 	case *parse.WithNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Pipe, found)
+			walk(x.List, found)
+			walk(x.ElseList, found)
 		}
-		walk(x.Pipe, found)
-		walk(x.List, found)
-		walk(x.ElseList, found)
-
 	case *parse.TemplateNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Pipe, found)
 		}
-		walk(x.Pipe, found)
-
 	case *parse.PipeNode:
-		if x == nil {
-			return
+		if x != nil {
+			for _, cmd := range x.Cmds {
+				walk(cmd, found)
+			}
 		}
-		for _, cmd := range x.Cmds {
-			walk(cmd, found)
-		}
-
 	case *parse.CommandNode:
-		if x == nil {
-			return
+		if x != nil {
+			for _, arg := range x.Args {
+				walk(arg, found)
+			}
 		}
-		for _, arg := range x.Args {
-			walk(arg, found)
-		}
-
 	case *parse.ChainNode:
-		if x == nil {
-			return
+		if x != nil {
+			walk(x.Node, found)
 		}
-		walk(x.Node, found)
-
 	case *parse.IdentifierNode:
-		if x == nil {
-			return
+		if x != nil {
+			found[x.Ident] = true
 		}
-		found[x.Ident] = true
 	}
 }
 
@@ -320,65 +345,48 @@ func walkTemplateRefs(n parse.Node, found map[string]bool) {
 		for _, node := range x.Nodes {
 			walkTemplateRefs(node, found)
 		}
-
 	case *parse.ActionNode:
 		if x != nil {
 			walkTemplateRefs(x.Pipe, found)
 		}
-
 	case *parse.IfNode:
 		if x != nil {
 			walkTemplateRefs(x.Pipe, found)
 			walkTemplateRefs(x.List, found)
 			walkTemplateRefs(x.ElseList, found)
 		}
-
 	case *parse.RangeNode:
 		if x != nil {
 			walkTemplateRefs(x.Pipe, found)
 			walkTemplateRefs(x.List, found)
 			walkTemplateRefs(x.ElseList, found)
 		}
-
 	case *parse.WithNode:
 		if x != nil {
 			walkTemplateRefs(x.Pipe, found)
 			walkTemplateRefs(x.List, found)
 			walkTemplateRefs(x.ElseList, found)
 		}
-
 	case *parse.TemplateNode:
 		if x != nil {
 			found[x.Name] = true
 			walkTemplateRefs(x.Pipe, found)
 		}
-
 	case *parse.PipeNode:
 		if x != nil {
 			for _, cmd := range x.Cmds {
 				walkTemplateRefs(cmd, found)
 			}
 		}
-
 	case *parse.CommandNode:
 		if x != nil {
 			for _, arg := range x.Args {
 				walkTemplateRefs(arg, found)
 			}
 		}
-
 	case *parse.ChainNode:
 		if x != nil {
 			walkTemplateRefs(x.Node, found)
 		}
 	}
-}
-
-func pathBase(name string) string {
-	for i := len(name) - 1; i >= 0; i-- {
-		if name[i] == '/' || name[i] == '\\' {
-			return name[i+1:]
-		}
-	}
-	return name
 }

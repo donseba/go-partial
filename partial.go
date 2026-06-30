@@ -13,34 +13,22 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"reflect"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/internal/templateutil"
 )
 
 var (
 	// coreFunctionNames are the helpers go-partial injects per render and needs
 	// for its own layout, request, connector, and runtime behavior. Optional
 	// helper providers must not overwrite these names.
-	coreFunctionNames = functionNames(placeholderRequestFuncMap())
+	coreFunctionNames = templateutil.Names(placeholderRequestFuncMap())
 )
 
 type (
-	cachedTemplate struct {
-		base          *template.Template
-		requiredFuncs map[string]struct{}
-		pool          sync.Pool
-	}
-
-	templateStore struct {
-		templates sync.Map
-		mutexes   sync.Map
-	}
-
 	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
 		id                 string
@@ -62,7 +50,7 @@ type (
 		response           connector.Response
 		renderers          []Renderer
 		renderersInherited bool
-		templateCache      *templateStore
+		templateCache      *templateutil.Store
 		mu                 sync.RWMutex
 		children           map[string]*Partial
 		oobChildren        map[string]struct{}
@@ -113,7 +101,7 @@ const (
 
 // New creates a new root.
 func New(templates ...string) *Partial {
-	functions := copyFuncMap()
+	functions := make(template.FuncMap)
 	return &Partial{
 		id:            "root",
 		templates:     templates,
@@ -122,7 +110,7 @@ func New(templates ...string) *Partial {
 		oobChildren:   make(map[string]struct{}),
 		extensions:    make(map[any]any),
 		fs:            os.DirFS("./"),
-		templateCache: newTemplateStore(),
+		templateCache: templateutil.NewStore(),
 	}
 }
 
@@ -747,7 +735,7 @@ func (p *Partial) getFunctionSignature() string {
 
 	signature := templateFuncSignature(p.staticFuncs)
 	if p.parent != nil {
-		signature = mergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
+		signature = templateutil.MergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
 	}
 	return signature
 }
@@ -892,40 +880,11 @@ func placeholderRequestFuncMap() template.FuncMap {
 	}
 }
 
-func functionNames(funcs template.FuncMap) map[string]struct{} {
-	names := make(map[string]struct{}, len(funcs))
-	for name := range funcs {
-		names[name] = struct{}{}
-	}
-	return names
-}
-
-func mergeFuncMaps(staticFuncs, requestFuncs template.FuncMap) template.FuncMap {
-	funcs := make(template.FuncMap, len(staticFuncs)+len(requestFuncs))
-	maps.Copy(funcs, staticFuncs)
-	maps.Copy(funcs, requestFuncs)
-	return funcs
-}
-
 func isProtectedFunctionName(name string) bool {
 	if _, ok := coreFunctionNames[name]; ok {
 		return true
 	}
 	return strings.HasPrefix(name, "_")
-}
-
-func filterFuncMap(funcs template.FuncMap, required map[string]struct{}) template.FuncMap {
-	if required == nil {
-		return funcs
-	}
-
-	filtered := make(template.FuncMap, min(len(funcs), len(required)))
-	for name := range required {
-		if fn, ok := funcs[name]; ok {
-			filtered[name] = fn
-		}
-	}
-	return filtered
 }
 
 func (p *Partial) getBasePath() string {
@@ -1252,34 +1211,29 @@ func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Requ
 
 func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool, renderTemplates []string) (*template.Template, func(), error) {
 	store := p.getTemplateStore()
-	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
-		if entry, ok := tmpl.(*cachedTemplate); ok {
-			return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
-		}
+	if entry, cached := store.Load(cacheKey); cached && p.useCache {
+		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
-	muInterface, _ := store.mutexes.LoadOrStore(cacheKey, &sync.Mutex{})
-	mu := muInterface.(*sync.Mutex)
+	mu := store.Mutex(cacheKey)
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Double-check after acquiring lock
-	if tmpl, cached := store.templates.Load(cacheKey); cached && p.useCache {
-		if entry, ok := tmpl.(*cachedTemplate); ok {
-			return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
-		}
+	if entry, cached := store.Load(cacheKey); cached && p.useCache {
+		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
 	functions := funcs
 	if !funcsAreFull {
-		functions = mergeFuncMaps(p.getStaticFuncMap(), funcs)
+		functions = templateutil.MergeFuncMaps(p.getStaticFuncMap(), funcs)
 	}
 	parseFuncs := functions
 	if p.useCache {
-		parseFuncs = mergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
+		parseFuncs = templateutil.MergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
 	}
 	t := template.New(path.Base(p.templates[0])).Funcs(parseFuncs)
-	contracts, err := typedRootContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := templateutil.RootContractsFromFS(p.getFS(), renderTemplates)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error scanning template contracts: %w", err)
 	}
@@ -1297,17 +1251,17 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing templates: %w", err)
 	}
-	if err := addTemplatePathAliases(tmpl, renderTemplates); err != nil {
+	if err := templateutil.AddPathAliases(tmpl, renderTemplates); err != nil {
 		return nil, nil, fmt.Errorf("error adding template path aliases: %w", err)
 	}
 
 	if p.useCache {
-		requiredFuncs, err := requiredFuncsFromFS(p.getFS(), renderTemplates)
+		requiredFuncs, err := templateutil.RequiredFuncsFromFS(p.getFS(), renderTemplates)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error scanning template requirements: %w", err)
 		}
-		entry := &cachedTemplate{base: tmpl, requiredFuncs: requiredFuncs}
-		store.templates.Store(cacheKey, entry)
+		entry := templateutil.NewCachedTemplate(tmpl, requiredFuncs)
+		store.Store(cacheKey, entry)
 		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
@@ -1318,7 +1272,7 @@ func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderT
 	if tmpl == nil {
 		return nil
 	}
-	contracts, err := typedRootContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := templateutil.RootContractsFromFS(p.getFS(), renderTemplates)
 	if err != nil {
 		return fmt.Errorf("error scanning template contracts: %w", err)
 	}
@@ -1329,151 +1283,6 @@ func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderT
 		return err
 	}
 	return registerRootContracts(tmpl, contracts, p.getContracts())
-}
-
-func validateRootContracts(contracts map[string]typedRootContract) error {
-	for name := range contracts {
-		if _, protected := coreFunctionNames[name]; protected {
-			return fmt.Errorf("register contracts: %s conflicts with a go-partial template helper", name)
-		}
-	}
-	return nil
-}
-
-func placeholderRootFuncMap(contracts map[string]typedRootContract) template.FuncMap {
-	funcs := make(template.FuncMap, len(contracts))
-	for name := range contracts {
-		funcs[name] = func() any {
-			return nil
-		}
-	}
-	return funcs
-}
-
-func registerRootContracts(tmpl *template.Template, contracts map[string]typedRootContract, bindings []contractInformation) error {
-	funcs := make(template.FuncMap, len(contracts))
-	for name, contract := range contracts {
-		value, err := resolveContractValue(name, contract, bindings)
-		if err != nil {
-			return err
-		}
-		captured := value
-		funcs[name] = func() any {
-			return captured
-		}
-	}
-	tmpl.Funcs(funcs)
-	return nil
-}
-
-func resolveContractValue(name string, contract typedRootContract, bindings []contractInformation) (any, error) {
-	for _, binding := range bindings {
-		if binding.Kind != "" && binding.Kind != contractRoot {
-			continue
-		}
-		if binding.Annotation != "" && binding.Annotation != contract.Annotation {
-			continue
-		}
-		if binding.Name != name {
-			continue
-		}
-		if !contractValueMatchesType(contract.Type, binding.Value) {
-			return nil, fmt.Errorf("register contracts: @%s %s expects %s, got %s", contract.Annotation, name, contract.Type, contractValueTypeName(binding.Value))
-		}
-		return binding.Value, nil
-	}
-
-	var matches []any
-	for _, binding := range bindings {
-		if binding.Kind != "" && binding.Kind != contractRoot {
-			continue
-		}
-		if binding.Name != "" {
-			continue
-		}
-		if binding.Annotation != "" && binding.Annotation != contract.Annotation {
-			continue
-		}
-		if contractValueMatchesType(contract.Type, binding.Value) {
-			matches = append(matches, binding.Value)
-		}
-	}
-
-	switch len(matches) {
-	case 1:
-		return matches[0], nil
-	case 0:
-		return nil, fmt.Errorf("register contracts: @%s %s has no matching value for %s", contract.Annotation, name, contract.Type)
-	default:
-		return nil, fmt.Errorf("register contracts: @%s %s has multiple matching values for %s; bind it by name", contract.Annotation, name, contract.Type)
-	}
-}
-
-func contractValueMatchesType(contractType string, value any) bool {
-	valueType := contractValueTypeName(value)
-	if valueType == "" {
-		return false
-	}
-	contractType = normalizeContractType(contractType)
-	if valueType == contractType {
-		return true
-	}
-	return strings.HasPrefix(valueType, "main.") && shortContractTypeName(valueType) == shortContractTypeName(contractType)
-}
-
-func contractValueTypeName(value any) string {
-	if value == nil {
-		return ""
-	}
-	typ := reflect.TypeOf(value)
-	for typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-	}
-	if typ.Name() == "" || typ.PkgPath() == "" {
-		return fmt.Sprintf("%T", value)
-	}
-	return typ.PkgPath() + "." + typ.Name()
-}
-
-func shortContractTypeName(typeName string) string {
-	lastDot := strings.LastIndex(typeName, ".")
-	if lastDot < 0 || lastDot == len(typeName)-1 {
-		return typeName
-	}
-	return typeName[lastDot+1:]
-}
-
-func addTemplatePathAliases(tmpl *template.Template, names []string) error {
-	if tmpl == nil {
-		return nil
-	}
-	for _, name := range names {
-		base := pathBase(name)
-		if name == "" || name == base || tmpl.Lookup(base) == nil {
-			continue
-		}
-		for _, alias := range templatePathAliases(name) {
-			if tmpl.Lookup(alias) != nil {
-				continue
-			}
-			if _, err := tmpl.New(alias).Parse(fmt.Sprintf(`{{ template %q . }}`, base)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func templatePathAliases(name string) []string {
-	trimmed := strings.TrimLeft(name, `/\`)
-	if trimmed == "" {
-		return nil
-	}
-	aliases := []string{trimmed}
-	if strings.HasPrefix(name, "/") || strings.HasPrefix(name, `\`) {
-		return aliases
-	}
-	return append(aliases, "/"+trimmed)
 }
 
 func (p *Partial) renderTemplates() []string {
@@ -1495,7 +1304,7 @@ func (p *Partial) collectRenderTemplates(seen map[string]struct{}, refs map[stri
 		seen[name] = struct{}{}
 		templates = append(templates, name)
 	}
-	maps.Copy(refs, referencedTemplatesFromFS(p.getFS(), p.templates))
+	maps.Copy(refs, templateutil.ReferencedTemplatesFromFS(p.getFS(), p.templates))
 
 	p.mu.RLock()
 	children := make([]*Partial, 0, len(p.children))
@@ -1523,7 +1332,7 @@ func (p *Partial) matchesTemplateReference(refs map[string]struct{}) bool {
 		return false
 	}
 
-	defined := definedTemplatesFromFS(p.getFS(), p.templates)
+	defined := templateutil.DefinedTemplatesFromFS(p.getFS(), p.templates)
 	for name := range defined {
 		if _, ok := refs[name]; ok {
 			return true
@@ -1532,104 +1341,27 @@ func (p *Partial) matchesTemplateReference(refs map[string]struct{}) bool {
 	return false
 }
 
-func (p *Partial) templateFromCacheEntry(entry *cachedTemplate, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
+func (p *Partial) templateFromCacheEntry(entry *templateutil.CachedTemplate, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
 	functions := funcs
 	if applyFullFuncs && !funcsAreFull {
-		functions = mergeFuncMaps(p.getCustomFuncMap(), funcs)
+		functions = templateutil.MergeFuncMaps(p.getCustomFuncMap(), funcs)
 	}
-	return entry.template(functions)
-}
-
-func newTemplateStore() *templateStore {
-	return &templateStore{}
-}
-
-func functionNameSignature(funcs template.FuncMap) string {
-	names := make([]string, 0, len(funcs))
-	for name := range funcs {
-		names = append(names, name)
-	}
-	return functionNameSignatureFromNames(names)
+	return entry.Template(functions)
 }
 
 func templateFuncSignature(funcs template.FuncMap) string {
-	return mergeFunctionSignatures(functionNameSignature(funcs), functionNameSignatureFromSet(coreFunctionNames))
+	return templateutil.MergeFunctionSignatures(templateutil.FunctionNameSignature(funcs), templateutil.FunctionNameSignatureFromSet(coreFunctionNames))
 }
 
-func functionNameSignatureFromNames(names []string) string {
-	if len(names) == 0 {
-		return ""
-	}
-
-	names = slices.Clone(names)
-	sort.Strings(names)
-	names = slices.Compact(names)
-
-	var builder strings.Builder
-	for _, name := range names {
-		if name == "" {
-			continue
-		}
-		builder.WriteString(name)
-		builder.WriteString(";")
-	}
-	return builder.String()
-}
-
-func functionNameSignatureFromSet(names map[string]struct{}) string {
-	out := make([]string, 0, len(names))
-	for name := range names {
-		out = append(out, name)
-	}
-	return functionNameSignatureFromNames(out)
-}
-
-func mergeFunctionSignatures(signatures ...string) string {
-	var names []string
-	for _, signature := range signatures {
-		for _, name := range strings.Split(signature, ";") {
-			if name == "" {
-				continue
-			}
-			names = append(names, name)
-		}
-	}
-	return functionNameSignatureFromNames(names)
-}
-
-func (p *Partial) getTemplateStore() *templateStore {
+func (p *Partial) getTemplateStore() *templateutil.Store {
 	if p.templateCache != nil {
 		return p.templateCache
 	}
 	if p.parent != nil {
 		return p.parent.getTemplateStore()
 	}
-	p.templateCache = newTemplateStore()
+	p.templateCache = templateutil.NewStore()
 	return p.templateCache
-}
-
-func (c *cachedTemplate) template(functions template.FuncMap) (*template.Template, func(), error) {
-	functions = filterFuncMap(functions, c.requiredFuncs)
-
-	if pooled := c.pool.Get(); pooled != nil {
-		t, ok := pooled.(*template.Template)
-		if !ok {
-			return nil, nil, fmt.Errorf("cached template pool contained %T", pooled)
-		}
-		if len(functions) > 0 {
-			t.Funcs(functions)
-		}
-		return t, func() { c.pool.Put(t) }, nil
-	}
-
-	t, err := c.base.Clone()
-	if err != nil {
-		return nil, nil, fmt.Errorf("error cloning cached template: %w", err)
-	}
-	if len(functions) > 0 {
-		t.Funcs(functions)
-	}
-	return t, func() { c.pool.Put(t) }, nil
 }
 
 func (p *Partial) clone() *Partial {

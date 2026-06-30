@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/internal/templateutil"
 )
 
 type (
@@ -35,7 +36,7 @@ type (
 		customFuncs        template.FuncMap
 		hasCustomFunctions bool
 		connector          connector.Connector
-		templateCache      *templateStore
+		templateCache      *templateutil.Store
 		renderers          []Renderer
 		funcsLock          sync.RWMutex
 	}
@@ -70,7 +71,7 @@ func NewService(cfg *Config) *Service {
 		cfg.Connector = connector.NewPartial(nil)
 	}
 
-	functions := copyFuncMap()
+	functions := make(template.FuncMap)
 	return &Service{
 		config:        cfg,
 		funcsLock:     sync.RWMutex{},
@@ -78,7 +79,7 @@ func NewService(cfg *Config) *Service {
 		customFuncs:   make(template.FuncMap),
 		connector:     cfg.Connector,
 		renderers:     append([]Renderer(nil), cfg.Renderers...),
-		templateCache: newTemplateStore(),
+		templateCache: templateutil.NewStore(),
 	}
 }
 
