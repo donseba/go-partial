@@ -134,7 +134,7 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 
 ## `partial`
 
-`partial` renders a template path through go-partial's render path. This is useful when you want to render another template with request helpers, model registration, error fallback, and the configured filesystem/cache behavior, but you do not want to make that template part of the native parse tree.
+`partial` renders a template path through go-partial's render path. This is useful when you want to render another template with request helpers, model registration, extension error handling, and the configured filesystem/cache behavior, but you do not want to make that template part of the native parse tree.
 
 ```gotemplate
 {{ partial runtime "templates/notice.gohtml" .Notice }}

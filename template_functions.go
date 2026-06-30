@@ -23,17 +23,17 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
 			}
 
-			html, err := child.renderSelf(state.Context, p.getRequest())
-			if err != nil {
-				child.getLogger().Error("error rendering template partial", "path", templatePath, "error", err)
-				fallback, fallbackErr := child.renderErrorFragment(state.Context, p.getRequest(), err)
+			result := child.renderSelfResult(state.Context, p.getRequest())
+			if result.Err != nil {
+				child.getLogger().Error("error rendering template partial", "path", templatePath, "error", result.Err)
+				fallback, fallbackErr := child.renderErrorFragment(state.Context, p.getRequest(), result.Err)
 				if fallbackErr != nil {
 					return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, fallbackErr))
 				}
 				return fallback
 			}
 
-			return html
+			return result.HTML
 		}
 
 		p.getLogger().Warn("partial template path not found", "path", id)

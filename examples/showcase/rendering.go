@@ -21,7 +21,7 @@ import (
 func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
 	content := partial.NewID(id, tmpl)
 	if id == "content" {
-		metrics.WithPartialTag(content, "main")
+		metrics.WithPartialLabel(content, "main")
 	}
 	if data != nil {
 		content.SetDot(data)
@@ -35,13 +35,14 @@ func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *p
 }
 
 func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
-	content.SetConnector(connector.NewHTMX(nil))
-	content.SetFileSystem(os.DirFS("examples/showcase"))
-	content.Use(app.showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := content.WriteWithRequest(app.requestContext(r), w, r); err != nil {
+	out, err := app.standaloneService(connector.NewHTMX(nil)).NewLayout().Set(content).RenderWithRequest(app.requestContext(r), r)
+	if err != nil {
 		log.Printf("render error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	_, _ = w.Write([]byte(out))
 }
 
 func (app *App) writeLayout(w http.ResponseWriter, r *http.Request, layout *partial.Layout) {
@@ -52,10 +53,8 @@ func (app *App) writeLayout(w http.ResponseWriter, r *http.Request, layout *part
 }
 
 func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
-	content.SetFileSystem(os.DirFS("examples/showcase"))
-	content.Use(app.showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	out, err := content.RenderWithRequest(app.requestContext(r), r)
+	out, err := app.standaloneService(nil).NewLayout().Set(content).RenderWithRequest(app.requestContext(r), r)
 	if err != nil {
 		log.Printf("render error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -64,8 +63,20 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 	_, _ = w.Write([]byte(out))
 }
 
+func (app *App) standaloneService(conn connector.Connector) *partial.Service {
+	if conn == nil {
+		conn = connector.NewPartial(nil)
+	}
+	return partial.NewService(&partial.Config{
+		Connector:        conn,
+		FS:               os.DirFS("examples/showcase"),
+		Renderers:        app.showcaseRenderers(),
+		UseTemplateCache: false,
+	})
+}
+
 func (app *App) wrapper() *partial.Partial {
-	wrapper := metrics.WithPartialTag(partial.NewID("layout", "templates/layout.gohtml"), "shell")
+	wrapper := metrics.WithPartialLabel(partial.NewID("layout", "templates/layout.gohtml"), "shell")
 	header := HeaderPage{
 		AppName: "go-partial showcase",
 		Now:     time.Now().Format("02 Jan 06 15:04 MST"),
@@ -76,7 +87,7 @@ func (app *App) wrapper() *partial.Partial {
 		AppName: "go-partial showcase",
 		Header:  header,
 	})
-	headerPartial := metrics.WithPartialTag(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true), "sidebar")
+	headerPartial := metrics.WithPartialLabel(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true), "sidebar")
 	slots.Set(wrapper, "header", headerPartial)
 	wrapper.WithOOB(headerPartial)
 	return wrapper

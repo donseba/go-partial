@@ -50,7 +50,7 @@
                     {{ if .Latest }}
                         {{ range .Latest }}
                             <tr>
-                                <td class="border-b border-stone-300 bg-stone-100 px-3 py-2 font-mono text-[13px] font-bold text-stone-950" colspan="8">{{ .Timestamp }} trace {{ .RequestID }} {{ .Method }} {{ .Path }}</td>
+                                <td class="border-b border-stone-300 bg-stone-100 px-3 py-2 font-mono text-[13px] font-bold text-stone-950" colspan="8">{{ .Timestamp }} request {{ .RequestID }}{{ if .TraceID }} trace {{ .TraceID }}{{ end }} {{ .Method }} {{ .Path }}</td>
                             </tr>
                             {{ range .Records }}
                             <tr class="align-top">

@@ -21,7 +21,30 @@ func (app *App) requestContext(r *http.Request) context.Context {
 		key:   csrf.DefaultTokenKey,
 		token: randomID(),
 	})
-	return metrics.WithRequestID(ctx, randomID())
+	requestID := requestIDFromRequest(r)
+	traceID := traceIDFromRequest(r, requestID)
+	ctx = metrics.WithRequestID(ctx, requestID)
+	return metrics.WithTraceID(ctx, traceID)
+}
+
+func requestIDFromRequest(r *http.Request) string {
+	if r == nil {
+		return randomID()
+	}
+	if requestID := r.Header.Get(metrics.HeaderRequestID); requestID != "" {
+		return requestID
+	}
+	return randomID()
+}
+
+func traceIDFromRequest(r *http.Request, fallback string) string {
+	if r == nil {
+		return fallback
+	}
+	if traceID := r.Header.Get(metrics.HeaderTraceID); traceID != "" {
+		return traceID
+	}
+	return fallback
 }
 
 func (app *App) flowSession(w http.ResponseWriter, r *http.Request) *pageflow.SessionData {

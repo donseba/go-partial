@@ -23,6 +23,7 @@ func newRuntime(p *Partial, state *RenderContext) *Runtime {
 	return &Runtime{partial: p, state: state}
 }
 
+// Context returns the context for the active render.
 func (r *Runtime) Context() context.Context {
 	if r == nil || r.state == nil {
 		return context.Background()
@@ -30,6 +31,7 @@ func (r *Runtime) Context() context.Context {
 	return r.state.Context
 }
 
+// Request returns the request for the active render, if any.
 func (r *Runtime) Request() *http.Request {
 	if r == nil || r.state == nil {
 		return nil
@@ -37,6 +39,7 @@ func (r *Runtime) Request() *http.Request {
 	return r.state.Request
 }
 
+// URL returns the request URL for the active render, if any.
 func (r *Runtime) URL() *url.URL {
 	if r == nil || r.state == nil {
 		return nil
@@ -44,6 +47,7 @@ func (r *Runtime) URL() *url.URL {
 	return r.state.URL
 }
 
+// BasePath returns the active render base path.
 func (r *Runtime) BasePath() string {
 	if r == nil || r.state == nil {
 		return ""
@@ -51,6 +55,7 @@ func (r *Runtime) BasePath() string {
 	return r.state.BasePath
 }
 
+// RenderContext returns the active render context.
 func (r *Runtime) RenderContext() *RenderContext {
 	if r == nil {
 		return nil
@@ -58,6 +63,7 @@ func (r *Runtime) RenderContext() *RenderContext {
 	return r.state
 }
 
+// Value returns a value from the active render context.
 func (r *Runtime) Value(key any) any {
 	if r == nil || r.state == nil {
 		return nil
@@ -65,6 +71,7 @@ func (r *Runtime) Value(key any) any {
 	return r.state.Values.Get(key)
 }
 
+// SetValue stores a value in the active render context.
 func (r *Runtime) SetValue(key any, value any) {
 	if r == nil || r.state == nil {
 		return
@@ -75,6 +82,7 @@ func (r *Runtime) SetValue(key any, value any) {
 	r.state.Values.Set(key, value)
 }
 
+// Connector returns the connector for the active partial.
 func (r *Runtime) Connector() connector.Connector {
 	if r == nil || r.partial == nil {
 		return nil
@@ -90,12 +98,14 @@ func (r *Runtime) Partial(path string, args ...any) template.HTML {
 	return partialFunc(r.partial, r.state)(path, args...)
 }
 
+// RenderPartial renders a child partial through the current renderer chain.
 func (r *Runtime) RenderPartial(p *Partial) (template.HTML, error) {
 	child, err := r.preparePartial(p)
 	if err != nil {
 		return "", err
 	}
-	return child.renderSelf(r.state.Context, r.state.Request)
+	result := child.renderSelfResult(r.state.Context, r.state.Request)
+	return result.HTML, result.Err
 }
 
 // RenderPartialWithFallback renders a partial through the current renderer
@@ -106,12 +116,12 @@ func (r *Runtime) RenderPartialWithFallback(p *Partial) (template.HTML, error) {
 		return "", err
 	}
 
-	out, err := child.renderSelf(r.state.Context, r.state.Request)
-	if err == nil {
-		return out, nil
+	result := child.renderSelfResult(r.state.Context, r.state.Request)
+	if result.Err == nil {
+		return result.HTML, nil
 	}
 
-	fallback, fallbackErr := child.renderErrorFragment(r.state.Context, r.state.Request, err)
+	fallback, fallbackErr := child.renderErrorFragment(r.state.Context, r.state.Request, result.Err)
 	if fallbackErr != nil {
 		return "", fallbackErr
 	}

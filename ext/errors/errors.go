@@ -73,7 +73,7 @@ pre{white-space:pre-wrap;overflow:auto;background:#f2f0e8;border:1px solid #d8d5
 <main>
 <section>
 <h1>Template render error</h1>
-<p>The fallback error page was rendered by go-partial because a template failed.</p>
+<p>The error response was rendered by go-partial because a template failed.</p>
 <dl>
 <dt>Partial ID</dt><dd>{{ .PartialID }}</dd>
 <dt>{{ .TemplateLabel }}</dt><dd>{{ range $i, $template := .Templates }}{{ if $i }}, {{ end }}{{ $template }}{{ end }}</dd>
@@ -90,7 +90,7 @@ pre{white-space:pre-wrap;overflow:auto;background:#f2f0e8;border:1px solid #d8d5
 
 const fragmentTemplate = `<section class="go-partial-error" role="alert" style="background:#fff;border:1px solid #d8d5ca;border-left:4px solid #8a4b12;border-radius:8px;padding:16px;color:#252522;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
 <h1 style="font-size:20px;margin:0 0 8px">Template render error</h1>
-<p style="margin:0 0 12px;color:#55524a">go-partial rendered this fallback because a template failed during a partial request.</p>
+<p style="margin:0 0 12px;color:#55524a">go-partial rendered this error response because a template failed during a partial request.</p>
 <dl style="display:grid;grid-template-columns:110px 1fr;gap:8px 12px;margin:0 0 12px">
 <dt style="font-weight:700">Partial ID</dt><dd style="margin:0;overflow-wrap:anywhere">{{ .PartialID }}</dd>
 <dt style="font-weight:700">{{ .TemplateLabel }}</dt><dd style="margin:0;overflow-wrap:anywhere">{{ range $i, $template := .Templates }}{{ if $i }}, {{ end }}{{ $template }}{{ end }}</dd>
@@ -122,6 +122,18 @@ func Renderer(options ...Option) partial.Renderer {
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Kind != RenderKindError {
 				return ctx, nil
+			}
+
+			if ctx.Response == nil {
+				ctx.Response = &partial.RenderResponse{Headers: make(map[string]string)}
+			}
+			if ctx.Response.Headers == nil {
+				ctx.Response.Headers = make(map[string]string)
+			}
+			ctx.Response.Headers["Content-Type"] = "text/html; charset=utf-8"
+			ctx.Response.Status = http.StatusInternalServerError
+			if ctx.Name == "fragment" {
+				ctx.Response.Status = http.StatusOK
 			}
 
 			data := BuildData(ctx, cfg.mode)

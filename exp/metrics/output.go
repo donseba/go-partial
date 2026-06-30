@@ -16,24 +16,26 @@ type (
 	}
 
 	jsonRecord struct {
-		Kind       string            `json:"kind,omitempty"`
-		Name       string            `json:"name,omitempty"`
-		RequestID  string            `json:"requestID,omitempty"`
-		PartialID  string            `json:"partialID,omitempty"`
-		ParentID   string            `json:"parentID,omitempty"`
-		PartialTag string            `json:"partialTag,omitempty"`
-		SlotName   string            `json:"slotName,omitempty"`
-		Templates  []string          `json:"templates,omitempty"`
-		OOB        bool              `json:"oob,omitempty"`
-		Method     string            `json:"method,omitempty"`
-		Path       string            `json:"path,omitempty"`
-		Size       int               `json:"size"`
-		Rendered   bool              `json:"rendered"`
-		StartedAt  time.Time         `json:"startedAt,omitempty"`
-		Duration   string            `json:"duration,omitempty"`
-		DurationNS int64             `json:"durationNS,omitempty"`
-		Error      string            `json:"error,omitempty"`
-		Tags       map[string]string `json:"tags,omitempty"`
+		Kind            string            `json:"kind,omitempty"`
+		Name            string            `json:"name,omitempty"`
+		RequestID       string            `json:"requestID,omitempty"`
+		TraceID         string            `json:"traceID,omitempty"`
+		ParentRequestID string            `json:"parentRequestID,omitempty"`
+		PartialID       string            `json:"partialID,omitempty"`
+		ParentID        string            `json:"parentID,omitempty"`
+		PartialLabel    string            `json:"partialLabel,omitempty"`
+		SlotName        string            `json:"slotName,omitempty"`
+		Templates       []string          `json:"templates,omitempty"`
+		OOB             bool              `json:"oob,omitempty"`
+		Method          string            `json:"method,omitempty"`
+		Path            string            `json:"path,omitempty"`
+		Size            int               `json:"size"`
+		Rendered        bool              `json:"rendered"`
+		StartedAt       time.Time         `json:"startedAt,omitempty"`
+		Duration        string            `json:"duration,omitempty"`
+		DurationNS      int64             `json:"durationNS,omitempty"`
+		Error           string            `json:"error,omitempty"`
+		Tags            map[string]string `json:"tags,omitempty"`
 	}
 )
 
@@ -78,23 +80,25 @@ func (sink *WriterSink) Err() error {
 
 func toJSONRecord(record Record) jsonRecord {
 	out := jsonRecord{
-		Kind:       string(record.Kind),
-		Name:       record.Name,
-		RequestID:  record.RequestID,
-		PartialID:  record.PartialID,
-		ParentID:   record.ParentID,
-		PartialTag: record.PartialTag,
-		SlotName:   record.SlotName,
-		Templates:  record.Templates,
-		OOB:        record.OOB,
-		Method:     record.Method,
-		Path:       record.Path,
-		Size:       record.Size,
-		Rendered:   record.Rendered,
-		StartedAt:  record.StartedAt,
-		Duration:   record.Duration.String(),
-		DurationNS: record.Duration.Nanoseconds(),
-		Tags:       record.Tags,
+		Kind:            string(record.Kind),
+		Name:            record.Name,
+		RequestID:       record.RequestID,
+		TraceID:         record.TraceID,
+		ParentRequestID: record.ParentRequestID,
+		PartialID:       record.PartialID,
+		ParentID:        record.ParentID,
+		PartialLabel:    record.PartialLabel,
+		SlotName:        record.SlotName,
+		Templates:       record.Templates,
+		OOB:             record.OOB,
+		Method:          record.Method,
+		Path:            record.Path,
+		Size:            record.Size,
+		Rendered:        record.Rendered,
+		StartedAt:       record.StartedAt,
+		Duration:        record.Duration.String(),
+		DurationNS:      record.Duration.Nanoseconds(),
+		Tags:            record.Tags,
 	}
 	if record.Error != nil {
 		out.Error = record.Error.Error()

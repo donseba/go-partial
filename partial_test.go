@@ -231,8 +231,6 @@ func TestSetContractSupportsNamedContracts(t *testing.T) {
 }
 
 func TestRequestBasic(t *testing.T) {
-	svc := NewService(&Config{})
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
@@ -240,6 +238,7 @@ func TestRequestBasic(t *testing.T) {
 				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
 
 		// content
 		content := New("templates/content.html").ID("content")
@@ -248,7 +247,7 @@ func TestRequestBasic(t *testing.T) {
 		})
 		p := New("templates/index.html").ID("root")
 
-		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -284,8 +283,6 @@ func TestRequestBasic(t *testing.T) {
 }
 
 func TestRequestWrap(t *testing.T) {
-	svc := NewService(&Config{})
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
@@ -293,6 +290,7 @@ func TestRequestWrap(t *testing.T) {
 				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
 
 		index := New("templates/index.html").ID("root")
 
@@ -302,7 +300,7 @@ func TestRequestWrap(t *testing.T) {
 			"Text": "Welcome to the home page",
 		})
 
-		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(index).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(content).Wrap(index).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -679,8 +677,6 @@ func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 }
 
 func TestRequestOOB(t *testing.T) {
-	svc := NewService(&Config{})
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
@@ -689,6 +685,7 @@ func TestRequestOOB(t *testing.T) {
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
 
 		p := New("templates/index.html").ID("root")
 		p.SetDot(map[string]any{"Text": "This is the footer"})
@@ -705,7 +702,7 @@ func TestRequestOOB(t *testing.T) {
 		})
 		p.WithOOB(oob)
 
-		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -741,8 +738,6 @@ func TestRequestOOB(t *testing.T) {
 }
 
 func TestRequestOOBSwap(t *testing.T) {
-	svc := NewService(&Config{})
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
@@ -751,6 +746,7 @@ func TestRequestOOBSwap(t *testing.T) {
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
 
 		// the main template that will be rendered
 		p := New("templates/index.html").ID("root")
@@ -769,7 +765,7 @@ func TestRequestOOBSwap(t *testing.T) {
 			"Text": "Welcome to the home page",
 		})
 
-		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -805,9 +801,6 @@ func TestRequestOOBSwap(t *testing.T) {
 }
 
 func TestDeepNested(t *testing.T) {
-	svc := NewService(&Config{})
-	svc.SetFunc(templatehelpers.FuncMap())
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
@@ -816,6 +809,8 @@ func TestDeepNested(t *testing.T) {
 				"templates/nested.html":  `<div>{{ upper .Text }}</div>`,
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
+		svc.SetFunc(templatehelpers.FuncMap())
 
 		p := New("templates/index.html").ID("root")
 
@@ -831,7 +826,7 @@ func TestDeepNested(t *testing.T) {
 			"Text": "Welcome to the home page",
 		}).With(nested)
 
-		out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -855,18 +850,17 @@ func TestDeepNested(t *testing.T) {
 }
 
 func TestMissingPartial(t *testing.T) {
-	svc := NewService(&Config{})
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		fsys := &inMemoryFS{
 			Files: map[string]string{
 				"templates/index.html": `<html><body></body></html>`,
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
 
 		p := New("templates/index.html").ID("root")
 
-		out, err := svc.NewLayout().FS(fsys).Set(p).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(p).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -895,13 +889,13 @@ func TestTypedDotsInTemplates(t *testing.T) {
 		Articles  []string
 	}
 
-	svc := NewService(&Config{})
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"templates/index.html":   `<html><head><title>{{ .Title }}</title></head><body>{{ content }}</body></html>`,
 			"templates/content.html": `<div>{{ .PageTitle }}</div><div>{{ .User }}</div><div>{{ .Articles }}</div>`,
 		},
 	}
+	svc := NewService(&Config{FS: fsys})
 
 	content := New("templates/content.html").ID("content").SetDot(contentData{
 		PageTitle: "Home Page",
@@ -911,7 +905,7 @@ func TestTypedDotsInTemplates(t *testing.T) {
 	wrapper := New("templates/index.html").ID("root").SetDot(shell{Title: "My Page"})
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	out, err := svc.NewLayout().FS(fsys).Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
+	out, err := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1315,8 +1309,9 @@ func BenchmarkWithSelectMap(b *testing.B) {
 	service := NewService(&Config{
 		Connector:        connector.NewPartial(nil),
 		UseTemplateCache: false,
+		FS:               fsys,
 	})
-	layout := service.NewLayout().FS(fsys)
+	layout := service.NewLayout()
 
 	content := New("content.gohtml").
 		ID("content")
@@ -1345,14 +1340,6 @@ func BenchmarkWithSelectMap(b *testing.B) {
 }
 
 func BenchmarkRenderWithRequest(b *testing.B) {
-	// Setup configuration and service
-	cfg := &Config{
-		Connector:        connector.NewPartial(nil),
-		UseTemplateCache: false,
-	}
-
-	service := NewService(cfg)
-
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"templates/index.html":   `<html><head><title>{{ .Title }}</title></head><body>{{ content }}</body></html>`,
@@ -1360,8 +1347,17 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 		},
 	}
 
+	// Setup configuration and service
+	cfg := &Config{
+		Connector:        connector.NewPartial(nil),
+		UseTemplateCache: false,
+		FS:               fsys,
+	}
+
+	service := NewService(cfg)
+
 	// Create a new layout
-	layout := service.NewLayout().FS(fsys)
+	layout := service.NewLayout()
 
 	// Create content partial
 	content := NewID("content", "templates/content.html")
@@ -1392,9 +1388,6 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 }
 
 func TestRenderTable(t *testing.T) {
-	svc := NewService(&Config{})
-	svc.SetFunc(templatehelpers.FuncMap())
-
 	var handleRequest = func(w http.ResponseWriter, r *http.Request) {
 		// Define in-memory templates for the table and the row
 		fsys := &inMemoryFS{
@@ -1403,6 +1396,8 @@ func TestRenderTable(t *testing.T) {
 				"templates/row.html":   `<tr><td>Row {{ .RowNumber }}</td></tr>`,
 			},
 		}
+		svc := NewService(&Config{FS: fsys})
+		svc.SetFunc(templatehelpers.FuncMap())
 
 		// Create the table partial and set data
 		tablePartial := New("templates/table.html").ID("table")
@@ -1410,7 +1405,7 @@ func TestRenderTable(t *testing.T) {
 			"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
 		})
 		// Render the table partial
-		out, err := svc.NewLayout().FS(fsys).Set(tablePartial).RenderWithRequest(r.Context(), r)
+		out, err := svc.NewLayout().Set(tablePartial).RenderWithRequest(r.Context(), r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -32,10 +32,13 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 		Use(Renderer(SinkFunc(func(record Record) {
 			records = append(records, record)
 		}), WithClock(now), WithTag("area", "showcase")))
-	WithPartialTag(p, "main panel")
+	WithPartialLabel(p, "main panel")
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
-	out, err := p.RenderWithRequest(WithRequestID(context.Background(), "req-test"), req)
+	ctx := WithRequestID(context.Background(), "req-test")
+	ctx = WithTraceID(ctx, "trace-test")
+	ctx = WithParentRequestID(ctx, "parent-test")
+	out, err := p.RenderWithRequest(ctx, req)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -56,11 +59,17 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 	if record.ParentID != "" {
 		t.Fatalf("ParentID = %q", record.ParentID)
 	}
-	if record.PartialTag != "main panel" {
-		t.Fatalf("PartialTag = %q", record.PartialTag)
+	if record.PartialLabel != "main panel" {
+		t.Fatalf("PartialLabel = %q", record.PartialLabel)
 	}
 	if record.RequestID != "req-test" {
 		t.Fatalf("RequestID = %q", record.RequestID)
+	}
+	if record.TraceID != "trace-test" {
+		t.Fatalf("TraceID = %q", record.TraceID)
+	}
+	if record.ParentRequestID != "parent-test" {
+		t.Fatalf("ParentRequestID = %q", record.ParentRequestID)
 	}
 	if len(record.Templates) != 1 || record.Templates[0] != "page.gohtml" {
 		t.Fatalf("Templates = %#v", record.Templates)
@@ -85,7 +94,7 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 	}
 }
 
-func TestRendererUsesRequestIDHeaderFallback(t *testing.T) {
+func TestRendererUsesCorrelationHeaderFallbacks(t *testing.T) {
 	var record Record
 	p := partial.New("page.gohtml").
 		SetFileSystem(fstest.MapFS{
@@ -97,11 +106,19 @@ func TestRendererUsesRequestIDHeaderFallback(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	req.Header.Set(HeaderRequestID, "req-header")
+	req.Header.Set(HeaderTraceID, "trace-header")
+	req.Header.Set(HeaderParentRequestID, "parent-header")
 	if _, err := p.RenderWithRequest(context.Background(), req); err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 	if record.RequestID != "req-header" {
 		t.Fatalf("RequestID = %q", record.RequestID)
+	}
+	if record.TraceID != "trace-header" {
+		t.Fatalf("TraceID = %q", record.TraceID)
+	}
+	if record.ParentRequestID != "parent-header" {
+		t.Fatalf("ParentRequestID = %q", record.ParentRequestID)
 	}
 }
 
@@ -121,9 +138,9 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 		},
 	})
 
-	content := WithPartialTag(partial.NewID("content", "content.gohtml"), "main")
-	wrapper := WithPartialTag(partial.NewID("layout", "layout.gohtml"), "shell").
-		WithOOB(WithPartialTag(partial.NewID("header", "header.gohtml").SetAlwaysSwapOOB(true), "sidebar"))
+	content := WithPartialLabel(partial.NewID("content", "content.gohtml"), "main")
+	wrapper := WithPartialLabel(partial.NewID("layout", "layout.gohtml"), "shell").
+		WithOOB(WithPartialLabel(partial.NewID("header", "header.gohtml").SetAlwaysSwapOOB(true), "sidebar"))
 	layout := svc.NewLayout().Set(content).Wrap(wrapper)
 
 	req := httptest.NewRequest("GET", "/rows", nil)
@@ -146,8 +163,8 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 			if record.ParentID != "layout" {
 				t.Fatalf("content ParentID = %q", record.ParentID)
 			}
-			if record.PartialTag != "main" {
-				t.Fatalf("content PartialTag = %q", record.PartialTag)
+			if record.PartialLabel != "main" {
+				t.Fatalf("content PartialLabel = %q", record.PartialLabel)
 			}
 			if record.OOB {
 				t.Fatal("content OOB = true, want false")
@@ -157,8 +174,8 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 			if record.ParentID != "layout" {
 				t.Fatalf("header ParentID = %q", record.ParentID)
 			}
-			if record.PartialTag != "sidebar" {
-				t.Fatalf("header PartialTag = %q", record.PartialTag)
+			if record.PartialLabel != "sidebar" {
+				t.Fatalf("header PartialLabel = %q", record.PartialLabel)
 			}
 			if !record.OOB {
 				t.Fatal("header OOB = false, want true")
@@ -213,17 +230,20 @@ func TestWriterSinkWritesJSONLines(t *testing.T) {
 	startedAt := time.Date(2026, 6, 30, 10, 0, 0, 0, time.UTC)
 
 	sink.Record(Record{
-		Kind:      partial.RenderKindPartial,
-		RequestID: "req-json",
-		PartialID: "content",
-		Method:    "GET",
-		Path:      "/metrics",
-		Size:      12,
-		Rendered:  true,
-		StartedAt: startedAt,
-		Duration:  3 * time.Millisecond,
-		Error:     errors.New("boom"),
-		Tags:      map[string]string{"chain": "showcase"},
+		Kind:            partial.RenderKindPartial,
+		RequestID:       "req-json",
+		TraceID:         "trace-json",
+		ParentRequestID: "parent-json",
+		PartialID:       "content",
+		PartialLabel:    "main",
+		Method:          "GET",
+		Path:            "/metrics",
+		Size:            12,
+		Rendered:        true,
+		StartedAt:       startedAt,
+		Duration:        3 * time.Millisecond,
+		Error:           errors.New("boom"),
+		Tags:            map[string]string{"chain": "showcase"},
 	})
 
 	if err := sink.Err(); err != nil {
@@ -240,6 +260,9 @@ func TestWriterSinkWritesJSONLines(t *testing.T) {
 	}
 	if got["kind"] != "partial" || got["requestID"] != "req-json" || got["partialID"] != "content" {
 		t.Fatalf("unexpected identity fields: %#v", got)
+	}
+	if got["traceID"] != "trace-json" || got["parentRequestID"] != "parent-json" || got["partialLabel"] != "main" {
+		t.Fatalf("unexpected correlation fields: %#v", got)
 	}
 	if got["duration"] != "3ms" || got["durationNS"] != float64((3*time.Millisecond).Nanoseconds()) {
 		t.Fatalf("unexpected duration fields: %#v", got)

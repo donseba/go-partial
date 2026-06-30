@@ -13,23 +13,25 @@ import (
 type (
 	// Record describes one completed render lifecycle.
 	Record struct {
-		Kind       partial.RenderKind
-		Name       string
-		RequestID  string
-		PartialID  string
-		ParentID   string
-		PartialTag string
-		SlotName   string
-		Templates  []string
-		OOB        bool
-		Method     string
-		Path       string
-		Size       int
-		Rendered   bool
-		StartedAt  time.Time
-		Duration   time.Duration
-		Error      error
-		Tags       map[string]string
+		Kind            partial.RenderKind
+		Name            string
+		RequestID       string
+		TraceID         string
+		ParentRequestID string
+		PartialID       string
+		ParentID        string
+		PartialLabel    string
+		SlotName        string
+		Templates       []string
+		OOB             bool
+		Method          string
+		Path            string
+		Size            int
+		Rendered        bool
+		StartedAt       time.Time
+		Duration        time.Duration
+		Error           error
+		Tags            map[string]string
 	}
 
 	// Sink receives render metric records.
@@ -53,9 +55,11 @@ type (
 	// Option configures the metrics renderer.
 	Option func(*config)
 
-	partialTagKey struct{}
-	requestIDKey  struct{}
-	stateKey      struct{}
+	partialLabelKey    struct{}
+	requestIDKey       struct{}
+	traceIDKey         struct{}
+	parentRequestIDKey struct{}
+	stateKey           struct{}
 
 	state struct {
 		startedAt time.Time
@@ -66,6 +70,10 @@ type (
 const (
 	// HeaderRequestID is the conventional HTTP header used as a metrics request ID fallback.
 	HeaderRequestID = "X-Request-ID"
+	// HeaderTraceID is the conventional HTTP header used as a metrics trace ID fallback.
+	HeaderTraceID = "X-Trace-ID"
+	// HeaderParentRequestID is the conventional HTTP header used as a parent request ID fallback.
+	HeaderParentRequestID = "X-Parent-Request-ID"
 )
 
 // Record sends a metrics record to the wrapped function.
@@ -109,21 +117,61 @@ func RequestIDFromContext(ctx context.Context) string {
 	return requestID
 }
 
-// WithPartialTag labels a partial in emitted metrics records.
-func WithPartialTag(p *partial.Partial, tag string) *partial.Partial {
-	if p == nil || tag == "" {
-		return p
+// WithTraceID stores a trace ID for metrics records created from this context.
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return p.SetExtension(partialTagKey{}, tag)
+	if traceID == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, traceIDKey{}, traceID)
 }
 
-// PartialTag returns the metrics label configured for a partial.
-func PartialTag(p *partial.Partial) string {
+// TraceIDFromContext returns the metrics trace ID stored in ctx.
+func TraceIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	traceID, _ := ctx.Value(traceIDKey{}).(string)
+	return traceID
+}
+
+// WithParentRequestID stores a parent request ID for metrics records created from this context.
+func WithParentRequestID(ctx context.Context, parentRequestID string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if parentRequestID == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, parentRequestIDKey{}, parentRequestID)
+}
+
+// ParentRequestIDFromContext returns the parent request ID stored in ctx.
+func ParentRequestIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	parentRequestID, _ := ctx.Value(parentRequestIDKey{}).(string)
+	return parentRequestID
+}
+
+// WithPartialLabel labels a partial in emitted metrics records.
+func WithPartialLabel(p *partial.Partial, label string) *partial.Partial {
+	if p == nil || label == "" {
+		return p
+	}
+	return p.SetExtension(partialLabelKey{}, label)
+}
+
+// PartialLabel returns the metrics label configured for a partial.
+func PartialLabel(p *partial.Partial) string {
 	if p == nil {
 		return ""
 	}
-	tag, _ := p.Extension(partialTagKey{})
-	value, _ := tag.(string)
+	label, _ := p.Extension(partialLabelKey{})
+	value, _ := label.(string)
 	return value
 }
 
@@ -218,10 +266,12 @@ func buildRecord(ctx *partial.RenderContext, out template.HTML, renderErr error,
 	record.Kind = ctx.Kind
 	record.Name = ctx.Name
 	record.RequestID = requestID(ctx)
+	record.TraceID = traceID(ctx)
+	record.ParentRequestID = parentRequestID(ctx)
 	if ctx.Partial != nil {
 		record.PartialID = ctx.Partial.PartialID()
 		record.ParentID = ctx.Partial.ParentID()
-		record.PartialTag = PartialTag(ctx.Partial)
+		record.PartialLabel = PartialLabel(ctx.Partial)
 		if cfg.slotName != nil {
 			record.SlotName = cfg.slotName(ctx.Partial)
 		}
@@ -268,6 +318,32 @@ func requestID(ctx *partial.RenderContext) string {
 		return ""
 	}
 	return ctx.Request.Header.Get(HeaderRequestID)
+}
+
+func traceID(ctx *partial.RenderContext) string {
+	if ctx == nil {
+		return ""
+	}
+	if id := TraceIDFromContext(ctx.Context); id != "" {
+		return id
+	}
+	if ctx.Request == nil {
+		return ""
+	}
+	return ctx.Request.Header.Get(HeaderTraceID)
+}
+
+func parentRequestID(ctx *partial.RenderContext) string {
+	if ctx == nil {
+		return ""
+	}
+	if id := ParentRequestIDFromContext(ctx.Context); id != "" {
+		return id
+	}
+	if ctx.Request == nil {
+		return ""
+	}
+	return ctx.Request.Header.Get(HeaderParentRequestID)
 }
 
 func cloneTags(tags map[string]string) map[string]string {

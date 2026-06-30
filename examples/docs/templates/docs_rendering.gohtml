@@ -18,6 +18,12 @@ layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ template \"stats.gohtml\" .Stats }}" }}</code></pre>
     <p class="leading-7 text-slate-400">For typed row and component composition, prefer Go's native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> action with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">@dot</code>. Register partials in Go when those templates also need stable HTMX target IDs.</p>
 
+    <h2 class="text-xl font-bold text-slate-50">Slots</h2>
+    <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/slots</code> when a child region should render through its own partial lifecycle. A slot inherits the parent renderer chain, can participate in out-of-band updates, and appears as a child render in metrics. It is not a replacement for every native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> call; it is for structured child partials.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">slots.Set(wrapper, "header", headerPartial)
+
+{{ "{{ slot \"header\" }}" }}</code></pre>
+
     <h2 class="text-xl font-bold text-slate-50">Request rendering flow</h2>
     <ol>
         <li>The route creates the content partial and any registered regions needed for that request.</li>
@@ -35,6 +41,12 @@ layout := svc.NewLayout().Set(content).Wrap(wrapper)</code></pre>
 })</code></pre>
     <p class="leading-7 text-slate-400"><a href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">Read the full target resolver guide</a>.</p>
 
+    <h2 class="text-xl font-bold text-slate-50">Renderer lifecycle</h2>
+    <p class="leading-7 text-slate-400">Optional behavior uses the same renderer contract everywhere. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Prepare</code> sets up request-scoped context, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Render</code> wraps or replaces the terminal render, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Finalize</code> observes or transforms the result after success or failure.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">prepare A -&gt; prepare B
+render A -&gt; render B -&gt; template renderer
+finalize B -&gt; finalize A</code></pre>
+
     <h2 class="text-xl font-bold text-slate-50">Writer APIs versus render APIs</h2>
-    <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest</code> in HTTP handlers when possible. It owns response headers, protocol response instructions, and embedded error output. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest</code> when you want HTML and error handling under your own control.</p>
+    <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest</code> in HTTP handlers when possible. It owns response headers and protocol response instructions. Error output is provided by the optional <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/errors</code> renderer. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest</code> when you want HTML and error handling under your own control.</p>
 </article>

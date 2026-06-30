@@ -24,14 +24,16 @@ go get github.com/donseba/go-partial
 Template-facing helpers and accessors are documented in [TEMPLATE_FUNCTIONS.md](TEMPLATE_FUNCTIONS.md).
 
 ## Package Layout
-The root package is intentionally small: rendering lifecycle, partial trees, layouts, runtime context, connectors, and core template helpers.
+The root package is intentionally small: rendering lifecycle, partial trees, layouts, runtime context, connectors, and core template helpers. Core does not import optional packages.
 
 Optional packages are split by stability:
 
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
 - `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, slots, target resolvers, template helpers, and SSE.
 
-Core does not import these packages. Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers.
+Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A renderer follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
+
+Renderers may set generic response metadata through `ctx.Response`. `WriteWithRequest` applies that status and those headers after rendering. Templates do not receive helpers for setting headers or status; templates produce HTML.
 
 ## Metrics Output
 `exp/metrics` records render lifecycle data through a small `Sink` interface. Use your own sink for storage, or write JSON lines to any `io.Writer`:
@@ -46,6 +48,8 @@ service.Use(metrics.Renderer(sink, metrics.WithTag("chain", "web")))
 ```
 
 The writer sink is intentionally plain: it works with stdout, files, buffers, pipes, or app-owned adapters that forward records to SSE, queues, or databases.
+
+Metrics records distinguish request identity from flow identity. `WithRequestID` labels the current HTTP request. `WithTraceID` can group related browser work such as a page request and later async or SSE requests. `WithParentRequestID` can link a spawned request back to the request that caused it.
 
 ## Example Applications
 A documentation-style site built with `go-partial` is available in [examples/docs](examples/docs).
@@ -62,7 +66,7 @@ An htmx-backed feature showcase with real template files is available in [exampl
 go run ./examples/showcase
 ```
 
-Open http://localhost:8090 to see pages for typed rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, infinite scroll with cursor-style `X-Action` values, and the embedded error page.
+Open http://localhost:8090 to see pages for typed rows, selection partials, actions, out-of-band rendering, context helpers, localization, HTMX response headers, server-sent events, live metrics, infinite scroll with cursor-style `X-Action` values, and the optional error page.
 
 ## Integrations
 Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file.
@@ -73,8 +77,8 @@ Several integrations are available, detailed information can be found in the [IN
 - Partial, for framework-neutral fetch clients and tests
 - SSE writer, for streaming rendered HTML patches
 
-## Embedded Error Page
-`WriteWithRequest` can render an HTML error page when template parsing or execution fails. Register `ext/errors` to choose the fallback markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
+## Error Output
+`WriteWithRequest` can render an HTML error page when template parsing or execution fails, but only when an error renderer is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
 
 Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200`, because HTMX does not swap `500` responses by default.
 
@@ -91,7 +95,7 @@ Or on one partial:
 content.Use(exterrors.Renderer())
 ```
 
-`RenderWithRequest` still returns the render error directly. The fallback page is written by `WriteWithRequest`.
+`RenderWithRequest` still returns the render error directly. `WriteWithRequest` asks the renderer chain for a failure response; without `ext/errors`, it returns the original render error.
 
 ## Localization
 Templates receive a request localizer through the `localizer` and `locale` helpers from `exp/localization`. The interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:

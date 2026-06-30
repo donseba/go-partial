@@ -13,11 +13,13 @@ import (
 )
 
 type (
+	// Logger is the logging interface used by go-partial.
 	Logger interface {
 		Warn(msg string, args ...any)
 		Error(msg string, args ...any)
 	}
 
+	// Config configures a Service.
 	Config struct {
 		Connector        connector.Connector
 		UseTemplateCache bool
@@ -26,6 +28,7 @@ type (
 		Renderers        []Renderer
 	}
 
+	// Service stores shared rendering configuration for layouts.
 	Service struct {
 		config             *Config
 		staticFuncs        template.FuncMap
@@ -37,6 +40,7 @@ type (
 		funcsLock          sync.RWMutex
 	}
 
+	// Layout binds a content partial to an optional wrapper partial.
 	Layout struct {
 		service            *Service
 		filesystem         fs.FS
@@ -94,11 +98,6 @@ func (svc *Service) NewLayout() *Layout {
 	}
 }
 
-func (svc *Service) SetConnector(conn connector.Connector) *Service {
-	svc.connector = conn
-	return svc
-}
-
 // Use appends renderers to every layout created by this service.
 func (svc *Service) Use(renderers ...Renderer) *Service {
 	if svc == nil {
@@ -154,16 +153,6 @@ func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, logger Logge
 		merged[k] = v
 	}
 	return merged
-}
-
-// FS sets the filesystem for the Layout.
-func (l *Layout) FS(fs fs.FS) *Layout {
-	l.filesystem = fs
-	return l
-}
-
-func (l *Layout) Connector() connector.Connector {
-	return l.connector
 }
 
 // Use appends renderers to the layout render chain.

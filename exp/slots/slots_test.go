@@ -67,7 +67,7 @@ func TestMissingSlotRendersEmpty(t *testing.T) {
 
 func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 	var records []metrics.Record
-	parent := metrics.WithPartialTag(partial.NewID("page", "page.gohtml"), "shell").
+	parent := metrics.WithPartialLabel(partial.NewID("page", "page.gohtml"), "shell").
 		SetFileSystem(fstest.MapFS{
 			"page.gohtml":    &fstest.MapFile{Data: []byte(`<main>{{ slot "toolbar" }}</main>`)},
 			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`<nav>Actions</nav>`)},
@@ -75,7 +75,7 @@ func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 		Use(Renderer(), metrics.Renderer(metrics.SinkFunc(func(record metrics.Record) {
 			records = append(records, record)
 		}), metrics.WithSlotName(Name)))
-	child := metrics.WithPartialTag(partial.NewID("toolbar", "toolbar.gohtml"), "actions")
+	child := metrics.WithPartialLabel(partial.NewID("toolbar", "toolbar.gohtml"), "actions")
 	Set(parent, "toolbar", child)
 
 	if _, err := parent.Render(metrics.WithRequestID(context.Background(), "req-slot")); err != nil {
@@ -102,8 +102,8 @@ func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 			if record.SlotName != "toolbar" {
 				t.Fatalf("toolbar SlotName = %q", record.SlotName)
 			}
-			if record.PartialTag != "actions" {
-				t.Fatalf("toolbar PartialTag = %q", record.PartialTag)
+			if record.PartialLabel != "actions" {
+				t.Fatalf("toolbar PartialLabel = %q", record.PartialLabel)
 			}
 		}
 	}

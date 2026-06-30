@@ -3,9 +3,11 @@ package errors
 import (
 	"errors"
 	"html/template"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	partial "github.com/donseba/go-partial"
 )
@@ -93,6 +95,32 @@ func TestRendererUsesAllLifecyclePhases(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "broken.gohtml:1") {
 		t.Fatalf("expected detailed location, got %q", out)
+	}
+}
+
+func TestWriteWithRequestUsesErrorRenderResponse(t *testing.T) {
+	p := partial.New("broken.gohtml").
+		ID("broken").
+		SetFileSystem(fstest.MapFS{
+			"broken.gohtml": &fstest.MapFile{Data: []byte(`{{ if .Missing }}missing`)},
+		}).
+		Use(Renderer(WithMode(ModeDetailed)))
+
+	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
+	rec := httptest.NewRecorder()
+	err := p.WriteWithRequest(req.Context(), rec, req)
+	if err == nil {
+		t.Fatal("WriteWithRequest() error = nil, want original render error")
+	}
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if contentType := rec.Header().Get("Content-Type"); contentType != "text/html; charset=utf-8" {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
+	if !strings.Contains(rec.Body.String(), "Template render error") {
+		t.Fatalf("expected rendered error body, got %q", rec.Body.String())
 	}
 }
 

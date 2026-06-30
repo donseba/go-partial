@@ -56,7 +56,7 @@ func (app *App) metricsPage(w http.ResponseWriter, r *http.Request) {
 		Total:      total,
 		Latest:     metricsRecordViews(records),
 		ChainTag:   "showcase",
-		TraceLabel: "request id",
+		TraceLabel: "request + trace id",
 	}
 	app.render(w, r, "content", "templates/metrics.gohtml", data)
 }
@@ -78,6 +78,7 @@ func metricsRecordViews(records []metrics.Record) []MetricsTraceView {
 		latest := latestMetricTimestamp(records)
 		group := MetricsTraceView{
 			RequestID: requestID,
+			TraceID:   shortRequestID(first.TraceID),
 			Timestamp: formatTimestamp(latest),
 			Method:    first.Method,
 			Path:      first.Path,
@@ -85,26 +86,28 @@ func metricsRecordViews(records []metrics.Record) []MetricsTraceView {
 		}
 		for _, record := range records {
 			group.Records = append(group.Records, MetricsRecordView{
-				Kind:       metricKind(record),
-				Name:       record.Name,
-				RequestID:  requestID,
-				Timestamp:  formatTimestamp(record.StartedAt),
-				Label:      metricLabel(record),
-				PartialID:  record.PartialID,
-				ParentID:   record.ParentID,
-				Depth:      metricDepth(record, records),
-				Indent:     metricIndent(metricDepth(record, records)),
-				Meta:       metricMeta(record),
-				PartialTag: record.PartialTag,
-				SlotName:   record.SlotName,
-				Templates:  strings.Join(record.Templates, ", "),
-				Swap:       formatMetricSwap(record.OOB),
-				Method:     record.Method,
-				Path:       record.Path,
-				Size:       formatBytes(record.Size),
-				Duration:   formatDuration(record.Duration),
-				Error:      formatMetricError(record.Error),
-				Chain:      record.Tags["chain"],
+				Kind:            metricKind(record),
+				Name:            record.Name,
+				RequestID:       requestID,
+				TraceID:         shortRequestID(record.TraceID),
+				ParentRequestID: shortRequestID(record.ParentRequestID),
+				Timestamp:       formatTimestamp(record.StartedAt),
+				Label:           metricLabel(record),
+				PartialID:       record.PartialID,
+				ParentID:        record.ParentID,
+				Depth:           metricDepth(record, records),
+				Indent:          metricIndent(metricDepth(record, records)),
+				Meta:            metricMeta(record),
+				PartialLabel:    record.PartialLabel,
+				SlotName:        record.SlotName,
+				Templates:       strings.Join(record.Templates, ", "),
+				Swap:            formatMetricSwap(record.OOB),
+				Method:          record.Method,
+				Path:            record.Path,
+				Size:            formatBytes(record.Size),
+				Duration:        formatDuration(record.Duration),
+				Error:           formatMetricError(record.Error),
+				Chain:           record.Tags["chain"],
 			})
 		}
 		traces = append(traces, metricTraceRecords{Latest: latest, View: group})
@@ -179,8 +182,8 @@ func metricDepth(record metrics.Record, records []metrics.Record) int {
 }
 
 func metricLabel(record metrics.Record) string {
-	if record.PartialTag != "" {
-		return record.PartialTag
+	if record.PartialLabel != "" {
+		return record.PartialLabel
 	}
 	if record.Kind == "interaction" && record.Name != "" {
 		return record.Name

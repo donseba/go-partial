@@ -142,6 +142,7 @@ type MetricsPage struct {
 
 type MetricsTraceView struct {
 	RequestID string
+	TraceID   string
 	Timestamp string
 	Method    string
 	Path      string
@@ -149,26 +150,28 @@ type MetricsTraceView struct {
 }
 
 type MetricsRecordView struct {
-	Kind       string
-	Name       string
-	RequestID  string
-	Timestamp  string
-	Label      string
-	PartialID  string
-	ParentID   string
-	Depth      int
-	Indent     string
-	Meta       []string
-	PartialTag string
-	SlotName   string
-	Templates  string
-	Swap       string
-	Method     string
-	Path       string
-	Size       string
-	Duration   string
-	Error      string
-	Chain      string
+	Kind            string
+	Name            string
+	RequestID       string
+	TraceID         string
+	ParentRequestID string
+	Timestamp       string
+	Label           string
+	PartialID       string
+	ParentID        string
+	Depth           int
+	Indent          string
+	Meta            []string
+	PartialLabel    string
+	SlotName        string
+	Templates       string
+	Swap            string
+	Method          string
+	Path            string
+	Size            string
+	Duration        string
+	Error           string
+	Chain           string
 }
 
 type LiveMetricsPage struct {

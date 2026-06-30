@@ -71,8 +71,12 @@ When `UseURLQuery` is enabled, `target`, `select`, and `action` query parameters
 Turbo Frame requests can target a frame through the `Turbo-Frame` header.
 
 ```go
+svc := partial.NewService(&partial.Config{
+	Connector: connector.NewTurbo(nil),
+	FS:        os.DirFS("templates"),
+})
 content := partial.NewID("account-frame", "account.gohtml")
-content.SetConnector(connector.NewTurbo(nil))
+_ = svc.NewLayout().Set(content).WriteWithRequest(ctx, w, r)
 ```
 
 ```html
@@ -84,8 +88,12 @@ content.SetConnector(connector.NewTurbo(nil))
 Unpoly fragment requests use `X-Up-Target`.
 
 ```go
+svc := partial.NewService(&partial.Config{
+	Connector: connector.NewUnpoly(nil),
+	FS:        os.DirFS("templates"),
+})
 content := partial.NewID("content", "content.gohtml")
-content.SetConnector(connector.NewUnpoly(nil))
+_ = svc.NewLayout().Set(content).WriteWithRequest(ctx, w, r)
 ```
 
 ```html

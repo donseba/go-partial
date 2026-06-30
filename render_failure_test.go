@@ -11,7 +11,7 @@ import (
 	"github.com/donseba/go-partial/connector"
 )
 
-func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T) {
+func TestWriteWithRequestRendersSafeRendererErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
@@ -29,16 +29,16 @@ func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T
 		t.Fatalf("expected 500, got %d", rec.Code)
 	}
 	if !strings.Contains(body, "Template render error") {
-		t.Fatalf("expected fallback error page, got %q", body)
+		t.Fatalf("expected failure response, got %q", body)
 	}
 	if !strings.Contains(body, "broken.gohtml") {
-		t.Fatalf("expected template name in fallback page, got %q", body)
+		t.Fatalf("expected template name in failure response, got %q", body)
 	}
 	if !strings.Contains(body, "Partial ID") {
-		t.Fatalf("expected partial ID label in fallback page, got %q", body)
+		t.Fatalf("expected partial ID label in failure response, got %q", body)
 	}
 	if !strings.Contains(body, "<dt>Template</dt>") {
-		t.Fatalf("expected singular template label in fallback page, got %q", body)
+		t.Fatalf("expected singular template label in failure response, got %q", body)
 	}
 	if strings.Contains(body, "unexpected EOF") {
 		t.Fatalf("expected safe mode to hide detailed error, got %q", body)
@@ -48,7 +48,7 @@ func TestWriteWithRequestRendersSafeDefaultErrorPageOnTemplateError(t *testing.T
 	}
 }
 
-func TestWriteWithRequestRendersDetailedDefaultErrorPageOnTemplateError(t *testing.T) {
+func TestWriteWithRequestRendersDetailedRendererErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
@@ -66,13 +66,13 @@ func TestWriteWithRequestRendersDetailedDefaultErrorPageOnTemplateError(t *testi
 		t.Fatalf("expected 500, got %d", rec.Code)
 	}
 	if !strings.Contains(body, "unexpected EOF") {
-		t.Fatalf("expected detailed error in fallback page, got %q", body)
+		t.Fatalf("expected detailed error in failure response, got %q", body)
 	}
 	if !strings.Contains(body, "broken.gohtml:1") {
-		t.Fatalf("expected template error location in fallback page, got %q", body)
+		t.Fatalf("expected template error location in failure response, got %q", body)
 	}
 	if strings.Contains(body, "stack trace:") {
-		t.Fatalf("expected default detailed renderer to omit stack trace, got %q", body)
+		t.Fatalf("expected detailed renderer to omit stack trace, got %q", body)
 	}
 }
 
@@ -170,7 +170,7 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	}
 }
 
-func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
+func TestRegisteredTargetTemplateErrorRendersSectionFailureResponse(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ content }}</main><footer>Footer</footer></body></html>`)
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
@@ -200,7 +200,7 @@ func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 		t.Fatalf("expected target error fragment, got %q", body)
 	}
 	if strings.Contains(body, "<!doctype html>") {
-		t.Fatalf("expected section fallback, got full error document: %q", body)
+		t.Fatalf("expected section failure response, got full error document: %q", body)
 	}
 }
 
