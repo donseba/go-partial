@@ -52,13 +52,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs the request-scoped logger template helper.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 // Logger emits an info-level diagnostic event from template code.
 //
 // go-doc:sig func(message string, pairs ...any) string

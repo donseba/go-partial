@@ -50,16 +50,6 @@ type (
 		RenderFunc   func(*RenderContext, RenderNext) (template.HTML, error)
 		FinalizeFunc func(*RenderContext, template.HTML, error) (template.HTML, error)
 	}
-
-	// Renderer observes or changes a render lifecycle.
-	//
-	// Deprecated: use RenderStage.
-	Renderer = RenderStage
-
-	// RendererHooks adapts individual lifecycle functions to Renderer.
-	//
-	// Deprecated: use RenderStageHooks.
-	RendererHooks = RenderStageHooks
 )
 
 const (
@@ -100,9 +90,9 @@ func templateRenderStage() RenderStage {
 	return RenderStageHooks{
 		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Partial == nil {
-				return "", fmt.Errorf("template renderer requires a partial")
+				return "", fmt.Errorf("template stage requires a partial")
 			}
-			return ctx.Partial.renderTemplate(ctx)
+			return renderTemplate(ctx)
 		},
 	}
 }
@@ -166,7 +156,7 @@ func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind Ren
 		Values:   make(RenderValues),
 		Response: &RenderResponse{Headers: make(map[string]string)},
 		Funcs:    make(template.FuncMap),
-		Events:   mergeEventSinks(p.getEventSink(), EventSinkFromContext(ctx)),
+		Events:   mergeEventSinks(p.getEvents(), EventSinkFromContext(ctx)),
 	}
 	state.Runtime = newRuntime(p, state)
 	return state

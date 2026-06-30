@@ -91,8 +91,8 @@ func (app *App) writeCartUpdate(w http.ResponseWriter, r *http.Request, sessionI
 	wrapper.WithOOB(app.shopCartButtonPartial(sessionID))
 
 	content := app.shopCartPopupPartial(sessionID, true)
-	layout := app.service.NewLayout().Set(content).Wrap(wrapper)
-	app.writeLayout(w, r, layout)
+	root := wrapper.SetContent(content)
+	app.writePartial(w, r, root)
 }
 
 func (app *App) shopPartial(w http.ResponseWriter, r *http.Request, id string, start int, count int) *partial.Partial {

@@ -22,23 +22,22 @@ import (
 
 var (
 	// coreFunctionNames are the helpers go-partial injects per render and needs
-	// for its own layout, request, connector, and runtime behavior. Optional
+	// for its own tree, request, connector, and runtime behavior. Optional
 	// helper providers must not overwrite these names.
 	coreFunctionNames = templateutil.Names(placeholderRequestFuncMap())
 )
 
 type (
-	// Partial represents a renderable component with optional child partials and data.
+	// Partial stores reusable template, data, and child-tree configuration.
 	Partial struct {
 		id              string
 		parent          *Partial
-		layoutContentID string
+		contentID       string
 		renderOOB       bool
 		alwaysSwapOOB   bool
 		fs              fs.FS
 		fsSet           bool
 		connector       connector.Connector
-		events          EventSink
 		useCache        bool
 		templates       []string
 		staticFuncs     template.FuncMap
@@ -47,8 +46,8 @@ type (
 		extensions      map[any]any
 		responseHeaders map[string]string
 		response        connector.Response
+		events          EventSink
 		stages          []RenderStage
-		stagesInherited bool
 		templateCache   *templateutil.Store
 		mu              sync.RWMutex
 		children        map[string]*Partial
@@ -99,7 +98,7 @@ const (
 	contractFunc contractKind = "func"
 )
 
-// New creates a new root.
+// New creates a root partial with the default ID "root".
 func New(templates ...string) *Partial {
 	functions := make(template.FuncMap)
 	return &Partial{
@@ -114,12 +113,12 @@ func New(templates ...string) *Partial {
 	}
 }
 
-// NewID creates a new instance with the provided ID.
+// NewID creates a partial with the provided ID.
 func NewID(id string, templates ...string) *Partial {
 	return New(templates...).ID(id)
 }
 
-// ID sets the ID of the partial.
+// ID sets the stable ID used for target lookup, child registration, and diagnostics.
 func (p *Partial) ID(id string) *Partial {
 	p.id = id
 	return p
@@ -161,17 +160,7 @@ func (p *Partial) IsOOB() bool {
 	return p.renderOOB
 }
 
-// Reset resets the partial to its initial state.
-func (p *Partial) Reset() *Partial {
-	p.contracts = nil
-	p.children = make(map[string]*Partial)
-	p.oobChildren = make(map[string]struct{})
-	p.extensions = make(map[any]any)
-
-	return p
-}
-
-// Clone returns a copy of the partial configuration and child tree references.
+// Clone returns an independent copy of the partial configuration and child tree.
 func (p *Partial) Clone() *Partial {
 	if p == nil {
 		return nil
@@ -276,7 +265,6 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 	}
 	annotation = strings.TrimSpace(annotation)
 	if annotation == "" {
-		p.emitConfig(Event{Kind: EventContractInvalid, Level: EventWarn, Message: "contract annotation cannot be empty"})
 		return p
 	}
 
@@ -287,12 +275,6 @@ func (p *Partial) SetContract(annotation string, values ...any) *Partial {
 		if named, ok := value.(NamedContract); ok {
 			name = strings.TrimSpace(named.ContractName())
 			if name == "" {
-				p.emitConfig(Event{
-					Kind:    EventContractInvalid,
-					Level:   EventWarn,
-					Message: "contract name cannot be derived",
-					Fields:  map[string]any{"annotation": annotation},
-				})
 				continue
 			}
 		}
@@ -311,7 +293,7 @@ func (p *Partial) SetModel(values ...any) *Partial {
 	return p.SetContract("model", values...)
 }
 
-// SetResponseHeaders configures plain HTTP headers written with this partial.
+// SetResponseHeaders configures plain HTTP headers written by Write.
 func (p *Partial) SetResponseHeaders(headers map[string]string) *Partial {
 	if p == nil {
 		return nil
@@ -346,6 +328,9 @@ func (p *Partial) getResponseHeaders() map[string]string {
 
 // Response returns a builder for connector-specific response instructions.
 func (p *Partial) Response() *connector.ResponseBuilder {
+	if p == nil {
+		return connector.NewResponseBuilder(nil)
+	}
 	return connector.NewResponseBuilder(&p.response)
 }
 
@@ -358,6 +343,18 @@ func (p *Partial) SetResponse(response connector.Response) *Partial {
 	defer p.mu.Unlock()
 
 	p.response = response
+	return p
+}
+
+// SetEvents configures the diagnostic event sink inherited by this partial tree.
+func (p *Partial) SetEvents(events EventSink) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.events = events
 	return p
 }
 
@@ -383,19 +380,19 @@ func (p *Partial) GetBasePath() string {
 	return ""
 }
 
-// SetConnector sets the connector for the partial.
 // SetConnector configures the request connector used by this partial.
-func (p *Partial) SetConnector(connector connector.Connector) *Partial {
+func (p *Partial) SetConnector(c connector.Connector) *Partial {
 	if p == nil {
 		return nil
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.connector = connector
+	p.connector = c
 	return p
 }
 
+// SetAlwaysSwapOOB makes this out-of-band partial render on every partial request.
 func (p *Partial) SetAlwaysSwapOOB(alwaysSwapOOB bool) *Partial {
 	if p == nil {
 		return nil
@@ -418,18 +415,6 @@ func (p *Partial) SetFunc(funcMaps ...template.FuncMap) *Partial {
 	for _, funcMap := range funcMaps {
 		p.setFuncMapLocked(funcMap)
 	}
-	return p
-}
-
-// SetEventSink configures diagnostic events for the partial.
-func (p *Partial) SetEventSink(events EventSink) *Partial {
-	if p == nil {
-		return nil
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.events = events
 	return p
 }
 
@@ -477,6 +462,18 @@ func (p *Partial) With(child *Partial) *Partial {
 	return p
 }
 
+// SetContent registers the primary content child rendered by the content helper.
+func (p *Partial) SetContent(child *Partial) *Partial {
+	if p == nil || child == nil {
+		return p
+	}
+	p.With(child)
+	p.mu.Lock()
+	p.contentID = child.id
+	p.mu.Unlock()
+	return p
+}
+
 // WithTemplate creates a child partial from a template path and registers it
 // on the partial tree. The child ID is inferred from the file name without its
 // extension: "templates/sidebar.gohtml" becomes "sidebar".
@@ -511,72 +508,6 @@ func (p *Partial) WithOOB(child *Partial) *Partial {
 	return p
 }
 
-// RenderWithRequest renders the partial with the given http.Request.
-func (p *Partial) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	result := p.renderWithRequestResult(ctx, r)
-	return result.HTML, result.Err
-}
-
-func (p *Partial) renderWithRequestResult(ctx context.Context, r *http.Request) renderResult {
-	if p == nil {
-		return renderResult{Err: errors.New("partial is not initialized")}
-	}
-
-	if p.getConnectorOrDefault().RenderPartial(r) {
-		return p.renderWithTargetResult(ctx, r)
-	}
-
-	return p.renderSelfResult(ctx, r)
-}
-
-// WriteWithRequest writes the partial to the http.ResponseWriter.
-func (p *Partial) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	if p == nil {
-		_, err := fmt.Fprintf(w, "partial is not initialized")
-		return err
-	}
-
-	result := p.renderWithRequestResult(ctx, r)
-	if result.Err != nil {
-		p.emitWithContext(ctx, r, Event{
-			Kind:    EventRenderError,
-			Level:   EventError,
-			Message: "error rendering partial",
-			Error:   result.Err,
-		})
-		return p.writeRenderFailure(ctx, w, r, result.Err)
-	}
-
-	// get headers
-	headers := result.Headers
-	if headers == nil {
-		headers = p.getResponseHeaders()
-	}
-	for k, v := range headers {
-		w.Header().Set(k, v)
-	}
-	for k, v := range p.getConnectorResponseHeaders() {
-		w.Header().Set(k, v)
-	}
-	applyRenderResponseHeaders(w, result.Response)
-	if result.Response != nil && result.Response.Status > 0 {
-		w.WriteHeader(result.Response.Status)
-	}
-
-	_, err := w.Write([]byte(result.HTML))
-	if err != nil {
-		p.emitWithContext(ctx, r, Event{
-			Kind:    EventRenderWriteError,
-			Level:   EventError,
-			Message: "error writing partial to response",
-			Error:   err,
-		})
-		return err
-	}
-
-	return nil
-}
-
 func (p *Partial) getConnectorResponseHeaders() map[string]string {
 	if p == nil {
 		return nil
@@ -588,44 +519,6 @@ func (p *Partial) getConnectorResponseHeaders() map[string]string {
 	}
 
 	return conn.ResponseHeaders(p.response)
-}
-
-func (p *Partial) writeRenderFailure(ctx context.Context, w http.ResponseWriter, r *http.Request, renderErr error) error {
-	isPartialRequest := p.isPartialRequest(r)
-	result := p.renderErrorResult(ctx, r, renderErr, isPartialRequest)
-	if result.Err != nil {
-		if errors.Is(result.Err, renderErr) {
-			return renderErr
-		}
-		return fmt.Errorf("error rendering failure response: %w; original render error: %v", result.Err, renderErr)
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	status := http.StatusInternalServerError
-	if isPartialRequest {
-		oobOut, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
-		if oobErr != nil {
-			p.emitWithContext(ctx, r, Event{
-				Kind:    EventRenderOOBError,
-				Level:   EventError,
-				Message: "error rendering OOB regions for failure response",
-				Error:   oobErr,
-			})
-			return fmt.Errorf("error rendering OOB regions for failure response: %w; original render error: %v", oobErr, renderErr)
-		}
-		result.HTML += oobOut
-		status = http.StatusOK
-	}
-	applyRenderResponseHeaders(w, result.Response)
-	if result.Response != nil && result.Response.Status > 0 {
-		status = result.Response.Status
-	}
-	w.WriteHeader(status)
-	if _, err := w.Write([]byte(result.HTML)); err != nil {
-		return fmt.Errorf("error writing failure response: %w; original render error: %v", err, renderErr)
-	}
-
-	return renderErr
 }
 
 func applyRenderResponseHeaders(w http.ResponseWriter, response *RenderResponse) {
@@ -644,29 +537,6 @@ func (p *Partial) isPartialRequest(r *http.Request) bool {
 
 	conn := p.getConnector()
 	return conn != nil && conn.RenderPartial(r)
-}
-
-// Render renders the partial without requiring an http.Request.
-// It can be used when you don't need access to the request data.
-func (p *Partial) Render(ctx context.Context) (template.HTML, error) {
-	if p == nil {
-		return "", errors.New("partial is not initialized")
-	}
-
-	// Since we don't have an http.Request, we'll pass nil where appropriate.
-	result := p.renderSelfResult(ctx, nil)
-	return result.HTML, result.Err
-}
-
-func (p *Partial) mergeFuncMapInternal(funcMap, customFuncMap template.FuncMap) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if p.staticFuncs == nil {
-		p.staticFuncs = make(template.FuncMap, len(funcMap))
-	}
-	maps.Copy(p.staticFuncs, funcMap)
-	p.setFuncMapLocked(customFuncMap)
 }
 
 // getStaticFuncMap returns the combined function map of the partial.
@@ -711,12 +581,6 @@ func (p *Partial) contractFuncMapLocked() template.FuncMap {
 func (p *Partial) setFuncMapLocked(funcMap template.FuncMap) {
 	for name, fn := range funcMap {
 		if isProtectedFunctionName(name) {
-			p.emitConfig(Event{
-				Kind:    EventFuncProtected,
-				Level:   EventWarn,
-				Message: "function name is protected and cannot be overwritten",
-				Fields:  map[string]any{"function": name},
-			})
 			continue
 		}
 
@@ -937,6 +801,24 @@ func (p *Partial) getConnectorOrDefault() connector.Connector {
 	return connector.NewPartial(nil)
 }
 
+func (p *Partial) getEvents() EventSink {
+	if p == nil {
+		return nil
+	}
+	p.mu.RLock()
+	events := p.events
+	parent := p.parent
+	p.mu.RUnlock()
+
+	if events != nil {
+		return events
+	}
+	if parent != nil {
+		return parent.getEvents()
+	}
+	return nil
+}
+
 func (p *Partial) getFS() fs.FS {
 	if p == nil {
 		return os.DirFS("./")
@@ -961,26 +843,6 @@ func (p *Partial) getFS() fs.FS {
 	return os.DirFS("./")
 }
 
-func (p *Partial) getEventSink() EventSink {
-	if p == nil {
-		return nil
-	}
-	if p.events != nil {
-		return p.events
-	}
-	if p.parent != nil {
-		return p.parent.getEventSink()
-	}
-	return nil
-}
-
-func (p *Partial) emitConfig(event Event) {
-	if p == nil {
-		return
-	}
-	emitSafely(p.getEventSink(), nil, preparePartialEvent(p, event))
-}
-
 func (p *Partial) emitWithContext(ctx context.Context, r *http.Request, event Event) {
 	if p == nil {
 		return
@@ -995,21 +857,29 @@ func (p *Partial) getRenderStages() []RenderStage {
 	}
 
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	stages := slices.Clone(p.stages)
+	parent := p.parent
+	p.mu.RUnlock()
 
-	return slices.Clone(p.stages)
+	if parent != nil {
+		parentStages := parent.getRenderStages()
+		if len(parentStages) > 0 {
+			stages = append(parentStages, stages...)
+		}
+	}
+	return stages
 }
 
-func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) renderResult {
+func renderWithTargetResult(ctx context.Context, r *http.Request, p *Partial) renderResult {
 	requestedTarget := p.getConnectorOrDefault().GetTargetValue(r)
 	if requestedTarget == "" || requestedTarget == p.id {
-		result := p.renderSelfResult(ctx, r)
+		result := renderSelfResult(ctx, r, p)
 		if result.Err != nil {
 			return result
 		}
 
 		// Render OOB regions from the parent tree when necessary.
-		oobOutAll, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
+		oobOutAll, oobErr := renderAllAncestorOOBChildren(ctx, r, p, true)
 		if oobErr != nil {
 			p.emitWithContext(ctx, r, Event{
 				Kind:    EventRenderOOBError,
@@ -1025,12 +895,12 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 	} else {
 		c := p.recursiveChildLookup(requestedTarget, make(map[string]bool))
 		if c == nil {
-			result, ok := p.renderResolvedTargetResult(ctx, r, requestedTarget)
+			result, ok := renderResolvedTargetResult(ctx, r, p, requestedTarget)
 			if result.Err != nil {
 				return result
 			}
 			if ok {
-				oobOutAll, oobErr := p.renderAllAncestorOOBChildren(ctx, r, true)
+				oobOutAll, oobErr := renderAllAncestorOOBChildren(ctx, r, p, true)
 				if oobErr != nil {
 					p.emitWithContext(ctx, r, Event{
 						Kind:    EventRenderOOBError,
@@ -1053,11 +923,11 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 			})
 			return renderResult{Err: fmt.Errorf("requested partial %s not found in parent %s", requestedTarget, p.id)}
 		}
-		return c.renderWithTargetResult(ctx, r)
+		return renderWithTargetResult(ctx, r, c)
 	}
 }
 
-func (p *Partial) renderResolvedTargetResult(ctx context.Context, r *http.Request, target string) (renderResult, bool) {
+func renderResolvedTargetResult(ctx context.Context, r *http.Request, p *Partial, target string) (renderResult, bool) {
 	state := newRenderContext(ctx, p, r, RenderKindTarget)
 	state.Name = target
 	result := renderWithChainResult(state, p.getRenderStages(), func(state *RenderContext) (template.HTML, error) {
@@ -1100,7 +970,7 @@ func (p *Partial) recursiveChildLookup(id string, visited map[string]bool) *Part
 	return nil
 }
 
-func (p *Partial) renderChildPartial(ctx context.Context, r *http.Request, id string) (template.HTML, error) {
+func renderChildPartial(ctx context.Context, r *http.Request, p *Partial, id string) (template.HTML, error) {
 	p.mu.RLock()
 	child, ok := p.children[id]
 	p.mu.RUnlock()
@@ -1120,7 +990,7 @@ func (p *Partial) renderChildPartial(ctx context.Context, r *http.Request, id st
 	// Set the parent of the cloned child to the current partial.
 	childClone.parent = p
 
-	result := childClone.renderSelfResult(ctx, r)
+	result := renderSelfResult(ctx, r, childClone)
 	if result.Err != nil {
 		childClone.emitWithContext(ctx, r, Event{
 			Kind:    EventRenderError,
@@ -1129,7 +999,7 @@ func (p *Partial) renderChildPartial(ctx context.Context, r *http.Request, id st
 			Error:   result.Err,
 			Fields:  map[string]any{"id": id},
 		})
-		fallback, fallbackErr := childClone.renderErrorFragment(ctx, r, result.Err)
+		fallback, fallbackErr := renderErrorFragment(ctx, r, childClone, result.Err)
 		if fallbackErr != nil {
 			return "", fallbackErr
 		}
@@ -1139,8 +1009,8 @@ func (p *Partial) renderChildPartial(ctx context.Context, r *http.Request, id st
 	return result.HTML, nil
 }
 
-func (p *Partial) renderErrorFragment(ctx context.Context, r *http.Request, renderErr error) (template.HTML, error) {
-	result := p.renderErrorResult(ctx, r, renderErr, true)
+func renderErrorFragment(ctx context.Context, r *http.Request, p *Partial, renderErr error) (template.HTML, error) {
+	result := renderErrorResult(ctx, r, p, renderErr, true)
 	if result.Err != nil {
 		return "", fmt.Errorf("error rendering error response fragment: %w; original render error: %v", result.Err, renderErr)
 	}
@@ -1148,7 +1018,7 @@ func (p *Partial) renderErrorFragment(ctx context.Context, r *http.Request, rend
 	return result.HTML, nil
 }
 
-func (p *Partial) renderErrorResult(ctx context.Context, r *http.Request, renderErr error, fragment bool) renderResult {
+func renderErrorResult(ctx context.Context, r *http.Request, p *Partial, renderErr error, fragment bool) renderResult {
 	if p == nil {
 		return renderResult{Err: renderErr}
 	}
@@ -1165,7 +1035,7 @@ func (p *Partial) renderErrorResult(ctx context.Context, r *http.Request, render
 	})
 }
 
-func (p *Partial) renderSelfResult(ctx context.Context, r *http.Request) renderResult {
+func renderSelfResult(ctx context.Context, r *http.Request, p *Partial) renderResult {
 	state := newRenderContext(ctx, p, r, RenderKindPartial)
 
 	stages := append(p.getRenderStages(), templateRenderStage())
@@ -1176,7 +1046,8 @@ func (p *Partial) renderSelfResult(ctx context.Context, r *http.Request) renderR
 	return result
 }
 
-func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
+func renderTemplate(state *RenderContext) (template.HTML, error) {
+	var p *Partial
 	if state != nil && state.Partial != nil {
 		p = state.Partial
 	}
@@ -1200,7 +1071,7 @@ func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
 	}
 
 	dot, hasDot := p.getDotContract()
-	renderTemplates := p.renderTemplates()
+	renderTemplates := p.templateTree()
 	cacheKey := p.generateCacheKey(renderTemplates, p.getFunctionSignature())
 	var funcs template.FuncMap
 	if p.useCache {
@@ -1248,7 +1119,7 @@ func (p *Partial) renderTemplate(state *RenderContext) (template.HTML, error) {
 	return template.HTML(buf.String()), nil
 }
 
-func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, renderOOB bool, isAncestor bool) (template.HTML, error) {
+func renderOOBChildren(ctx context.Context, r *http.Request, p *Partial, renderOOB bool, isAncestor bool) (template.HTML, error) {
 	var out template.HTML
 
 	children := make(map[string]*Partial)
@@ -1266,7 +1137,7 @@ func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, render
 		childClone := child.clone()
 		childClone.parent = p
 		childClone.renderOOB = renderOOB
-		result := childClone.renderSelfResult(ctx, r)
+		result := renderSelfResult(ctx, r, childClone)
 		if result.Err != nil {
 			return "", fmt.Errorf("error rendering OOB region '%s': %w", id, result.Err)
 		}
@@ -1276,11 +1147,11 @@ func (p *Partial) renderOOBChildren(ctx context.Context, r *http.Request, render
 	return out, nil
 }
 
-func (p *Partial) renderAllAncestorOOBChildren(ctx context.Context, r *http.Request, renderOOB bool) (template.HTML, error) {
+func renderAllAncestorOOBChildren(ctx context.Context, r *http.Request, p *Partial, renderOOB bool) (template.HTML, error) {
 	var out template.HTML
 	ancestor := p.parent
 	for ancestor != nil {
-		chunk, err := ancestor.renderOOBChildren(ctx, r, renderOOB, true)
+		chunk, err := renderOOBChildren(ctx, r, ancestor, renderOOB, true)
 		if err != nil {
 			return "", fmt.Errorf("error rendering OOB regions from ancestor '%s': %w", ancestor.id, err)
 		}
@@ -1366,13 +1237,13 @@ func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderT
 	return registerRootContracts(tmpl, contracts, p.getContracts())
 }
 
-func (p *Partial) renderTemplates() []string {
+func (p *Partial) templateTree() []string {
 	seen := make(map[string]struct{})
 	refs := make(map[string]struct{})
-	return p.collectRenderTemplates(seen, refs)
+	return p.collectTemplateTree(seen, refs)
 }
 
-func (p *Partial) collectRenderTemplates(seen map[string]struct{}, refs map[string]struct{}) []string {
+func (p *Partial) collectTemplateTree(seen map[string]struct{}, refs map[string]struct{}) []string {
 	if p == nil {
 		return nil
 	}
@@ -1402,7 +1273,7 @@ func (p *Partial) collectRenderTemplates(seen map[string]struct{}, refs map[stri
 		if !child.matchesTemplateReference(refs) {
 			continue
 		}
-		templates = append(templates, child.collectRenderTemplates(seen, refs)...)
+		templates = append(templates, child.collectTemplateTree(seen, refs)...)
 	}
 
 	return templates
@@ -1452,13 +1323,12 @@ func (p *Partial) clone() *Partial {
 	clone := &Partial{
 		id:              p.id,
 		parent:          p.parent,
-		layoutContentID: p.layoutContentID,
+		contentID:       p.contentID,
 		renderOOB:       p.renderOOB,
 		alwaysSwapOOB:   p.alwaysSwapOOB,
 		fs:              p.fs,
 		fsSet:           p.fsSet,
 		connector:       p.connector,
-		events:          p.events,
 		useCache:        p.useCache,
 		templates:       slices.Clone(p.templates),
 		staticFuncs:     maps.Clone(p.staticFuncs),
@@ -1467,11 +1337,16 @@ func (p *Partial) clone() *Partial {
 		extensions:      maps.Clone(p.extensions),
 		responseHeaders: maps.Clone(p.responseHeaders),
 		response:        p.response,
+		events:          p.events,
 		stages:          slices.Clone(p.stages),
-		stagesInherited: p.stagesInherited,
 		templateCache:   p.templateCache,
-		children:        maps.Clone(p.children),
+		children:        make(map[string]*Partial, len(p.children)),
 		oobChildren:     maps.Clone(p.oobChildren),
+	}
+	for id, child := range p.children {
+		childClone := child.clone()
+		childClone.parent = clone
+		clone.children[id] = childClone
 	}
 
 	return clone

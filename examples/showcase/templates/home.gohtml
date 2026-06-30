@@ -11,7 +11,7 @@
     <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5 rounded-lg border border-stone-300 bg-white p-4">
         <article>
             <h2 class="text-lg font-bold text-stone-950">Core render model</h2>
-            <p class="leading-7 text-stone-600">Layouts wrap a content partial. htmx requests target the content partial directly.</p>
+            <p class="leading-7 text-stone-600">A wrapper partial renders route content. htmx requests target the content partial directly.</p>
         </article>
         <article>
             <h2 class="text-lg font-bold text-stone-950">Template helpers</h2>
@@ -25,14 +25,14 @@
 
     <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">How to read this showcase</h2>
-        <p class="leading-7 text-stone-600">Each page demonstrates one server-rendering capability with actual template files, HTMX requests, and the same go-partial service setup.</p>
+        <p class="leading-7 text-stone-600">Each page demonstrates one server-rendering capability with actual template files, HTMX requests, and the same configured root partial.</p>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content := partial.NewID("content", "templates/home.gohtml")
-layout := service.NewLayout().Set(content).Wrap(wrapper)
-layout.WriteWithRequest(ctx, w, r)</code></pre>
+page := root.Clone().SetContent(content)
+partial.Write(ctx, w, r, page)</code></pre>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
@@ -44,3 +44,4 @@ layout.WriteWithRequest(ctx, w, r)</code></pre>
 &lt;/section&gt;</code></pre>
     </article>
 </section>
+

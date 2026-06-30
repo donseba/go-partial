@@ -126,19 +126,18 @@
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Scope</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">API</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
         <tbody>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Service</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">svc.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Layout</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">layout.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers for one render pipeline or page shell.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Root partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">root.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Application-wide helpers such as translations, money, or asset URLs.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Root partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Partial.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers shared by configured partial trees.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Partial</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.SetFunc</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Helpers local to one component tree.</td></tr>
         </tbody>
     </table>
 
-    <p class="leading-7 text-slate-400">Create the service first, then register helpers owned by the application.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    FS: os.DirFS("web"),
-})</code></pre>
+    <p class="leading-7 text-slate-400">Create the Root partial first, then register helpers owned by the application.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
+    SetFileSystem(os.DirFS("web"))</code></pre>
 
-    <p class="leading-7 text-slate-400">Service helpers are available to every layout and partial rendered through that service.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(template.FuncMap{
+    <p class="leading-7 text-slate-400">Root partial helpers are available to every wrapper and partial rendered through that root.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.SetFunc(template.FuncMap{
     "money": func(cents int) string {
         return fmt.Sprintf("EUR %.2f", float64(cents)/100)
     },
@@ -148,7 +147,7 @@
 })</code></pre>
 
     <p class="leading-7 text-slate-400">The optional template helper package is split into smaller maps. Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">templatehelpers.FuncMap()</code> for every helper, or narrower maps when a page only needs one category.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.SetFunc(
     templatehelpers.StringFuncMap(),
     templatehelpers.CollectionFuncMap(),
 )</code></pre>
@@ -217,8 +216,8 @@ row.SetFunc(template.FuncMap{
     <h2 class="text-xl font-bold text-slate-50">Debug output</h2>
     <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug</code> is provided by <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/debug.FuncMap()</code> and renders through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">debug.RenderKindDebug</code>. Register <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/debug.Stage()</code> or an app stage with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Use</code> when you want diagnostics to match your application.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.SetFunc(debug.FuncMap())
-svc.Use(debug.Stage())</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.SetFunc(debug.FuncMap())
+root.Use(debug.Stage())</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Localization functions are provider-owned</h2>
     <p class="leading-7 text-slate-400">Calls such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ tl localizer \"checkout\" }}" }}</code> are not built-in go-partial functions. They come from your application's function map, while <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code> carries the active locale. For library-backed translation helpers, see the localization guide.</p>

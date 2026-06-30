@@ -38,7 +38,7 @@
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">current := parseCursor(r.Header.Get(connector.HeaderAction.String()))
 start := current + 1
 content := infinitePartial("infinite-chunk", start, 25)
-content.Render(ctx)</code></pre>
+partial.Render(ctx, content)</code></pre>
     </article>
 
     <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">

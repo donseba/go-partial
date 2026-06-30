@@ -4,7 +4,7 @@
 // go-partial's render tree, request handling, or connector behavior. Register
 // them explicitly when an application wants them:
 //
-//	service.SetFunc(templatehelpers.FuncMap())
+//	root.SetFunc(templatehelpers.FuncMap())
 package templatehelpers
 
 import (

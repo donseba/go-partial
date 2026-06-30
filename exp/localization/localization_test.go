@@ -31,7 +31,7 @@ func TestRendererAddsLocaleHelpers(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/", nil)
 	ctx := WithLocalizer(context.Background(), testLocalizer{locale: "nl_NL"})
-	out, err := p.RenderWithRequest(ctx, req)
+	out, err := partial.RenderWithRequest(ctx, req, p)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -69,7 +69,7 @@ func TestRendererAddsLocaleHelpersConcurrently(t *testing.T) {
 			defer wg.Done()
 			value := "locale_" + strconv.Itoa(i)
 			req := httptest.NewRequest("GET", "/", nil)
-			out, err := p.RenderWithRequest(WithLocalizer(req.Context(), testLocalizer{locale: value}), req)
+			out, err := partial.RenderWithRequest(WithLocalizer(req.Context(), testLocalizer{locale: value}), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

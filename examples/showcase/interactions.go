@@ -125,7 +125,8 @@ func (app *App) interactionsStream(w http.ResponseWriter, r *http.Request) {
 			Message: "Received over an SSE message.",
 			Time:    time.Now().Format("15:04:05"),
 		})
-	out, err := content.Render(app.requestContext(r))
+	content = app.configureStandalone(content, nil)
+	out, err := partial.Render(app.requestContext(r), content)
 	if err != nil {
 		if _, writeErr := fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error()); writeErr != nil {
 			return

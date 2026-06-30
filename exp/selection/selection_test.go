@@ -33,7 +33,7 @@ func TestRendererRendersSelectedPartial(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "summary")
-	out, err := content.RenderWithRequest(context.Background(), req)
+	out, err := partial.RenderWithRequest(context.Background(), req, content)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -53,7 +53,7 @@ func TestSelectionIsUsesDefault(t *testing.T) {
 		Use(Stage())
 	WithSelectMap(content, "summary", nil)
 
-	out, err := content.Render(context.Background())
+	out, err := partial.Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -78,7 +78,7 @@ func TestRendererUsesErrorFallbackForSelectedPartial(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "broken")
-	out, err := content.RenderWithRequest(context.Background(), req)
+	out, err := partial.RenderWithRequest(context.Background(), req, content)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -122,7 +122,7 @@ func TestRendererRendersConcurrentSelections(t *testing.T) {
 			}
 			req := httptest.NewRequest(http.MethodGet, "/tabs?value="+value, nil)
 			req.Header.Set(connector.HeaderSelect.String(), selected)
-			out, err := content.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, content)
 			if err != nil {
 				errs <- err.Error()
 				return

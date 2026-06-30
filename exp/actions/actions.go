@@ -125,13 +125,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs action helpers and executes configured partial actions.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 func firstRenderContext(ctx []*partial.RenderContext) *partial.RenderContext {
 	if len(ctx) == 0 {
 		return nil

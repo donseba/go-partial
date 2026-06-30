@@ -26,7 +26,7 @@ func TestSlotRendersChildPartial(t *testing.T) {
 		SetDot(map[string]string{"Label": "Actions"})
 	Set(parent, "toolbar", child)
 
-	out, err := parent.Render(context.Background())
+	out, err := partial.Render(context.Background(), parent)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -44,12 +44,12 @@ func TestHasSlot(t *testing.T) {
 		Use(Stage())
 	Set(parent, "toolbar", partial.NewID("toolbar", "toolbar.gohtml"))
 
-	out, err := parent.Render(context.Background())
+	out, err := partial.Render(context.Background(), parent)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 	if got := string(out); got != "yes" {
-		t.Fatalf("Render() = %q", got)
+		t.Fatalf("Render() = %q, want %q", got, "yes")
 	}
 }
 
@@ -60,12 +60,12 @@ func TestMissingSlotRendersEmpty(t *testing.T) {
 		}).
 		Use(Stage())
 
-	out, err := parent.Render(context.Background())
+	out, err := partial.Render(context.Background(), parent)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 	if got := string(out); got != "beforeafter" {
-		t.Fatalf("Render() = %q", got)
+		t.Fatalf("Render() = %q, want %q", got, "beforeafter")
 	}
 }
 
@@ -82,7 +82,7 @@ func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 	child := metrics.WithPartialLabel(partial.NewID("toolbar", "toolbar.gohtml"), "actions")
 	Set(parent, "toolbar", child)
 
-	if _, err := parent.Render(metrics.WithRequestID(context.Background(), "req-slot")); err != nil {
+	if _, err := partial.Render(metrics.WithRequestID(context.Background(), "req-slot"), parent); err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 
@@ -134,7 +134,7 @@ func TestSlotRendersConcurrently(t *testing.T) {
 			defer wg.Done()
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
-			out, err := parent.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, parent)
 			if err != nil {
 				errs <- err.Error()
 				return

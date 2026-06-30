@@ -88,7 +88,7 @@ func TestWriterPatchPartial(t *testing.T) {
 	}
 }
 
-func TestWriterPatchPartialUsesRenderers(t *testing.T) {
+func TestWriterPatchPartialUsesStages(t *testing.T) {
 	fsys := fstest.MapFS{
 		"notice.gohtml": &fstest.MapFile{Data: []byte(`<div>{{ marker }}</div>`)},
 	}

@@ -11,8 +11,8 @@
         <p class="leading-7 text-slate-400">The showcase keeps these separate: the metrics pages show measurements, while the logger page shows diagnostic events.</p>
     </div>
 
-    <h2 class="text-xl font-bold text-slate-50">Service-scoped events</h2>
-    <p class="leading-7 text-slate-400">Attach long-lived consumers through <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Config.Events</code>. This is the right place for application logs, shared in-memory debug stores, or process-wide telemetry.</p>
+    <h2 class="text-xl font-bold text-slate-50">Root-scoped events</h2>
+    <p class="leading-7 text-slate-400">Attach long-lived consumers with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetEvents</code> on the reusable root partial. This is the right place for application logs, shared in-memory debug stores, or process-wide telemetry.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">events := partial.NewAsyncEvents(
     partial.EventsConfig{
         Buffer:     256,
@@ -22,13 +22,12 @@
     app.logs,
 )
 
-service := partial.NewService(&partial.Config{
-    Events: events,
-})</code></pre>
-    <p class="leading-7 text-slate-400">A service-scoped dispatcher belongs to the server lifecycle. Close it during graceful shutdown, not at the end of every request.</p>
+root := partial.New("shell.gohtml").
+    SetEvents(events)</code></pre>
+    <p class="leading-7 text-slate-400">A root partial-scoped dispatcher belongs to the server lifecycle. Close it during graceful shutdown, not at the end of every request.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Request-scoped events</h2>
-    <p class="leading-7 text-slate-400">Request-owned collectors can be attached to context. Renders started with that context fan out to both the request sink and the configured service or partial sink.</p>
+    <p class="leading-7 text-slate-400">Request-owned collectors can be attached to context. Renders started with that context fan out to both the request sink and the configured root partial sink.</p>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">func observability(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         events := partial.NewAsyncEvents(
@@ -49,7 +48,7 @@ service := partial.NewService(&partial.Config{
     <p class="leading-7 text-slate-400">Pass the same request-derived context to rendering. Template helpers and render lifecycle events use the active render context, so request-owned collectors see helper breadcrumbs, parse and execute errors, target misses, and extension signals for that request only.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Event scope and concurrency</h2>
-    <p class="leading-7 text-slate-400">Service events are shared process wiring. Request events are context values. A concurrent render of the same configured partial tree will not move one request's event sink, URL, target, or stage values onto another request. Keep custom sinks concurrency-safe when they are shared, or attach a fresh sink per request.</p>
+    <p class="leading-7 text-slate-400">Root partial events are shared process wiring. Request events are context values. A concurrent render of the same configured partial tree will not move one request's event sink, URL, target, or stage values onto another request. Keep custom sinks concurrency-safe when they are shared, or attach a fresh sink per request.</p>
 
     <h2 class="text-xl font-bold text-slate-50">OpenTelemetry</h2>
     <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/otel</code> adds go-partial events to the active OpenTelemetry span. It does not create spans, tracer providers, exporters, or samplers; those stay in your app or platform wiring.</p>
@@ -64,8 +63,8 @@ service := partial.NewService(&partial.Config{
 
     <h2 class="text-xl font-bold text-slate-50">Template logging</h2>
     <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext/logger</code> can install a template helper for lightweight breadcrumbs. It emits an <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ext.logger.template</code> event and renders no visible HTML.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.SetFunc(logger.FuncMap())
-service.Use(logger.Stage())</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">Partial.SetFunc(logger.FuncMap())
+root.Use(logger.Stage())</code></pre>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ logger \"cart sidebar rendered\" \"items\" .Cart.Count \"template\" \"cart.gohtml\" }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">External collectors</h2>

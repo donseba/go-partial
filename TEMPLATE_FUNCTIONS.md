@@ -6,7 +6,7 @@ The current model is intentionally close to normal Go templates:
 
 - Use native `{{ template "row.gohtml" . }}` for typed composition.
 - Use go-doc annotations such as `@model` and `@dot` so editors understand the values.
-- Use `content` inside layout wrappers to output the route content partial.
+- Use `content` inside wrapper partials to output the route content child.
 - Use `partial` only when you intentionally want to render a template path through go-partial's render path.
 - Use interaction helpers such as `async`, `poll`, and `refresh` for client-side delivery behavior.
 
@@ -20,7 +20,7 @@ When a template uses `SetDot`, request-specific values are still available throu
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
-| `content` | Layout helper | Render the content partial configured with `layout.Set(content).Wrap(wrapper)`. |
+| `content` | Content helper | Render the content child configured with `root.SetContent(content)`. |
 | `partial` | Composition helper | Render a template path through go-partial's render path. Prefer native `template` for typed rows. |
 | `selection` | Helper | Render the selected partial from a `selection.WithSelectMap` registration. |
 | `action` | Helper | Render the partial returned by an action callback. |
@@ -40,7 +40,7 @@ When a template uses `SetDot`, request-specific values are still available throu
 | `urlIs`, `urlStarts`, `urlContains`, `urlPath`, `joinPath` | URL helpers | Read and compare request paths. |
 | `targetValue`, `selectionValue`, `actionValue` | Connector helpers | Read current connector target, selection, and action values. |
 
-Translation helpers such as `tl`, `tn`, `ctl`, and `ctn` are not built in. Add them through `Service.SetFunc`, `Layout.SetFunc`, or `Partial.SetFunc`.
+Translation helpers such as `tl`, `tn`, `ctl`, and `ctn` are not built in. Add them through `Partial.SetFunc`.
 
 ## Typed Template Composition
 
@@ -88,9 +88,9 @@ target.WithResolver(table, func(ctx context.Context, r *http.Request, target str
 
 That gives you one template for three modes: inside a parent render, as a standalone render, and as an HTMX target response.
 
-## Layout Content
+## Wrapper Content
 
-When a layout wraps a content partial, the wrapper renders that configured route partial with `content`:
+When a wrapper has a content child, the wrapper renders that configured route partial with `content`:
 
 ```gotemplate
 <main>
@@ -179,15 +179,15 @@ Rules:
 Flash helpers live in `github.com/donseba/go-partial/exp/flash` and are opt-in:
 
 ```go
-service.SetFunc(flash.FuncMap())
-service.Use(flash.Stage())
+root.SetFunc(flash.FuncMap())
+root.Use(flash.Stage())
 ```
 
 Add messages to the request context before rendering:
 
 ```go
 ctx := flash.Add(r.Context(), flash.Success("Saved"))
-_ = layout.WriteWithRequest(ctx, w, r.WithContext(ctx))
+_ = partial.Write(ctx, w, r.WithContext(ctx), root)
 ```
 
 Render them with the embedded default template:
@@ -196,7 +196,7 @@ Render them with the embedded default template:
 {{ flash }}
 ```
 
-Render a stable destination in a layout when fragments should append messages
+Render a stable destination in a wrapper when fragments should append messages
 out-of-band:
 
 ```gotemplate
@@ -229,7 +229,7 @@ and are opt-in. Register them explicitly:
 ```go
 import "github.com/donseba/go-partial/exp/interactions"
 
-service.SetFunc(interactions.FuncMap())
+root.SetFunc(interactions.FuncMap())
 ```
 
 Those functions carry `go-doc:sig` comments for overloads such as endpoint
@@ -380,13 +380,13 @@ helpers. Register them from the optional provider when you want them:
 ```go
 import "github.com/donseba/go-partial/exp/templatehelpers"
 
-service.SetFunc(templatehelpers.FuncMap())
+root.SetFunc(templatehelpers.FuncMap())
 ```
 
 Use narrower maps when you want a smaller helper surface:
 
 ```go
-service.SetFunc(
+root.SetFunc(
     templatehelpers.StringFuncMap(),
     templatehelpers.CollectionFuncMap(),
 )
@@ -400,8 +400,8 @@ mark content as trusted HTML.
 Translation helpers are user-owned. The localization stage exposes `localizer` and `locale`, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
 
 ```go
-service.SetFunc(localization.FuncMap(), translator.FuncMap())
-service.Use(localization.Stage())
+root.SetFunc(localization.FuncMap(), translator.FuncMap())
+root.Use(localization.Stage())
 ```
 
 ```gotemplate

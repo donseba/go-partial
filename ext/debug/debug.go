@@ -79,13 +79,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer returns a renderer that handles debug render contexts.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 // BuildData converts a render context into debug template data.
 func BuildData(ctx *partial.RenderContext) Data {
 	var value any

@@ -40,12 +40,12 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 	ctx := WithRequestID(context.Background(), "req-test")
 	ctx = WithTraceID(ctx, "trace-test")
 	ctx = WithParentRequestID(ctx, "parent-test")
-	out, err := p.RenderWithRequest(ctx, req)
+	out, err := partial.RenderWithRequest(ctx, req, p)
 	if err != nil {
-		t.Fatalf("Render() error = %v", err)
+		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 	if out != "Hello Ada" {
-		t.Fatalf("Render() = %q", out)
+		t.Fatalf("RenderWithRequest() = %q, want %q", out, "Hello Ada")
 	}
 	if len(records) != 1 {
 		t.Fatalf("records = %d, want 1", len(records))
@@ -110,7 +110,7 @@ func TestRendererUsesCorrelationHeaderFallbacks(t *testing.T) {
 	req.Header.Set(HeaderRequestID, "req-header")
 	req.Header.Set(HeaderTraceID, "trace-header")
 	req.Header.Set(HeaderParentRequestID, "parent-header")
-	if _, err := p.RenderWithRequest(context.Background(), req); err != nil {
+	if _, err := partial.RenderWithRequest(context.Background(), req, p); err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 	if record.RequestID != "req-header" {
@@ -126,31 +126,27 @@ func TestRendererUsesCorrelationHeaderFallbacks(t *testing.T) {
 
 func TestRendererMarksOOBPartials(t *testing.T) {
 	var records []Record
-	svc := partial.NewService(&partial.Config{
-		Connector: connector.NewHTMX(nil),
-		FS: fstest.MapFS{
-			"layout.gohtml":  &fstest.MapFile{Data: []byte(`{{ content }}`)},
+	root := WithPartialLabel(partial.NewID("shell", "shell.gohtml"), "shell").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fstest.MapFS{
+			"shell.gohtml":   &fstest.MapFile{Data: []byte(`{{ content }}`)},
 			"content.gohtml": &fstest.MapFile{Data: []byte(`<main>content</main>`)},
 			"header.gohtml":  &fstest.MapFile{Data: []byte(`<aside{{ oobAttr }}>header</aside>`)},
-		},
-		Stages: []partial.RenderStage{
-			Stage(SinkFunc(func(record Record) {
-				records = append(records, record)
-			})),
-		},
-	})
+		}).
+		Use(Stage(SinkFunc(func(record Record) {
+			records = append(records, record)
+		})))
 
 	content := WithPartialLabel(partial.NewID("content", "content.gohtml"), "main")
-	wrapper := WithPartialLabel(partial.NewID("layout", "layout.gohtml"), "shell").
-		WithOOB(WithPartialLabel(partial.NewID("header", "header.gohtml").SetAlwaysSwapOOB(true), "sidebar"))
-	layout := svc.NewLayout().Set(content).Wrap(wrapper)
+	root.SetContent(content)
+	root.WithOOB(WithPartialLabel(partial.NewID("header", "header.gohtml").SetAlwaysSwapOOB(true), "sidebar"))
 
 	req := httptest.NewRequest("GET", "/rows", nil)
 	req.Header.Set(connector.HTMXHeaderRequest.String(), "true")
 	req.Header.Set(connector.HTMXHeaderTarget.String(), "content")
 	recorder := httptest.NewRecorder()
-	if err := layout.WriteWithRequest(WithRequestID(context.Background(), "req-oob"), recorder, req); err != nil {
-		t.Fatalf("WriteWithRequest() error = %v", err)
+	if err := partial.Write(WithRequestID(context.Background(), "req-oob"), recorder, req, root); err != nil {
+		t.Fatalf("Write() error = %v", err)
 	}
 
 	seenContent := false
@@ -162,7 +158,7 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 		switch record.PartialID {
 		case "content":
 			seenContent = true
-			if record.ParentID != "layout" {
+			if record.ParentID != "shell" {
 				t.Fatalf("content ParentID = %q", record.ParentID)
 			}
 			if record.PartialLabel != "main" {
@@ -173,7 +169,7 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 			}
 		case "header":
 			seenHeader = true
-			if record.ParentID != "layout" {
+			if record.ParentID != "shell" {
 				t.Fatalf("header ParentID = %q", record.ParentID)
 			}
 			if record.PartialLabel != "sidebar" {
@@ -304,7 +300,7 @@ func TestRendererRecordsConcurrentRenders(t *testing.T) {
 			defer wg.Done()
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest("GET", "/metrics?value="+value, nil)
-			out, err := p.RenderWithRequest(WithRequestID(req.Context(), "req-"+value), req)
+			out, err := partial.RenderWithRequest(WithRequestID(req.Context(), "req-"+value), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

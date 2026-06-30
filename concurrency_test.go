@@ -75,7 +75,7 @@ func TestTemplateBasePathUsesChildOverride(t *testing.T) {
 	parent.SetBasePath("/parent").With(child)
 	child.SetBasePath("/child")
 
-	out, err := child.Render(context.Background())
+	out, err := Render(context.Background(), child)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestChildFileSystemOverridesParentFileSystem(t *testing.T) {
 	child := NewID("child", "shared.gohtml").SetFileSystem(childFS)
 	parent.With(child)
 
-	out, err := child.Render(context.Background())
+	out, err := Render(context.Background(), child)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestChildResponseHeadersDoNotLeakToParent(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	if err := parent.WriteWithRequest(context.Background(), rec, req); err != nil {
+	if err := Write(context.Background(), rec, req, parent); err != nil {
 		t.Fatal(err)
 	}
 	if got := rec.Header().Get("X-Child"); got != "" {
@@ -133,7 +133,7 @@ func TestChildResponseHeadersDoNotLeakToParent(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Target", "child")
-	if err := parent.WriteWithRequest(context.Background(), rec, req); err != nil {
+	if err := Write(context.Background(), rec, req, parent); err != nil {
 		t.Fatal(err)
 	}
 	if got := rec.Header().Get("X-Child"); got != "true" {
@@ -141,17 +141,18 @@ func TestChildResponseHeadersDoNotLeakToParent(t *testing.T) {
 	}
 }
 
-func TestLayoutWriteWithRequestWritesContentWithoutWrapper(t *testing.T) {
+func TestWriteWritesConfiguredContent(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"content.gohtml": `content`,
 		},
 	}
-	layout := NewService(&Config{FS: fsys}).NewLayout().Set(NewID("content", "content.gohtml"))
+	svc := newTestBlueprint(testBlueprintFS(fsys))
+	content := svc.Apply(NewID("content", "content.gohtml"))
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
-	if err := layout.WriteWithRequest(context.Background(), rec, req); err != nil {
+	if err := Write(svc.RenderContext(context.Background()), rec, req, content); err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.TrimSpace(rec.Body.String()); got != "content" {
@@ -176,7 +177,7 @@ func TestConcurrentPartialRendersDoNotBleedRequestData(t *testing.T) {
 			defer wg.Done()
 			want := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+want, nil)
-			out, err := p.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(req.Context(), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return
@@ -193,16 +194,15 @@ func TestConcurrentPartialRendersDoNotBleedRequestData(t *testing.T) {
 	}
 }
 
-func TestConcurrentLayoutRendersDoNotBleedRequestData(t *testing.T) {
+func TestConcurrentShellRendersDoNotBleedRequestData(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"layout.gohtml":  `<main>{{ content }}</main>`,
+			"shell.gohtml":   `<main>{{ content }}</main>`,
 			"content.gohtml": `{{ (request).URL.Query.Get "value" }}`,
 		},
 	}
-	layout := NewService(&Config{FS: fsys}).NewLayout().
-		Set(NewID("content", "content.gohtml")).
-		Wrap(NewID("layout", "layout.gohtml"))
+	svc := newTestBlueprint(testBlueprintFS(fsys))
+	root := svc.Compose(NewID("content", "content.gohtml"), NewID("shell", "shell.gohtml"))
 
 	const renders = 64
 	var wg sync.WaitGroup
@@ -213,7 +213,7 @@ func TestConcurrentLayoutRendersDoNotBleedRequestData(t *testing.T) {
 			defer wg.Done()
 			want := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+want, nil)
-			out, err := layout.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(svc.RenderContext(req.Context()), req, root)
 			if err != nil {
 				errs <- err.Error()
 				return
@@ -230,32 +230,31 @@ func TestConcurrentLayoutRendersDoNotBleedRequestData(t *testing.T) {
 	}
 }
 
-func TestConcurrentCachedLayoutRendersDoNotBleedRequestData(t *testing.T) {
+func TestConcurrentCachedShellRendersDoNotBleedRequestData(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"layout.gohtml":  `<main>{{ content }}</main>`,
+			"shell.gohtml":   `<main>{{ content }}</main>`,
 			"content.gohtml": `{{ requestValue }}`,
 		},
 	}
-	layout := NewService(&Config{FS: fsys, UseTemplateCache: true}).NewLayout().
-		SetFunc(template.FuncMap{
-			"requestValue": func(ctx *RenderContext) string {
-				if ctx == nil || ctx.Request == nil || ctx.Request.URL == nil {
-					return ""
-				}
+	svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
+	svc.SetFunc(template.FuncMap{
+		"requestValue": func(ctx *RenderContext) string {
+			if ctx == nil || ctx.Request == nil || ctx.Request.URL == nil {
+				return ""
+			}
+			return ctx.Request.URL.Query().Get("value")
+		},
+	})
+	svc.Use(RenderStageHooks{
+		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			ctx.SetFunc("requestValue", func() string {
 				return ctx.Request.URL.Query().Get("value")
-			},
-		}).
-		Use(RenderStageHooks{
-			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
-				ctx.SetFunc("requestValue", func() string {
-					return ctx.Request.URL.Query().Get("value")
-				})
-				return ctx, nil
-			},
-		}).
-		Set(NewID("content", "content.gohtml")).
-		Wrap(NewID("layout", "layout.gohtml"))
+			})
+			return ctx, nil
+		},
+	})
+	root := svc.Compose(NewID("content", "content.gohtml"), NewID("shell", "shell.gohtml"))
 
 	const renders = 64
 	var wg sync.WaitGroup
@@ -266,7 +265,7 @@ func TestConcurrentCachedLayoutRendersDoNotBleedRequestData(t *testing.T) {
 			defer wg.Done()
 			want := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+want, nil)
-			out, err := layout.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(svc.RenderContext(req.Context()), req, root)
 			if err != nil {
 				errs <- err.Error()
 				return
@@ -283,7 +282,7 @@ func TestConcurrentCachedLayoutRendersDoNotBleedRequestData(t *testing.T) {
 	}
 }
 
-func TestConcurrentRendererValuesAreIsolated(t *testing.T) {
+func TestConcurrentStageValuesAreIsolated(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
 			"page.gohtml": `{{ renderValue }}`,
@@ -312,7 +311,7 @@ func TestConcurrentRendererValuesAreIsolated(t *testing.T) {
 			defer wg.Done()
 			want := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+want, nil)
-			out, err := p.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(req.Context(), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return
@@ -352,7 +351,7 @@ func TestConcurrentTargetRendersDoNotBleedOOBState(t *testing.T) {
 			want := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+want, nil)
 			req.Header.Set(connector.HeaderTarget.String(), "row")
-			out, err := table.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(req.Context(), req, table)
 			if err != nil {
 				errs <- err.Error()
 				return
@@ -444,7 +443,7 @@ func TestRenderWithRequestUsesRequestContextWhenContextIsNil(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), requestContextTestKey{}, "from-request"))
 
 	//lint:ignore SA1012 this verifies RenderWithRequest falls back to req.Context when ctx is nil.
-	out, err := p.RenderWithRequest(nil, req)
+	out, err := RenderWithRequest(nil, req, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +473,7 @@ func TestRenderNilContextProvidesDefaultContext(t *testing.T) {
 		})
 
 	//lint:ignore SA1012 this verifies Render supplies a default context when ctx is nil.
-	out, err := p.Render(nil)
+	out, err := Render(nil, p)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -483,24 +482,20 @@ func TestRenderNilContextProvidesDefaultContext(t *testing.T) {
 	}
 }
 
-func TestConcurrentServiceCacheLayoutOOBAndTargetStress(t *testing.T) {
+func TestConcurrentBlueprintCacheShellOOBAndTargetStress(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"layout.gohtml":  `<html>{{ content }}</html>`,
+			"shell.gohtml":   `<html>{{ content }}</html>`,
 			"content.gohtml": `<main>{{ (request).URL.Query.Get "value" }}</main>`,
 			"row.gohtml":     `<tr>{{ (request).URL.Query.Get "value" }}:{{ renderMarker }}</tr>`,
 			"toast.gohtml":   `<aside{{ oobAttr }}>{{ (request).URL.Query.Get "value" }}</aside>`,
 		},
 	}
-	service := NewService(&Config{
-		FS:               fsys,
-		UseTemplateCache: true,
-		Connector:        connector.NewPartial(nil),
-	})
-	service.SetFunc(template.FuncMap{
+	blueprint := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true), testBlueprintConnector(connector.NewPartial(nil)))
+	blueprint.SetFunc(template.FuncMap{
 		"renderMarker": func() string { return "" },
 	})
-	service.Use(RenderStageHooks{
+	blueprint.Use(RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			marker := ctx.Request.URL.Query().Get("value")
 			ctx.Values.Set(requestContextTestKey{}, marker)
@@ -513,8 +508,8 @@ func TestConcurrentServiceCacheLayoutOOBAndTargetStress(t *testing.T) {
 	})
 
 	content := NewID("content", "content.gohtml").With(NewID("row", "row.gohtml"))
-	wrapper := NewID("layout", "layout.gohtml").WithOOB(NewID("toast", "toast.gohtml"))
-	layout := service.NewLayout().Set(content).Wrap(wrapper)
+	wrapper := NewID("shell", "shell.gohtml").WithOOB(NewID("toast", "toast.gohtml"))
+	root := blueprint.Compose(content, wrapper)
 
 	const renders = 64
 	var wg sync.WaitGroup
@@ -528,7 +523,7 @@ func TestConcurrentServiceCacheLayoutOOBAndTargetStress(t *testing.T) {
 			if i%2 == 0 {
 				req.Header.Set(connector.HeaderTarget.String(), "row")
 			}
-			out, err := layout.RenderWithRequest(req.Context(), req)
+			out, err := RenderWithRequest(blueprint.RenderContext(req.Context()), req, root)
 			if err != nil {
 				errs <- err.Error()
 				return

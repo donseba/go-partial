@@ -3,12 +3,12 @@
 </p>
 
 
-This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with layout wrapping, connector headers, OOB output, caching, and typed template-friendly data flow.
+This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with wrapper/content composition, connector headers, OOB output, caching, and typed template-friendly data flow.
 ## Features
 
 - **Partial Templates**: Define and render partial templates with typed dot data and functions.
 - **Native Template Composition**: Use `{{ template "row.gohtml" . }}` with `SetDot` so reusable sections can render inside a page or as HTMX targets.
-- **Layouts**: Use layouts to wrap content while keeping page data explicit.
+- **Wrapper Content**: Use wrapper partials with content children while keeping page data explicit.
 - **Template Caching**: Enable caching of parsed templates for improved performance.
 - **Out-of-Band Rendering**: Support for rendering out-of-band (OOB) partials.
 - **File System Support**: Use custom fs.FS implementations for template file access.
@@ -23,8 +23,8 @@ go get github.com/donseba/go-partial
 ## Template functions
 Template-facing helpers and accessors are documented in [TEMPLATE_FUNCTIONS.md](TEMPLATE_FUNCTIONS.md).
 
-## Package Layout
-The root package is intentionally small: rendering lifecycle, partial trees, layouts, runtime context, connectors, and core template helpers. Core does not import optional packages.
+## Package Shape
+The root package is intentionally small: rendering lifecycle, partial trees, runtime context, connectors, Root partial configuration, and core template helpers. Core does not import optional packages.
 
 Optional packages are split by stability:
 
@@ -33,7 +33,18 @@ Optional packages are split by stability:
 
 Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A render stage follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
 
-Render stages may set generic response metadata through `ctx.Response`. `WriteWithRequest` applies that status and those headers after rendering. Templates do not receive helpers for setting headers or status; templates produce HTML.
+Render stages may set generic response metadata through `ctx.Response`. `partial.Write` applies that status and those headers after rendering. Templates do not receive helpers for setting headers or status; templates produce HTML.
+
+## Rendering
+For partials, prefer the package-level rendering functions:
+
+```go
+html, err := partial.Render(ctx, content)
+html, err = partial.RenderWithRequest(ctx, r, content)
+err = partial.Write(ctx, w, r, content)
+```
+
+`partial.Write` owns HTTP response behavior: configured headers, connector response headers, render-stage response metadata, error fragments, and out-of-band regions. `Partial` itself does not render or write responses; pass it to the package functions.
 
 ## Metrics Output
 `exp/metrics` records render lifecycle data through a small `Sink` interface. Use your own sink for storage, or write JSON lines to any `io.Writer`:
@@ -44,7 +55,7 @@ sink := metrics.Fanout(
     metrics.NewWriterSink(os.Stdout),
 )
 
-service.Use(metrics.Stage(sink, metrics.WithTag("chain", "web")))
+root.Use(metrics.Stage(sink, metrics.WithTag("chain", "web")))
 ```
 
 The writer sink is intentionally plain: it works with stdout, files, buffers, pipes, or app-owned adapters that forward records to SSE, queues, or databases.
@@ -52,7 +63,7 @@ The writer sink is intentionally plain: it works with stdout, files, buffers, pi
 Metrics records distinguish request identity from flow identity. `WithRequestID` labels the current HTTP request. `WithTraceID` can group related browser work such as a page request and later async or SSE requests. `WithParentRequestID` can link a spawned request back to the request that caused it.
 
 ## Diagnostic Events
-Core and extensions can emit diagnostic events without owning logging, tracing, or queues. Attach consumers through `Config.Events`:
+Core and extensions can emit diagnostic events without owning logging, tracing, or queues. Attach shared consumers to the reusable root partial:
 
 ```go
 events := partial.NewAsyncEvents(
@@ -61,9 +72,8 @@ events := partial.NewAsyncEvents(
     mySink,
 )
 
-service := partial.NewService(&partial.Config{
-    Events: events,
-})
+root := partial.New("templates/shell.gohtml").
+    SetEvents(events)
 ```
 
 `ext/logger` adapts events to `log/slog`. App-owned sinks can forward the same events to DynamoDB, Kafka, OpenTelemetry, SSE debug pages, files, or any other collector. See [OBSERVABILITY.md](OBSERVABILITY.md) for concrete sink examples.
@@ -97,14 +107,14 @@ Several integrations are available, detailed information can be found in the [IN
 - SSE writer, for streaming rendered HTML patches
 
 ## Error Output
-`WriteWithRequest` can render an HTML error page when template parsing or execution fails, but only when an error stage is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
+`partial.Write` can render an HTML error page when template parsing or execution fails, but only when an error stage is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
 
 Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200`, because HTMX does not swap `500` responses by default.
 
-Register the error stage globally:
+Register the error stage on the reusable root partial:
 
 ```go
-service := partial.NewService(nil).
+root := partial.New("templates/shell.gohtml").
     Use(exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)))
 ```
 
@@ -114,19 +124,19 @@ Or on one partial:
 content.Use(exterrors.Stage())
 ```
 
-`RenderWithRequest` still returns the render error directly. `WriteWithRequest` asks the render stage chain for a failure response; without `ext/errors`, it returns the original render error.
+`partial.RenderWithRequest` still returns the render error directly. `partial.Write` asks the render stage chain for a failure response; without `ext/errors`, it returns the original render error.
 
 ## Localization
-Templates receive a request localizer through the `localizer` and `locale` helpers from `exp/localization`. The interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:
+Templates receive a request localizer through the `localizer` and `locale` helpers from `exp/localization`. The interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Partial.SetFunc`:
 
 ```go
-service.SetFunc(localization.FuncMap(), translator.FuncMap())
-service.Use(localization.Stage())
+root.SetFunc(localization.FuncMap(), translator.FuncMap())
+root.Use(localization.Stage())
 ```
 
 ```go
 ctx := localization.WithLocalizer(r.Context(), localizer)
-_ = content.WriteWithRequest(ctx, w, r)
+_ = partial.Write(ctx, w, r, content)
 ```
 
 ```html
@@ -162,7 +172,7 @@ content.SetResponse(connector.Response{
 })
 ```
 
-With the HTMX connector, these become `HX-Retarget`, `HX-Reswap`, and `HX-Trigger` headers during `WriteWithRequest`.
+With the HTMX connector, these become `HX-Retarget`, `HX-Reswap`, and `HX-Trigger` headers during `partial.Write`.
 
 ## Debug Helper
 The `debug` template helper renders a styled diagnostic box using an embedded template:
@@ -171,11 +181,11 @@ The `debug` template helper renders a styled diagnostic box using an embedded te
 {{ debug runtime . }}
 ```
 
-Register the debug helper and stage globally, per layout, or per partial:
+Register the debug helper and stage globally, per wrapper, or per partial:
 
 ```go
-service.SetFunc(debug.FuncMap())
-service.Use(debug.Stage())
+root.SetFunc(debug.FuncMap())
+root.Use(debug.Stage())
 ```
 
 ## Server-Sent Events
@@ -197,29 +207,26 @@ The writer declares constants for expected headers and event names, such as `Hea
 ## Basic Usage
 Here's a simple typed example. The template owns the contract, the handler supplies the model.
 
-### 1. Create a Service
-The `Service` holds shared render configuration.
+### 1. Create A Root Blueprint
+The root partial holds shared render configuration and is cloned per request.
 
 ```go 
-cfg := &partial.Config{
-    Connector:        connector.NewHTMX(nil), // Choose how request headers are read
-    FS:               os.DirFS("web"),        // Template filesystem
-    UseTemplateCache: true,                   // Enable parsed template caching
-    Events:           events,                 // Optional diagnostic event sink
-}
-
-service := partial.NewService(cfg)
-service.SetFunc(template.FuncMap{
-    "money": formatMoney,
-})
+root := partial.NewID("shell", "templates/shell.html").
+    SetConnector(connector.NewHTMX(nil)).
+    SetFileSystem(os.DirFS("web")).
+    UseTemplateCache(true).
+    SetEvents(events).
+    SetFunc(template.FuncMap{
+        "money": formatMoney,
+    })
 
 ```
 
-## 2. Create Layouts Per Request
-The `Layout` manages the overall structure of one render. Create it inside the
-handler when the content, wrapper, dot data, or registered children are
-request-specific. Shared services and already-configured partial trees can be
-reused across requests; per-request wiring should stay per request.
+## 2. Compose The Root Partial Per Request
+A wrapper partial can render one configured content child through `{{ content }}`.
+Create the tree inside the handler when the content, wrapper, dot data, or
+registered children are request-specific. Clone the configured root blueprint
+per request; per-request wiring should stay on the clone.
 
 ### 3. Define Partials
 Create `Partial` instances for the content and any other components.
@@ -230,7 +237,7 @@ type ContentPage struct {
     Message string
 }
 
-type LayoutPage struct {
+type ShellPage struct {
     AppName string
 }
 
@@ -242,15 +249,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
             Message:   "Welcome to our website!",
         })
     
-    // Optionally, create a wrapper partial (layout)
-    wrapper := partial.NewID("wrapper", "templates/layout.html").
-        SetDot(LayoutPage{AppName: "My Application"})
+    // Clone the shared shell and attach request-specific content.
+    page := root.Clone().
+        SetDot(ShellPage{AppName: "My Application"})
+    page.SetContent(content)
     
-    layout := service.NewLayout().
-        Set(content).
-        Wrap(wrapper)
-    
-    output, err := layout.RenderWithRequest(r.Context(), r)
+    output, err := partial.RenderWithRequest(r.Context(), r, page)
     if err != nil {
         http.Error(w, "An error occurred while rendering the page.", http.StatusInternalServerError)
         return
@@ -260,7 +264,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 ```
 
 ## Template Files
-templates/layout.html
+templates/shell.html
 ```html
 <!DOCTYPE html>
 <html>
@@ -278,7 +282,7 @@ templates/content.html
 <p>{{ .Message }}</p>
 ```
 
-Note: When a layout wraps content, the wrapper renders the configured route partial by calling `{{ content }}`.
+Note: When a wrapper partial wraps content, it renders the configured route partial by calling `{{ content }}`.
 
 
 ### Accessing Data in Templates
@@ -294,14 +298,14 @@ For shared application values, put them on a typed model and declare them with g
 
 ```gotemplate
 {{/*
-@model Service github.com/example/app.ServiceInfo
+@model App github.com/example/app.AppInfo
 */}}
 
-{{ Service.AppName }}
+{{ App.AppName }}
 ```
 
 ```go
-wrapper.SetModel(serviceInfo)
+wrapper.SetModel(AppInfo)
 ```
 
 When `SetDot` is used, request-specific values are available through helpers instead of fields on dot:
@@ -362,7 +366,7 @@ They are opt-in:
 ```go
 import "github.com/donseba/go-partial/exp/interactions"
 
-service.SetFunc(interactions.FuncMap())
+root.SetFunc(interactions.FuncMap())
 ```
 
 Those functions include go-doc signature metadata for the overloads that normal
@@ -428,7 +432,7 @@ target.WithResolver(table, func(ctx context.Context, r *http.Request, target str
 })
 ```
 
-For layout wrappers, render the route content through `content`:
+For wrapper partials, render the route content through `content`:
 
 ```gotemplate
 <main>{{ content }}</main>
@@ -484,7 +488,7 @@ funcs := template.FuncMap{
 p.SetFunc(funcs)
 ```
 
-`SetFunc` registers helpers in the current scope. Function names inherited from the service or layout remain available, and protected go-partial helper names cannot be overwritten.
+`SetFunc` registers helpers in the current scope. Function names inherited from the Root partial or parent partial remain available, and protected go-partial helper names cannot be overwritten.
 
 go-partial reserves only the helpers it injects for rendering and request state:
 `runtime`, `partial`, `content`, `ctx`, `request`, `url`, `locale`, `csrf`,
@@ -501,7 +505,7 @@ import (
     "github.com/donseba/go-partial/exp/templatehelpers"
 )
 
-service.SetFunc(
+root.SetFunc(
     flash.FuncMap(),
     interactions.FuncMap(),
     templatehelpers.StringFuncMap(),
@@ -535,9 +539,9 @@ import (
 )
 
 //go:embed templates/*
-var content embed.FS
+var templatesFS embed.FS
 
-p.SetFileSystem(content)
+p.SetFileSystem(templatesFS)
 ```
 
 If you do not use a custom file system, the package will use the default file system and look for templates relative to the current working directory.
@@ -587,7 +591,7 @@ target.WithResolver(tablePartial, func(ctx context.Context, r *http.Request, tar
     return partial.NewID(target, "templates/row.html").SetDot(row), true
 })
 
-out, err := layout.Set(tablePartial).RenderWithRequest(r.Context(), r)
+out, err := partial.RenderWithRequest(r.Context(), r, tablePartial)
 ```
 
 If the child does not need custom configuration, use `WithTemplate` as shorthand:
@@ -607,12 +611,12 @@ In your templates, prefer this model:
 - **Typed roots**: Additional typed values registered with `SetModel` or `SetContract`.
 - **{{ctx}}**, **{{request}}**, **{{url}}**, **{{locale}}**, **{{csrf}}**, **{{basePath}}**: request-aware helpers that stay available when `SetDot` changes `.`.
 
-go-partial does not wrap your model in `.Data`, `.Service`, `.Layout`, or `.Global`. Shared application values should be explicit typed roots, for example `SetModel(serviceInfo)` with a matching go-doc declaration. Request-scoped values live behind helper functions so changing dot never hides them.
+go-partial does not wrap your model in `.Data`, `.App`, `.Shell`, or `.Global`. Shared application values should be explicit typed roots, for example `SetModel(AppInfo)` with a matching go-doc declaration. Request-scoped values live behind helper functions so changing dot never hides them.
 
 ## Concurrency and Template Caching
-Configure services, layouts, partial trees, functions, render stages, headers, and filesystems before serving requests. After configuration, `RenderWithRequest` and `WriteWithRequest` can be called concurrently on the same partial or layout tree. Request-specific values such as `request`, `url`, `ctx`, `runtime`, stage values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
+Configure reusable root partials, functions, render stages, headers, and filesystems before serving requests. Clone before adding request-specific content or dot data. After configuration, `partial.RenderWithRequest` and `partial.Write` can be called concurrently on cloned partial trees. Request-specific values such as `request`, `url`, `ctx`, `runtime`, stage values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
 
-In HTTP handlers, pass the request context, normally `r.Context()` or a context derived from it. That lets cancellation, deadlines, localization, CSRF state, event sinks, metrics IDs, and other middleware values follow the render. `Render(ctx)` without a request is for tests, offline rendering, and small utilities.
+In HTTP handlers, pass the request context, normally `r.Context()` or a context derived from it. That lets cancellation, deadlines, localization, CSRF state, event sinks, metrics IDs, and other middleware values follow the render. `partial.Render(ctx, p)` without a request is for tests, offline rendering, and small utilities.
 
 Do not call configuration methods such as `SetFunc`, `Use`, `With`, `SetDot`, `SetFileSystem`, `SetConnector`, or `SetResponseHeaders` while the same tree is being rendered. Build or clone a separate tree when configuration needs to change at runtime.
 
@@ -620,16 +624,14 @@ Mutable builder and stream/session helpers are intentionally single-owner values
 
 The package also includes concurrency safety measures for template caching:
 
-- Parsed templates are cached per service.
-- Mutexes prevent duplicate parsing for the same service/template/function shape.
+- Parsed templates are cached by the configured partial tree.
+- Mutexes prevent duplicate parsing for the same Root partial/template/function shape.
 - Cached templates are rebound with request-specific functions per render.
 - Rendered HTML is not cached.
 - Set `UseTemplateCache` to `true` to enable parsed template caching.
 
 ```go
-cfg := &partial.Config{
-    UseTemplateCache: true,
-}
+root.UseTemplateCache(true)
 ```
 
 ## Handling Partial Rendering via HTTP Headers
@@ -638,7 +640,8 @@ You can render specific partials based on the X-Target header (or your custom he
 Example:
 ```go
 func handler(w http.ResponseWriter, r *http.Request) {
-    output, err := layout.RenderWithRequest(r.Context(), r)
+    page := root.Clone().SetContent(content)
+    output, err := partial.RenderWithRequest(r.Context(), r, page)
     if err != nil {
         http.Error(w, "An error occurred while rendering the page.", http.StatusInternalServerError)
         return

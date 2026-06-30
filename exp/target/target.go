@@ -105,13 +105,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs target helpers and applies configured target resolvers.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 func firstRenderContext(ctx []*partial.RenderContext) *partial.RenderContext {
 	if len(ctx) == 0 {
 		return nil

@@ -28,7 +28,7 @@ func TestWithActionCanReplacePartial(t *testing.T) {
 		return partial.NewID("next", "next.gohtml").SetFileSystem(fsys), nil
 	})
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -52,7 +52,7 @@ func TestTemplateActionAndHelpers(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(connector.HeaderAction.String(), "save")
-	out, err := p.RenderWithRequest(context.Background(), req)
+	out, err := partial.RenderWithRequest(context.Background(), req, p)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -74,7 +74,7 @@ func TestTemplateActionUsesErrorFallback(t *testing.T) {
 		return partial.NewID("broken", "broken.gohtml").SetFileSystem(fsys), nil
 	})
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -111,7 +111,7 @@ func TestTemplateActionRendersConcurrently(t *testing.T) {
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
 			req.Header.Set(connector.HeaderAction.String(), "save-"+value)
-			out, err := p.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

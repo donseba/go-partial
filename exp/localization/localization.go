@@ -62,13 +62,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs locale and localizer template helpers.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 // WithLocalizer stores a Localizer on a context.
 func WithLocalizer(ctx context.Context, localizer Localizer) context.Context {
 	return context.WithValue(ctx, localizerContextKey, localizer)

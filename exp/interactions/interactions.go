@@ -3,7 +3,7 @@
 // The core go-partial package does not register these helpers automatically.
 // Applications opt in with:
 //
-//	service.SetFunc(interactions.FuncMap())
+//	root.SetFunc(interactions.FuncMap())
 package interactions
 
 import (
@@ -80,13 +80,6 @@ func Stage(markup ...MarkupRenderer) partial.RenderStage {
 			return renderer(data.Runtime, data.Interaction, data.Attrs)
 		},
 	}
-}
-
-// Renderer returns a partial renderer for interaction markup.
-//
-// Deprecated: use Stage.
-func Renderer(markup ...MarkupRenderer) partial.RenderStage {
-	return Stage(markup...)
 }
 
 // NewAsync creates an async interaction contract value.
@@ -243,7 +236,7 @@ func (i Interaction) Option(key string, value any) Interaction {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Async(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionAsync, value, args...)
+	return Render(connector.InteractionAsync, value, runtime, args...)
 }
 
 // Reveal renders an interaction that loads when the element enters the viewport.
@@ -251,7 +244,7 @@ func Async(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Reveal(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionReveal, value, args...)
+	return Render(connector.InteractionReveal, value, runtime, args...)
 }
 
 // Poll renders an interaction that refreshes on an interval. When an endpoint
@@ -260,7 +253,7 @@ func Reveal(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Poll(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionPoll, value, args...)
+	return Render(connector.InteractionPoll, value, runtime, args...)
 }
 
 // On renders an interaction that refreshes when a browser event is dispatched.
@@ -277,7 +270,7 @@ func On(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Stream(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionStream, value, args...)
+	return Render(connector.InteractionStream, value, runtime, args...)
 }
 
 // Prefetch renders a non-visual prefetch hint.
@@ -285,7 +278,7 @@ func Stream(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Prefetch(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionPrefetch, value, args...)
+	return Render(connector.InteractionPrefetch, value, runtime, args...)
 }
 
 // Refresh renders a control that explicitly refreshes a target.
@@ -294,10 +287,10 @@ func Prefetch(runtime *partial.Runtime, value any, args ...any) template.HTML {
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTML
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTML
 func Refresh(runtime *partial.Runtime, value any, args ...any) template.HTML {
-	return render(runtime, connector.InteractionRefresh, value, args...)
+	return Render(connector.InteractionRefresh, value, runtime, args...)
 }
 
-func render(runtime *partial.Runtime, kind connector.InteractionKind, value any, args ...any) template.HTML {
+func Render(kind connector.InteractionKind, value any, runtime *partial.Runtime, args ...any) template.HTML {
 	interaction, err := fromValue(kind, value, args...)
 	if err != nil {
 		return escapedError(err)

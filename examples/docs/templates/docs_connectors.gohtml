@@ -5,12 +5,9 @@
     <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Connectors let go-partial understand request headers from a frontend library or a custom fetch client.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Choose a connector</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    Connector: connector.NewHTMX(nil),
-    FS:        os.DirFS("web"),
-})</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").SetConnector(connector.NewHTMX(nil)).SetFileSystem(os.DirFS("web"))</code></pre>
 
-    <p class="leading-7 text-slate-400">The connector is applied to layouts, content partials, registered regions, selected partials, and out-of-band partials rendered through the service.</p>
+    <p class="leading-7 text-slate-400">The connector is applied to wrapper partials, content partials, registered regions, selected partials, and out-of-band partials rendered through the root.</p>
 
     <h2 class="text-xl font-bold text-slate-50">Included connectors</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
@@ -41,11 +38,10 @@
     <h2 class="text-xl font-bold text-slate-50">URL query fallback</h2>
     <p class="leading-7 text-slate-400">Set <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">UseURLQuery</code> when a client cannot send custom headers. go-partial will read <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">select</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">action</code> from the query string after checking headers.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    Connector: connector.NewPartial(&connector.Config{
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
+    SetConnector(connector.NewPartial(&connector.Config{
         UseURLQuery: true,
-    }),
-})</code></pre>
+    }))</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Response instructions</h2>
     <p class="leading-7 text-slate-400">Partials can set protocol-neutral response instructions. The connector turns them into response headers when supported.</p>

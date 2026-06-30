@@ -105,7 +105,7 @@ func (app *App) renderLiveMetricRow(ctx context.Context, record metrics.Record) 
 	row := partial.NewID("live-metric-row", "templates/live_metric_row.gohtml").
 		SetFileSystem(os.DirFS("examples/showcase")).
 		SetDot(liveMetricRow(record))
-	return row.Render(ctx)
+	return partial.Render(ctx, row)
 }
 
 func liveMetricRow(record metrics.Record) LiveMetricRow {

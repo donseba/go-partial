@@ -35,20 +35,18 @@ type DocsShellPage struct {
 }
 
 type App struct {
-	service *partial.Service
+	root *partial.Partial
 }
 
 func main() {
+	root := partial.NewID("shell", "templates/shell.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(os.DirFS("examples/docs")).
+		Use(exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed))).
+		SetFunc(interactions.FuncMap(), templatehelpers.FuncMap())
 	app := &App{
-		service: partial.NewService(&partial.Config{
-			Connector: connector.NewHTMX(nil),
-			FS:        os.DirFS("examples/docs"),
-			Stages: []partial.RenderStage{
-				exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)),
-			},
-		}),
+		root: root,
 	}
-	app.service.SetFunc(interactions.FuncMap(), templatehelpers.FuncMap())
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.overview)
 	mux.HandleFunc("/docs/installation", app.installation)
@@ -182,17 +180,17 @@ func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string, conf
 	header := DocsHeaderPage{}
 	nav := app.navItems()
 	sidebar := DocsNavPage{Nav: nav, Groups: navGroups(nav)}
-	wrapper := partial.NewID("layout", "templates/layout.gohtml").SetDot(DocsShellPage{
+	root := app.root.Clone().SetDot(DocsShellPage{
 		AppName: "go-partial",
 		Header:  header,
 		Sidebar: sidebar,
 	})
-	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true))
-	wrapper.WithOOB(partial.NewID("sidebar", "templates/sidebar.gohtml").SetDot(sidebar).SetAlwaysSwapOOB(true))
+	root.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true))
+	root.WithOOB(partial.NewID("sidebar", "templates/sidebar.gohtml").SetDot(sidebar).SetAlwaysSwapOOB(true))
+	root.SetContent(content)
 
-	layout := app.service.NewLayout().Set(content).Wrap(wrapper)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := layout.WriteWithRequest(r.Context(), w, r); err != nil {
+	if err := partial.Write(r.Context(), w, r, root); err != nil {
 		log.Printf("render error: %v", err)
 	}
 }

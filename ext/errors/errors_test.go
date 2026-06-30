@@ -100,7 +100,7 @@ func TestRendererUsesAllLifecyclePhases(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestUsesErrorRenderResponse(t *testing.T) {
+func TestWriteUsesErrorRenderResponse(t *testing.T) {
 	p := partial.New("broken.gohtml").
 		ID("broken").
 		SetFileSystem(fstest.MapFS{
@@ -110,9 +110,9 @@ func TestWriteWithRequestUsesErrorRenderResponse(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
-	err := p.WriteWithRequest(req.Context(), rec, req)
+	err := partial.Write(req.Context(), rec, req, p)
 	if err == nil {
-		t.Fatal("WriteWithRequest() error = nil, want original render error")
+		t.Fatal("Write() error = nil, want original render error")
 	}
 
 	if rec.Code != http.StatusInternalServerError {
@@ -172,7 +172,7 @@ func TestRendererHandlesConcurrentFailures(t *testing.T) {
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/broken?value="+value, nil)
 			rec := httptest.NewRecorder()
-			err := p.WriteWithRequest(req.Context(), rec, req)
+			err := partial.Write(req.Context(), rec, req, p)
 			if err == nil {
 				errs <- "missing error " + value
 				return

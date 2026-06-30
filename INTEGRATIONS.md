@@ -16,10 +16,9 @@ Selection and action values use the shared `X-Select` and `X-Action` headers unl
 ## HTMX
 
 ```go
-svc := partial.NewService(&partial.Config{
-    Connector: connector.NewHTMX(nil),
-    FS:        os.DirFS("web"),
-})
+root := partial.New("shell.gohtml").
+    SetConnector(connector.NewHTMX(nil)).
+    SetFileSystem(os.DirFS("web"))
 ```
 
 ```html
@@ -37,7 +36,7 @@ notice.Response().
     ReswapWith(connector.NewSwap().Style(connector.SwapOuterHTML)).
     TriggerWith(connector.NewTrigger().AddEvent("saved"))
 
-_ = notice.WriteWithRequest(r.Context(), w, r)
+_ = partial.Write(r.Context(), w, r, notice)
 ```
 
 The HTMX connector writes headers such as `HX-Retarget`, `HX-Reswap`, and `HX-Trigger`.
@@ -47,12 +46,11 @@ The HTMX connector writes headers such as `HX-Retarget`, `HX-Reswap`, and `HX-Tr
 Use the neutral connector when your own fetch code sends go-partial headers.
 
 ```go
-svc := partial.NewService(&partial.Config{
-    Connector: connector.NewPartial(&connector.Config{
+root := partial.New("shell.gohtml").
+    SetConnector(connector.NewPartial(&connector.Config{
         UseURLQuery: true,
-    }),
-    FS: os.DirFS("web"),
-})
+    })).
+    SetFileSystem(os.DirFS("web"))
 ```
 
 ```js
@@ -71,12 +69,11 @@ When `UseURLQuery` is enabled, `target`, `select`, and `action` query parameters
 Turbo Frame requests can target a frame through the `Turbo-Frame` header.
 
 ```go
-svc := partial.NewService(&partial.Config{
-	Connector: connector.NewTurbo(nil),
-	FS:        os.DirFS("templates"),
-})
+root := partial.New("shell.gohtml").
+	SetConnector(connector.NewTurbo(nil)).
+	SetFileSystem(os.DirFS("templates"))
 content := partial.NewID("account-frame", "account.gohtml")
-_ = svc.NewLayout().Set(content).WriteWithRequest(ctx, w, r)
+_ = partial.Write(ctx, w, r, root.Clone().SetContent(content))
 ```
 
 ```html
@@ -88,12 +85,11 @@ _ = svc.NewLayout().Set(content).WriteWithRequest(ctx, w, r)
 Unpoly fragment requests use `X-Up-Target`.
 
 ```go
-svc := partial.NewService(&partial.Config{
-	Connector: connector.NewUnpoly(nil),
-	FS:        os.DirFS("templates"),
-})
+root := partial.New("shell.gohtml").
+	SetConnector(connector.NewUnpoly(nil)).
+	SetFileSystem(os.DirFS("templates"))
 content := partial.NewID("content", "content.gohtml")
-_ = svc.NewLayout().Set(content).WriteWithRequest(ctx, w, r)
+_ = partial.Write(ctx, w, r, root.Clone().SetContent(content))
 ```
 
 ```html

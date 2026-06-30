@@ -243,13 +243,6 @@ func Stage(sink Sink, options ...Option) partial.RenderStage {
 	}
 }
 
-// Renderer returns a passive renderer that records render timing and output size.
-//
-// Deprecated: use Stage.
-func Renderer(sink Sink, options ...Option) partial.RenderStage {
-	return Stage(sink, options...)
-}
-
 // EventSink returns a diagnostic event consumer that records events as metrics records.
 func EventSink(sink Sink, options ...Option) partial.EventSink {
 	cfg := config{

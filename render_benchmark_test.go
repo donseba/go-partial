@@ -16,20 +16,20 @@ type benchmarkRow struct {
 	Status string
 }
 
-func BenchmarkRenderLayoutNoCache(b *testing.B) {
-	benchmarkRenderReusableLayout(b, false)
+func BenchmarkRenderShellNoCache(b *testing.B) {
+	benchmarkRenderReusableShell(b, false)
 }
 
-func BenchmarkRenderLayoutWithCache(b *testing.B) {
-	benchmarkRenderReusableLayout(b, true)
+func BenchmarkRenderShellWithCache(b *testing.B) {
+	benchmarkRenderReusableShell(b, true)
 }
 
-func BenchmarkRenderLayoutPerRequestNoCache(b *testing.B) {
-	benchmarkRenderPerRequestLayout(b, false)
+func BenchmarkRenderShellPerRequestNoCache(b *testing.B) {
+	benchmarkRenderPerRequestShell(b, false)
 }
 
-func BenchmarkRenderLayoutPerRequestWithCache(b *testing.B) {
-	benchmarkRenderPerRequestLayout(b, true)
+func BenchmarkRenderShellPerRequestWithCache(b *testing.B) {
+	benchmarkRenderPerRequestShell(b, true)
 }
 
 func BenchmarkRenderWithRequestSimpleNoCache(b *testing.B) {
@@ -52,7 +52,7 @@ func benchmarkRenderWithRequestSimple(b *testing.B, useCache bool) {
 	ctx := context.Background()
 
 	if useCache {
-		if _, err := partial.RenderWithRequest(ctx, request); err != nil {
+		if _, err := RenderWithRequest(ctx, request, partial); err != nil {
 			b.Fatalf("prime render: %v", err)
 		}
 	}
@@ -60,7 +60,7 @@ func benchmarkRenderWithRequestSimple(b *testing.B, useCache bool) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		out, err := partial.RenderWithRequest(ctx, request)
+		out, err := RenderWithRequest(ctx, request, partial)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -70,19 +70,16 @@ func benchmarkRenderWithRequestSimple(b *testing.B, useCache bool) {
 	}
 }
 
-func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
-	svc := NewService(&Config{
-		FS:               benchmarkFS(),
-		UseTemplateCache: useCache,
-	})
+func benchmarkRenderReusableShell(b *testing.B, useCache bool) {
+	svc := newTestBlueprint(testBlueprintFS(benchmarkFS()), testBlueprintCache(useCache))
 	svc.SetFunc(templatehelpers.FuncMap())
 	content := benchmarkContentPartial()
-	wrapper := benchmarkLayoutPartial()
+	wrapper := benchmarkShellPartial()
 	request := benchmarkRequest()
 	ctx := context.Background()
 
 	if useCache {
-		if _, err := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(ctx, request); err != nil {
+		if _, err := RenderWithRequest(ctx, request, svc.Compose(content, wrapper)); err != nil {
 			b.Fatalf("prime render: %v", err)
 		}
 	}
@@ -90,7 +87,7 @@ func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		out, err := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(ctx, request)
+		out, err := RenderWithRequest(ctx, request, svc.Compose(content, wrapper))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -100,17 +97,14 @@ func benchmarkRenderReusableLayout(b *testing.B, useCache bool) {
 	}
 }
 
-func benchmarkRenderPerRequestLayout(b *testing.B, useCache bool) {
-	svc := NewService(&Config{
-		FS:               benchmarkFS(),
-		UseTemplateCache: useCache,
-	})
+func benchmarkRenderPerRequestShell(b *testing.B, useCache bool) {
+	svc := newTestBlueprint(testBlueprintFS(benchmarkFS()), testBlueprintCache(useCache))
 	svc.SetFunc(templatehelpers.FuncMap())
 	request := benchmarkRequest()
 	ctx := context.Background()
 
 	if useCache {
-		if _, err := svc.NewLayout().Set(benchmarkContentPartial()).Wrap(benchmarkLayoutPartial()).RenderWithRequest(ctx, request); err != nil {
+		if _, err := RenderWithRequest(ctx, request, svc.Compose(benchmarkContentPartial(), benchmarkShellPartial())); err != nil {
 			b.Fatalf("prime render: %v", err)
 		}
 	}
@@ -118,7 +112,7 @@ func benchmarkRenderPerRequestLayout(b *testing.B, useCache bool) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		out, err := svc.NewLayout().Set(benchmarkContentPartial()).Wrap(benchmarkLayoutPartial()).RenderWithRequest(ctx, request)
+		out, err := RenderWithRequest(ctx, request, svc.Compose(benchmarkContentPartial(), benchmarkShellPartial()))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -139,11 +133,11 @@ func benchmarkContentPartial() *Partial {
 		With(row)
 }
 
-func benchmarkLayoutPartial() *Partial {
+func benchmarkShellPartial() *Partial {
 	notice := NewID("notice", "templates/notice.gohtml").
 		SetDot(map[string]any{"Message": "Rendered as an OOB child"}).
 		SetAlwaysSwapOOB(true)
-	return NewID("layout", "templates/layout.gohtml").
+	return NewID("shell", "templates/shell.gohtml").
 		SetDot(map[string]any{"App": "Bench App"}).
 		WithOOB(notice)
 }
@@ -163,7 +157,7 @@ func benchmarkRows(count int) []benchmarkRow {
 
 func benchmarkFS() *inMemoryFS {
 	return &inMemoryFS{Files: map[string]string{
-		"templates/layout.gohtml":  `<!doctype html><html><body><header>{{ .App }}</header>{{ content }}</body></html>`,
+		"templates/shell.gohtml":   `<!doctype html><html><body><header>{{ .App }}</header>{{ content }}</body></html>`,
 		"templates/content.gohtml": `<section><h1>{{ .Title }}</h1><table>{{ range .Rows }}{{ template "row.gohtml" (dict "Row" . "Owner" $.Owner) }}{{ end }}</table></section>`,
 		"templates/row.gohtml":     `<tr id="row-{{ .Row.ID }}"><td>{{ .Row.Name }}</td><td>{{ .Row.Price }}</td><td>{{ .Row.Status }}</td><td>{{ .Owner }}</td></tr>`,
 		"templates/notice.gohtml":  `<aside id="notice"{{ oobAttr }}>{{ .Message }}</aside>`,

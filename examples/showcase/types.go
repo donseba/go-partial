@@ -267,7 +267,7 @@ type ShellPage struct {
 }
 
 type App struct {
-	service       *partial.Service
+	root          *partial.Partial
 	events        *partial.AsyncEvents
 	rows          []Row
 	products      []Product

@@ -48,7 +48,7 @@ content.SetDot(Page{
 
     content := partial.NewID("async-row", "templates/row.gohtml").SetDot(row)
 
-    _ = content.WriteWithRequest(r.Context(), w, r)
+    _ = partial.Write(r.Context(), w, r, content)
 }</code></pre>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;strong&gt;{{ "{{ .Name }}" }}&lt;/strong&gt;</code></pre>

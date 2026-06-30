@@ -106,7 +106,7 @@ ctx.Emit(partial.Event{
 Implemented attachment points:
 
 - `RenderContext.Emit(event)` is convenient for Stages.
-- `Config.Events` attaches sinks at the service boundary.
+- `Partial.SetEvents` attaches sinks to a reusable partial tree.
 - `partial.WithEventSink(ctx, sink)` attaches request-scoped sinks. Repeated
   calls append with fanout.
 
@@ -126,7 +126,7 @@ render.oob_error
 template.missing
 template.parse_error
 func.protected
-content.missing_layout
+content.missing
 target.missing
 ```
 
@@ -185,7 +185,7 @@ Trace consumers can use request context, `TraceID`, `SpanID`, and
 
 ```text
 GET /metrics
-  render layout
+  render tree
     slot header
       render header
     render content
@@ -232,7 +232,7 @@ render latency.
 ## Migration State
 
 1. Core has `Event`, `EventLevel`, `EventSink`, `EventSinkFunc`, async dispatch, and fanout.
-2. `Config.Events` propagates into `RenderContext`.
+2. `Partial.SetEvents` propagates into `RenderContext`.
 3. Core render/template/target failures emit diagnostic events instead of calling a logger.
 4. `ext/logger` consumes events through `slog`.
 5. `exp/metrics` can consume events, though the showcase keeps render metrics and diagnostic logs separate.

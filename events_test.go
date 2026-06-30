@@ -48,7 +48,7 @@ func TestAsyncEventsEmitDoesNotBlockOnSlowSink(t *testing.T) {
 func TestRenderContextEmitFillsIdentity(t *testing.T) {
 	var got Event
 	p := NewID("content", "content.gohtml")
-	parent := NewID("layout", "layout.gohtml").With(p)
+	parent := NewID("shell", "shell.gohtml").With(p)
 	p.parent = parent
 	ctx := newRenderContext(context.Background(), p, nil, RenderKindPartial)
 	ctx.Events = EventSinkFunc(func(ctx *RenderContext, event Event) {
@@ -63,7 +63,7 @@ func TestRenderContextEmitFillsIdentity(t *testing.T) {
 	if got.Level != EventInfo {
 		t.Fatalf("Level = %q, want %q", got.Level, EventInfo)
 	}
-	if got.PartialID != "content" || got.ParentID != "layout" {
+	if got.PartialID != "content" || got.ParentID != "shell" {
 		t.Fatalf("identity = partial %q parent %q", got.PartialID, got.ParentID)
 	}
 }
@@ -92,14 +92,14 @@ func TestRenderEmitsLifecycleEvents(t *testing.T) {
 		"page.gohtml": {Data: []byte(`hello {{ .Name }}`)},
 	}
 	var events []Event
+	ctx := WithEventSink(context.Background(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		events = append(events, event)
+	}))
 	page := NewID("page", "page.gohtml").
 		SetFileSystem(files).
-		SetDot(map[string]string{"Name": "world"}).
-		SetEventSink(EventSinkFunc(func(ctx *RenderContext, event Event) {
-			events = append(events, event)
-		}))
+		SetDot(map[string]string{"Name": "world"})
 
-	html, err := page.RenderWithRequest(context.Background(), httptestRequest("GET", "/page"))
+	html, err := RenderWithRequest(ctx, httptestRequest("GET", "/page"), page)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -125,7 +125,7 @@ func TestRequestContextEventSinkReceivesLifecycleEvents(t *testing.T) {
 	}))
 	page := NewID("page", "page.gohtml").SetFileSystem(files)
 
-	if _, err := page.RenderWithRequest(ctx, httptestRequest("GET", "/page")); err != nil {
+	if _, err := RenderWithRequest(ctx, httptestRequest("GET", "/page"), page); err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 
@@ -145,7 +145,7 @@ func TestRequestContextEventSinkReceivesTemplateHelperEvents(t *testing.T) {
 		events = append(events, event)
 	}))
 
-	if _, err := page.RenderWithRequest(ctx, req); err != nil {
+	if _, err := RenderWithRequest(ctx, req, page); err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 
@@ -165,7 +165,7 @@ func TestRequestContextEventSinkReceivesTemplateParseError(t *testing.T) {
 		events = append(events, event)
 	}))
 
-	if _, err := page.RenderWithRequest(ctx, req); err == nil {
+	if _, err := RenderWithRequest(ctx, req, page); err == nil {
 		t.Fatal("RenderWithRequest() error = nil, want parse error")
 	}
 	if !hasEvent(events, EventTemplateParseError) {
@@ -190,7 +190,7 @@ func TestRequestContextEventSinkReceivesTemplateExecuteError(t *testing.T) {
 		events = append(events, event)
 	}))
 
-	if _, err := page.RenderWithRequest(ctx, req); err == nil {
+	if _, err := RenderWithRequest(ctx, req, page); err == nil {
 		t.Fatal("RenderWithRequest() error = nil, want execute error")
 	}
 	if !hasEvent(events, EventTemplateExecuteError) {
@@ -198,31 +198,30 @@ func TestRequestContextEventSinkReceivesTemplateExecuteError(t *testing.T) {
 	}
 }
 
-func TestRequestContextEventSinkFansOutWithPartialSink(t *testing.T) {
+func TestRequestContextEventSinkFansOut(t *testing.T) {
 	files := fstest.MapFS{
 		"page.gohtml": {Data: []byte(`hello`)},
 	}
-	var partialCount atomic.Int64
-	var requestCount atomic.Int64
+	var firstCount atomic.Int64
+	var secondCount atomic.Int64
 	ctx := WithEventSink(context.Background(), EventSinkFunc(func(ctx *RenderContext, event Event) {
 		if event.Kind == EventRenderFinish {
-			requestCount.Add(1)
+			firstCount.Add(1)
 		}
 	}))
-	page := NewID("page", "page.gohtml").
-		SetFileSystem(files).
-		SetEventSink(EventSinkFunc(func(ctx *RenderContext, event Event) {
-			if event.Kind == EventRenderFinish {
-				partialCount.Add(1)
-			}
-		}))
+	ctx = WithEventSink(ctx, EventSinkFunc(func(ctx *RenderContext, event Event) {
+		if event.Kind == EventRenderFinish {
+			secondCount.Add(1)
+		}
+	}))
+	page := NewID("page", "page.gohtml").SetFileSystem(files)
 
-	if _, err := page.RenderWithRequest(ctx, httptestRequest("GET", "/page")); err != nil {
+	if _, err := RenderWithRequest(ctx, httptestRequest("GET", "/page"), page); err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 
-	if partialCount.Load() != 1 || requestCount.Load() != 1 {
-		t.Fatalf("partialCount = %d requestCount = %d, want 1/1", partialCount.Load(), requestCount.Load())
+	if firstCount.Load() != 1 || secondCount.Load() != 1 {
+		t.Fatalf("firstCount = %d secondCount = %d, want 1/1", firstCount.Load(), secondCount.Load())
 	}
 }
 

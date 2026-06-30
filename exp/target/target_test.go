@@ -36,7 +36,7 @@ func TestRendererResolvesDynamicTarget(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/rows", nil)
 	req.Header.Set(connector.HeaderTarget.String(), "row-2")
-	out, err := table.RenderWithRequest(context.Background(), req)
+	out, err := partial.RenderWithRequest(context.Background(), req, table)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -56,7 +56,7 @@ func TestRendererAddsTargetHelpers(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(connector.HeaderTarget.String(), "content")
 
-	out, err := p.RenderWithRequest(context.Background(), req)
+	out, err := partial.RenderWithRequest(context.Background(), req, p)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -91,7 +91,7 @@ func TestRendererResolvesTargetsConcurrently(t *testing.T) {
 			target := "row-" + value
 			req := httptest.NewRequest(http.MethodGet, "/rows?value="+value, nil)
 			req.Header.Set(connector.HeaderTarget.String(), target)
-			out, err := table.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, table)
 			if err != nil {
 				errs <- err.Error()
 				return

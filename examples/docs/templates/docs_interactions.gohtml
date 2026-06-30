@@ -60,7 +60,7 @@
     <h2 class="text-xl font-bold text-slate-50">Custom markup</h2>
     <p class="leading-7 text-slate-400">The default stage is intentionally simple. Applications can replace it when registering the optional interaction helper functions. The connector still supplies the protocol attributes, so your stage owns the element, classes, loading state, and accessibility text.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.Use(interactions.Stage(func(
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.Use(interactions.Stage(func(
     runtime *partial.Runtime,
     interaction connector.Interaction,
     attrs map[string]string,

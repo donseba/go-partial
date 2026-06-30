@@ -32,7 +32,7 @@ func TestRendererAddsCSRFHelper(t *testing.T) {
 		Use(Stage())
 
 	req := httptest.NewRequest("GET", "/", nil)
-	out, err := p.RenderWithRequest(WithToken(context.Background(), staticToken{}), req)
+	out, err := partial.RenderWithRequest(WithToken(context.Background(), staticToken{}), req, p)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -69,7 +69,7 @@ func TestRendererAddsCSRFHelperConcurrently(t *testing.T) {
 			value := "token-" + strconv.Itoa(i)
 			req := httptest.NewRequest("GET", "/", nil)
 			ctx := WithToken(req.Context(), valueToken(value))
-			out, err := p.RenderWithRequest(ctx, req)
+			out, err := partial.RenderWithRequest(ctx, req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

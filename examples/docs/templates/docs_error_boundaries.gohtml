@@ -12,7 +12,7 @@
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
         <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Failure</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Result</th></tr></thead>
         <tbody>
-            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Top-level content fails during <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">WriteWithRequest</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">A full error page for normal requests, or a swappable error fragment for HTMX requests.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Top-level content fails during <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.Write</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">A full error page for normal requests, or a swappable error fragment for HTMX requests.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Registered region fails inside a parent template</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The parent keeps rendering and the region position receives an error fragment.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Selected partial fails inside <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The selected tab or panel receives an error fragment while the rest of the page survives.</td></tr>
             <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">RenderWithRequest</code> returns an error</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The caller decides how to handle it. The embedded page is a writer-level behavior.</td></tr>
@@ -22,11 +22,11 @@
     <h2 class="text-xl font-bold text-slate-50">Development and production</h2>
     <p class="leading-7 text-slate-400">The default extension mode is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">errors.ModeSafe</code>. It keeps the fallback useful but hides detailed error messages. During development, opt into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">errors.ModeDetailed</code> to show the partial ID, template list, URL, template location, and original error.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(nil).
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
     Use(errors.Stage(errors.WithMode(errors.ModeDetailed)))</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Custom stage</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(nil).
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
     Use(partial.RenderStageHooks{
         RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
             if ctx.Kind != errors.RenderKindError {

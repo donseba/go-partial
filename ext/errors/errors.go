@@ -181,13 +181,6 @@ func Stage(options ...Option) partial.RenderStage {
 	}
 }
 
-// Renderer returns a renderer that handles error render contexts.
-//
-// Deprecated: use Stage.
-func Renderer(options ...Option) partial.RenderStage {
-	return Stage(options...)
-}
-
 func stateData(ctx *partial.RenderContext, mode Mode) Data {
 	if ctx == nil {
 		return BuildData(nil, mode)

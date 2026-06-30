@@ -54,17 +54,17 @@ func TestLoggerTemplateHelperEmitsEvent(t *testing.T) {
 		"page.gohtml": {Data: []byte(`before{{ logger "from template" "section" "hero" }}after`)},
 	}
 	var got partial.Event
+	ctx := partial.WithEventSink(context.Background(), partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
+		if event.Kind == EventTemplateLog {
+			got = event
+		}
+	}))
 	page := partial.NewID("page", "page.gohtml").
 		SetFileSystem(files).
 		SetFunc(FuncMap()).
-		SetEventSink(partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
-			if event.Kind == EventTemplateLog {
-				got = event
-			}
-		})).
 		Use(Stage())
 
-	html, err := page.Render(context.Background())
+	html, err := partial.Render(ctx, page)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -116,11 +116,6 @@ func TestLoggerTemplateHelperEmitsConcurrentEvents(t *testing.T) {
 	page := partial.NewID("page", "page.gohtml").
 		SetFileSystem(files).
 		SetFunc(FuncMap()).
-		SetEventSink(partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
-			if event.Kind == EventTemplateLog {
-				count.Store(event.Fields["value"], true)
-			}
-		})).
 		Use(Stage())
 
 	const renders = 64
@@ -132,7 +127,12 @@ func TestLoggerTemplateHelperEmitsConcurrentEvents(t *testing.T) {
 			defer wg.Done()
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest("GET", "/?value="+value, nil)
-			if _, err := page.RenderWithRequest(req.Context(), req); err != nil {
+			ctx := partial.WithEventSink(req.Context(), partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
+				if event.Kind == EventTemplateLog {
+					count.Store(event.Fields["value"], true)
+				}
+			}))
+			if _, err := partial.RenderWithRequest(ctx, req, page); err != nil {
 				errs <- err.Error()
 			}
 		}(i)

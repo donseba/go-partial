@@ -19,7 +19,7 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
 			}
 
-			result := child.renderSelfResult(state.Context, state.Request)
+			result := renderSelfResult(state.Context, state.Request, child)
 			if result.Err != nil {
 				state.EmitForPartial(child, Event{
 					Kind:    EventRenderError,
@@ -28,7 +28,7 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 					Error:   result.Err,
 					Fields:  map[string]any{"path": templatePath},
 				})
-				fallback, fallbackErr := child.renderErrorFragment(state.Context, state.Request, result.Err)
+				fallback, fallbackErr := renderErrorFragment(state.Context, state.Request, child, result.Err)
 				if fallbackErr != nil {
 					return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, fallbackErr))
 				}
@@ -82,24 +82,24 @@ func applyPartialTemplateArgs(state *RenderContext, p *Partial, id string, args 
 
 func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 	return func() template.HTML {
-		if p.layoutContentID == "" {
+		if p.contentID == "" {
 			state.EmitForPartial(p, Event{
-				Kind:    EventContentMissingLayout,
+				Kind:    EventContentMissing,
 				Level:   EventWarn,
-				Message: "content helper used outside layout wrapper",
+				Message: "content helper used without a content child",
 				Fields:  map[string]any{"id": p.id},
 			})
-			return template.HTML("content is only available on layout wrappers")
+			return template.HTML("content is only available when a content child is configured")
 		}
 
-		html, err := p.renderChildPartial(state.Context, state.Request, p.layoutContentID)
+		html, err := renderChildPartial(state.Context, state.Request, p, p.contentID)
 		if err != nil {
 			state.EmitForPartial(p, Event{
 				Kind:    EventRenderError,
 				Level:   EventError,
-				Message: "error rendering layout content",
+				Message: "error rendering content child",
 				Error:   err,
-				Fields:  map[string]any{"id": p.layoutContentID},
+				Fields:  map[string]any{"id": p.contentID},
 			})
 			return template.HTML(fmt.Sprintf("error rendering content: %v", err))
 		}

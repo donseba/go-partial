@@ -13,9 +13,18 @@ import (
 
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/exp/actions"
+	"github.com/donseba/go-partial/exp/csrf"
+	"github.com/donseba/go-partial/exp/flash"
 	"github.com/donseba/go-partial/exp/interactions"
+	"github.com/donseba/go-partial/exp/localization"
 	"github.com/donseba/go-partial/exp/metrics"
+	"github.com/donseba/go-partial/exp/selection"
 	"github.com/donseba/go-partial/exp/slots"
+	"github.com/donseba/go-partial/exp/target"
+	"github.com/donseba/go-partial/exp/templatehelpers"
+	extdebug "github.com/donseba/go-partial/ext/debug"
+	extlogger "github.com/donseba/go-partial/ext/logger"
 )
 
 func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
@@ -30,13 +39,14 @@ func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl s
 }
 
 func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
-	layout := app.service.NewLayout().Set(content).Wrap(app.wrapper())
-	app.writeLayout(w, r, layout)
+	root := app.wrapper().SetContent(content)
+	app.writePartial(w, r, root)
 }
 
 func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	out, err := app.standaloneService(connector.NewHTMX(nil)).NewLayout().Set(content).RenderWithRequest(app.requestContext(r), r)
+	content = app.configureStandalone(content, connector.NewHTMX(nil))
+	out, err := partial.RenderWithRequest(app.requestContext(r), r, content)
 	if err != nil {
 		log.Printf("render error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -45,16 +55,17 @@ func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *pa
 	_, _ = w.Write([]byte(out))
 }
 
-func (app *App) writeLayout(w http.ResponseWriter, r *http.Request, layout *partial.Layout) {
+func (app *App) writePartial(w http.ResponseWriter, r *http.Request, root *partial.Partial) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := layout.WriteWithRequest(app.requestContext(r), w, r); err != nil {
+	if err := partial.Write(app.requestContext(r), w, r, root); err != nil {
 		log.Printf("render error: %v", err)
 	}
 }
 
 func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	out, err := app.standaloneService(nil).NewLayout().Set(content).RenderWithRequest(app.requestContext(r), r)
+	content = app.configureStandalone(content, nil)
+	out, err := partial.RenderWithRequest(app.requestContext(r), r, content)
 	if err != nil {
 		log.Printf("render error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -63,21 +74,37 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 	_, _ = w.Write([]byte(out))
 }
 
-func (app *App) standaloneService(conn connector.Connector) *partial.Service {
+func (app *App) configureStandalone(content *partial.Partial, conn connector.Connector) *partial.Partial {
+	if content == nil {
+		return nil
+	}
 	if conn == nil {
 		conn = connector.NewPartial(nil)
 	}
-	return partial.NewService(&partial.Config{
-		Connector:        conn,
-		Events:           app.events,
-		FS:               os.DirFS("examples/showcase"),
-		Stages:           app.showcaseStages(),
-		UseTemplateCache: false,
-	})
+	return content.
+		SetConnector(conn).
+		SetEvents(app.events).
+		SetFileSystem(os.DirFS("examples/showcase")).
+		Use(app.showcaseStages()...).
+		UseTemplateCache(false).
+		SetFunc(
+			showcaseTranslationFunctions(),
+			actions.FuncMap(),
+			csrf.FuncMap(),
+			extdebug.FuncMap(),
+			flash.FuncMap(),
+			extlogger.FuncMap(),
+			interactions.FuncMap(),
+			localization.FuncMap(),
+			selection.FuncMap(),
+			slots.FuncMap(),
+			target.FuncMap(),
+			templatehelpers.FuncMap(),
+		)
 }
 
 func (app *App) wrapper() *partial.Partial {
-	wrapper := metrics.WithPartialLabel(partial.NewID("layout", "templates/layout.gohtml"), "shell")
+	wrapper := metrics.WithPartialLabel(app.root.Clone(), "shell")
 	header := HeaderPage{
 		AppName: "go-partial showcase",
 		Now:     time.Now().Format("02 Jan 06 15:04 MST"),
@@ -153,7 +180,7 @@ var showcaseProgrammerJokes = []string{
 	"The frontend developer left the party because there was no class.",
 	"The backend developer stayed because there was a queue.",
 	"My regex works perfectly, except on text.",
-	"Production is where all TODO comments go to become folklore.",
+	"Production is where unfinished notes go to become folklore.",
 	"I tried to explain DNS, but it took too long to resolve.",
 	"Unit tests passed, so the bug moved into integration.",
 	"My build pipeline is just optimism with logs.",
@@ -167,7 +194,7 @@ var showcaseProgrammerJokes = []string{
 	"I have a joke about indexes, but it starts at one by mistake.",
 	"I have a joke about arrays, but it is out of bounds.",
 	"I have a joke about interfaces, but it depends on the implementation.",
-	"I have a joke about microservices, but it needs twelve services to land.",
+	"I have a joke about microservices, but it needs twelve endpoints to land.",
 	"I have a joke about containers, but it works on my machine.",
 	"I have a joke about Kubernetes, but it needs a cluster to explain it.",
 	"I have a joke about logs, but it is buried in noise.",

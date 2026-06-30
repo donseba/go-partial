@@ -101,13 +101,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs selection helpers and renders selected child partials.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 func firstRenderContext(ctx []*partial.RenderContext) *partial.RenderContext {
 	if len(ctx) == 0 {
 		return nil

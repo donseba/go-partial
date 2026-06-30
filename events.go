@@ -107,17 +107,13 @@ const (
 	EventTemplateExecuteError = "template.execute_error"
 	// EventFuncProtected is emitted when a user function tries to overwrite a protected helper.
 	EventFuncProtected = "func.protected"
-	// EventContentMissingLayout is emitted when content is called outside a layout wrapper.
-	EventContentMissingLayout = "content.missing_layout"
+	// EventContentMissing is emitted when content is called without a content child.
+	EventContentMissing = "content.missing"
 	// EventTargetMissing is emitted when a requested target cannot be resolved.
 	EventTargetMissing = "target.missing"
 	// EventContractInvalid is emitted when contract data or helper arguments are invalid.
 	EventContractInvalid = "contract.invalid"
 )
-
-func timeNow() time.Time {
-	return time.Now()
-}
 
 // Emit sends event to the wrapped function.
 func (f EventSinkFunc) Emit(ctx *RenderContext, event Event) {
@@ -140,9 +136,9 @@ func (sinks FanoutEventSink) Emit(ctx *RenderContext, event Event) {
 
 // WithEventSink attaches a request-scoped event sink to ctx.
 //
-// Request-scoped sinks are fanned out with service or partial sinks for renders
-// started with this context. If the sink owns goroutines, the caller still owns
-// closing it, usually with defer in middleware.
+// Request-scoped sinks are fanned out with partial tree sinks configured with
+// Partial.SetEvents. If the sink owns goroutines, the
+// caller still owns closing it, usually with defer in middleware.
 //
 // If ctx already has a request-scoped sink, the new sink is appended with fanout.
 func WithEventSink(ctx context.Context, sink EventSink) context.Context {

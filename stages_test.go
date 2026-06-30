@@ -12,7 +12,7 @@ import (
 	"testing/fstest"
 )
 
-func TestRendererChainOrder(t *testing.T) {
+func TestStageChainOrder(t *testing.T) {
 	var calls []string
 	fsys := fstest.MapFS{
 		"page.gohtml": &fstest.MapFile{Data: []byte(`hello {{.}}`)},
@@ -37,11 +37,11 @@ func TestRendererChainOrder(t *testing.T) {
 		}
 	}
 
-	out, err := New("page.gohtml").
+	p := New("page.gohtml").
 		SetFileSystem(fsys).
 		SetDot("world").
-		Use(stage("a"), stage("b")).
-		Render(context.Background())
+		Use(stage("a"), stage("b"))
+	out, err := Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -65,20 +65,20 @@ func TestRendererChainOrder(t *testing.T) {
 	}
 }
 
-func TestRendererPrepareEnrichesTemplateContext(t *testing.T) {
+func TestStagePrepareEnrichesTemplateContext(t *testing.T) {
 	fsys := fstest.MapFS{
 		"page.gohtml": &fstest.MapFile{Data: []byte(`{{(ctx).Values.Get "message"}}`)},
 	}
 
-	out, err := New("page.gohtml").
+	p := New("page.gohtml").
 		SetFileSystem(fsys).
 		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				ctx.Values.Set("message", "from prepare")
 				return ctx, nil
 			},
-		}).
-		Render(context.Background())
+		})
+	out, err := Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -89,19 +89,19 @@ func TestRendererPrepareEnrichesTemplateContext(t *testing.T) {
 }
 
 func TestRenderTemplateRequiresRenderContext(t *testing.T) {
-	_, err := NewID("page", "page.gohtml").renderTemplate(nil)
+	_, err := renderTemplate(nil)
 	if err == nil {
 		t.Fatal("renderTemplate(nil) error = nil, want error")
 	}
 }
 
-func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
+func TestRootStageAppliesToContentPartials(t *testing.T) {
 	fsys := fstest.MapFS{
 		"content.gohtml": &fstest.MapFile{Data: []byte(`content`)},
-		"layout.gohtml":  &fstest.MapFile{Data: []byte(`layout:{{content}}`)},
+		"shell.gohtml":   &fstest.MapFile{Data: []byte(`shell:{{content}}`)},
 	}
 
-	svc := NewService(&Config{FS: fsys})
+	svc := newTestBlueprint(testBlueprintFS(fsys))
 	svc.Use(RenderStageHooks{
 		FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
 			return template.HTML("[" + string(out) + "]"), err
@@ -109,20 +109,18 @@ func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("GET", "/", nil)
-	out, err := svc.NewLayout().
-		Set(NewID("content", "content.gohtml")).
-		Wrap(NewID("layout", "layout.gohtml")).
-		RenderWithRequest(req.Context(), req)
+	root := svc.Compose(NewID("content", "content.gohtml"), NewID("shell", "shell.gohtml"))
+	out, err := RenderWithRequest(svc.RenderContext(req.Context()), req, root)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
 
-	if got, want := string(out), "[layout:[content]]"; got != want {
+	if got, want := string(out), "[shell:[content]]"; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
 }
 
-func TestRendererCanHandleErrorKind(t *testing.T) {
+func TestStageCanHandleErrorKind(t *testing.T) {
 	fsys := fstest.MapFS{
 		"broken.gohtml": &fstest.MapFile{Data: []byte(`{{ if .Missing }}missing`)},
 	}
@@ -141,7 +139,7 @@ func TestRendererCanHandleErrorKind(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
-	err := p.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, p)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -154,7 +152,7 @@ func TestRendererCanHandleErrorKind(t *testing.T) {
 	}
 }
 
-func TestRendererCanHandleRuntimeRenderKind(t *testing.T) {
+func TestStageCanHandleRuntimeRenderKind(t *testing.T) {
 	fsys := fstest.MapFS{
 		"inspect.gohtml": &fstest.MapFile{Data: []byte(`{{ inspect runtime . }}`)},
 	}
@@ -184,7 +182,7 @@ func TestRendererCanHandleRuntimeRenderKind(t *testing.T) {
 			},
 		})
 
-	out, err := p.Render(context.Background())
+	out, err := Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}

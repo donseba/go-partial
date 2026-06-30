@@ -12,7 +12,7 @@
     <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3.5">
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/rendering" hx-get="/docs/rendering" hx-target="#content" hx-push-url="true">
             <strong>Rendering model</strong>
-            <span>Layouts, content partials, registered regions, and targeted requests.</span>
+            <span>Wrapper partials, content children, registered regions, and targeted requests.</span>
         </a>
         <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/target-resolver" hx-get="/docs/target-resolver" hx-target="#content" hx-push-url="true">
             <strong>Target resolver</strong>
@@ -45,16 +45,14 @@
     </div>
 
     <h2 class="text-xl font-bold text-slate-50">A small root</h2>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc := partial.NewService(&partial.Config{
-    Connector: connector.NewHTMX(nil),
-    FS:        os.DirFS("templates"),
-})
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">blueprint := partial.New("shell.gohtml").
+    SetConnector(connector.NewHTMX(nil)).
+    SetFileSystem(os.DirFS("templates"))
 
-layout := svc.NewLayout().
-    Set(partial.NewID("content", "pages/home.gohtml")).
-    Wrap(partial.NewID("layout", "layout.gohtml"))
+content := partial.NewID("content", "pages/home.gohtml")
+root := blueprint.Clone().SetContent(content)
 
-_ = layout.WriteWithRequest(r.Context(), w, r)</code></pre>
+_ = partial.Write(r.Context(), w, r, root)</code></pre>
 
     <p class="leading-7 text-slate-400">The rest of this site is rendered by that same pattern. The navigation, sidebar, examples, and error sections are all partials.</p>
 
@@ -69,4 +67,3 @@ _ = layout.WriteWithRequest(r.Context(), w, r)</code></pre>
     <h2 class="text-xl font-bold text-slate-50">Integrates with</h2>
     <p class="leading-7 text-slate-400">go-partial is designed to sit beside packages such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-translator</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-form</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-importmap</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">go-router</code>. The render layer stays focused on partial trees and response behavior while the application stack handles routing, assets, translation, and forms.</p>
 </article>
-

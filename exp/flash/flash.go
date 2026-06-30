@@ -151,13 +151,6 @@ func Stage(opts ...Option) partial.RenderStage {
 	}
 }
 
-// Renderer installs flash template helpers.
-//
-// Deprecated: use Stage.
-func Renderer(opts ...Option) partial.RenderStage {
-	return Stage(opts...)
-}
-
 // WithTemplate renders flash messages with a user template from the active
 // partial tree filesystem.
 func WithTemplate(path string) Option {

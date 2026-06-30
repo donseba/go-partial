@@ -57,13 +57,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs the csrf template helper from the render context.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 // WithToken stores a Token on a context.
 func WithToken(ctx context.Context, token Token) context.Context {
 	return context.WithValue(ctx, tokenContextKey, token)

@@ -50,7 +50,7 @@ func TestFuncMapRendersDebugBox(t *testing.T) {
 		}).
 		Use(Stage())
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestFuncMapCanUseCustomRenderer(t *testing.T) {
 			},
 		})
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -111,7 +111,7 @@ func TestFuncMapDebugRendererSurvivesPartialClone(t *testing.T) {
 			},
 		})
 
-	out, err := parent.Render(context.Background())
+	out, err := partial.Render(context.Background(), parent)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -145,7 +145,7 @@ func TestFuncMapRendersConcurrently(t *testing.T) {
 			defer wg.Done()
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
-			out, err := p.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

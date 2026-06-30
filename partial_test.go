@@ -63,9 +63,6 @@ func TestNewRoot(t *testing.T) {
 		t.Errorf("NewRoot should have 0 oobChildren, got %d", len(root.oobChildren))
 	}
 
-	if root.Reset() != root {
-		t.Error("Reset should return the partial")
-	}
 }
 
 func TestWithTemplateRegistersChildByFileName(t *testing.T) {
@@ -92,11 +89,11 @@ func TestSetModelRegistersGoDocModelContracts(t *testing.T) {
 		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}<h1>{{ Page.Title }}</h1>`,
 	}}
 
-	out, err := NewID("content", "templates/page.gohtml").
+	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		SetModel(contractPage{Title: "Typed page"}).
-		Render(context.Background())
+		SetModel(contractPage{Title: "Typed page"})
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render contract model: %v", err)
 	}
@@ -114,7 +111,7 @@ func TestSetModelRegistersGoDocModelContractsWithCache(t *testing.T) {
 		SetFileSystem(fsys).
 		SetModel(contractPage{Title: "First"})
 
-	out, err := content.Render(context.Background())
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render first contract model: %v", err)
 	}
@@ -124,9 +121,8 @@ func TestSetModelRegistersGoDocModelContractsWithCache(t *testing.T) {
 
 	second := content.clone()
 	second.contracts = nil
-	out, err = second.
-		SetModel(contractPage{Title: "Second"}).
-		Render(context.Background())
+	second.SetModel(contractPage{Title: "Second"})
+	out, err = Render(context.Background(), second)
 	if err != nil {
 		t.Fatalf("render second contract model: %v", err)
 	}
@@ -140,11 +136,11 @@ func TestSetModelRejectsProtectedHelperCollision(t *testing.T) {
 		"templates/page.gohtml": `{{/* @model content github.com/donseba/go-partial.contractPage */}}{{ content.Title }}`,
 	}}
 
-	_, err := NewID("content", "templates/page.gohtml").
+	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		SetModel(contractPage{Title: "Typed page"}).
-		Render(context.Background())
+		SetModel(contractPage{Title: "Typed page"})
+	_, err := Render(context.Background(), content)
 	if err == nil || !strings.Contains(err.Error(), "conflicts with a go-partial template helper") {
 		t.Fatalf("expected protected helper collision, got %v", err)
 	}
@@ -158,14 +154,14 @@ func TestSetContractRegistersNamedGoDocSymbolContracts(t *testing.T) {
 */}}<section>{{ LikesPoll.Kind }}:{{ LikesPoll.URL }} {{ LikeButton.Kind }}:{{ LikeButton.URL }}</section>`,
 	}}
 
-	out, err := NewID("content", "templates/page.gohtml").
+	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
 		SetContract("widget",
 			testContract("LikesPoll", "poll", "/likes"),
 			testContract("LikeButton", "refresh", "/likes/toggle"),
-		).
-		Render(context.Background())
+		)
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render symbol contracts: %v", err)
 	}
@@ -189,7 +185,7 @@ func TestSetContractRegistersNamedGoDocSymbolContractsWithCache(t *testing.T) {
 		SetFileSystem(fsys).
 		SetContract("widget", testContract("LikesPoll", "poll", "/likes/first"))
 
-	first, err := content.Render(context.Background())
+	first, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render first symbol contract: %v", err)
 	}
@@ -199,9 +195,8 @@ func TestSetContractRegistersNamedGoDocSymbolContractsWithCache(t *testing.T) {
 
 	second := content.clone()
 	second.contracts = nil
-	out, err := second.
-		SetContract("widget", testContract("LikesPoll", "poll", "/likes/second")).
-		Render(context.Background())
+	second.SetContract("widget", testContract("LikesPoll", "poll", "/likes/second"))
+	out, err := Render(context.Background(), second)
 	if err != nil {
 		t.Fatalf("render second symbol contract: %v", err)
 	}
@@ -217,11 +212,11 @@ func TestSetContractSupportsNamedContracts(t *testing.T) {
 */}}<section>{{ Async.URL }}</section>`,
 	}}
 
-	out, err := NewID("content", "templates/page.gohtml").
+	content := NewID("content", "templates/page.gohtml").
 		SetFileSystem(fsys).
 		UseTemplateCache(false).
-		SetContract("widget", testContract("Async", "async", "/interactions/async")).
-		Render(context.Background())
+		SetContract("widget", testContract("Async", "async", "/interactions/async"))
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render named contract: %v", err)
 	}
@@ -238,7 +233,7 @@ func TestRequestBasic(t *testing.T) {
 				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 
 		// content
 		content := New("templates/content.html").ID("content")
@@ -247,7 +242,7 @@ func TestRequestBasic(t *testing.T) {
 		})
 		p := New("templates/index.html").ID("root")
 
-		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Compose(content, p))
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -290,7 +285,7 @@ func TestRequestWrap(t *testing.T) {
 				"templates/content.html": "<div>{{.Text}}</div>",
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 
 		index := New("templates/index.html").ID("root")
 
@@ -300,7 +295,7 @@ func TestRequestWrap(t *testing.T) {
 			"Text": "Welcome to the home page",
 		})
 
-		out, err := svc.NewLayout().Set(content).Wrap(index).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Compose(content, index))
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -338,14 +333,11 @@ func TestRequestWrap(t *testing.T) {
 func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<html><body>{{ content }}</body></html>`,
+			"templates/shell.html":   `<html><body>{{ content }}</body></html>`,
 			"templates/content.html": `<div>{{ .Text }}</div>`,
 		},
 	}
-	svc := NewService(&Config{
-		FS:               fsys,
-		UseTemplateCache: true,
-	})
+	svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -356,8 +348,8 @@ func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 		content := NewID("content", "templates/content.html").SetDot(map[string]any{
 			"Text": text,
 		})
-		layout := NewID("layout", "templates/layout.html")
-		out, err := svc.NewLayout().Set(content).Wrap(layout).RenderWithRequest(request.Context(), request)
+		shell := NewID("shell", "templates/shell.html")
+		out, err := RenderWithRequest(request.Context(), request, svc.Compose(content, shell))
 		if err != nil {
 			t.Fatalf("failed to render %q: %v", text, err)
 		}
@@ -372,7 +364,7 @@ func TestTemplateCacheUsesCurrentRenderFunctions(t *testing.T) {
 	}
 }
 
-func TestTemplateCacheIsServiceScoped(t *testing.T) {
+func TestTemplateCacheIsBlueprintScoped(t *testing.T) {
 	firstFS := &inMemoryFS{
 		Files: map[string]string{
 			"templates/content.html": `<p>first {{ .Name }}</p>`,
@@ -390,14 +382,11 @@ func TestTemplateCacheIsServiceScoped(t *testing.T) {
 
 	render := func(fsys *inMemoryFS, name string) string {
 		t.Helper()
-		svc := NewService(&Config{
-			FS:               fsys,
-			UseTemplateCache: true,
-		})
+		svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 		content := NewID("content", "templates/content.html").SetDot(map[string]any{
 			"Name": name,
 		})
-		out, err := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+		out, err := RenderWithRequest(request.Context(), request, svc.Apply(content))
 		if err != nil {
 			t.Fatalf("failed to render %q: %v", name, err)
 		}
@@ -405,10 +394,10 @@ func TestTemplateCacheIsServiceScoped(t *testing.T) {
 	}
 
 	if got := render(firstFS, "Ada"); got != "<p>first Ada</p>" {
-		t.Fatalf("unexpected first service render: %s", got)
+		t.Fatalf("unexpected first blueprint render: %s", got)
 	}
 	if got := render(secondFS, "Grace"); got != "<p>second Grace</p>" {
-		t.Fatalf("service cache reused template from another filesystem: %s", got)
+		t.Fatalf("blueprint cache reused template from another filesystem: %s", got)
 	}
 }
 
@@ -418,10 +407,7 @@ func TestTemplateCacheUsesCurrentCustomFunctions(t *testing.T) {
 			"templates/content.html": `<p>{{ label }}</p>`,
 		},
 	}
-	svc := NewService(&Config{
-		FS:               fsys,
-		UseTemplateCache: true,
-	})
+	svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -435,7 +421,7 @@ func TestTemplateCacheUsesCurrentCustomFunctions(t *testing.T) {
 				return label
 			},
 		})
-		out, err := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+		out, err := RenderWithRequest(request.Context(), request, svc.Apply(content))
 		if err != nil {
 			t.Fatalf("failed to render %q: %v", label, err)
 		}
@@ -466,12 +452,9 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 		render func(t *testing.T, label string) string
 	}{
 		{
-			name: "service",
+			name: "blueprint",
 			render: func() func(t *testing.T, label string) string {
-				svc := NewService(&Config{
-					FS:               fsys,
-					UseTemplateCache: true,
-				})
+				svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 				return func(t *testing.T, label string) string {
 					t.Helper()
 					svc.SetFunc(template.FuncMap{
@@ -480,34 +463,29 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 						},
 					})
 					content := NewID("content", "templates/content.html")
-					out, renderErr := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+					out, renderErr := RenderWithRequest(request.Context(), request, svc.Apply(content))
 					if renderErr != nil {
-						t.Fatalf("failed to render service label %q: %v", label, renderErr)
+						t.Fatalf("failed to render blueprint label %q: %v", label, renderErr)
 					}
 					return string(out)
 				}
 			}(),
 		},
 		{
-			name: "layout",
+			name: "shell",
 			render: func() func(t *testing.T, label string) string {
-				svc := NewService(&Config{
-					FS:               fsys,
-					UseTemplateCache: true,
-				})
+				svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 				return func(t *testing.T, label string) string {
 					t.Helper()
 					content := NewID("content", "templates/content.html")
-					layout := svc.NewLayout()
-					layout.SetFunc(template.FuncMap{
+					svc.SetFunc(template.FuncMap{
 						"label": func() string {
 							return label
 						},
 					})
-					layout.Set(content)
-					out, renderErr := layout.RenderWithRequest(request.Context(), request)
+					out, renderErr := RenderWithRequest(svc.RenderContext(request.Context()), request, svc.Apply(content))
 					if renderErr != nil {
-						t.Fatalf("failed to render layout label %q: %v", label, renderErr)
+						t.Fatalf("failed to render configured partial label %q: %v", label, renderErr)
 					}
 					return string(out)
 				}
@@ -516,10 +494,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 		{
 			name: "partial",
 			render: func() func(t *testing.T, label string) string {
-				svc := NewService(&Config{
-					FS:               fsys,
-					UseTemplateCache: true,
-				})
+				svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 				return func(t *testing.T, label string) string {
 					t.Helper()
 					content := NewID("content", "templates/content.html")
@@ -528,7 +503,7 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 							return label
 						},
 					})
-					out, renderErr := svc.NewLayout().Set(content).RenderWithRequest(request.Context(), request)
+					out, renderErr := RenderWithRequest(request.Context(), request, svc.Apply(content))
 					if renderErr != nil {
 						t.Fatalf("failed to render partial label %q: %v", label, renderErr)
 					}
@@ -553,21 +528,18 @@ func TestTemplateCacheUsesCurrentCustomFunctionsByScope(t *testing.T) {
 func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<main>{{ content }}{{ template "notice.html" . }}</main>`,
+			"templates/shell.html":   `<main>{{ content }}{{ template "notice.html" . }}</main>`,
 			"templates/content.html": `<section>{{ partial runtime "templates/row.html" "Name" "Ada" }}</section>`,
 			"templates/row.html":     `<p>{{ .Name }}</p>`,
 			"templates/notice.html":  `<aside id="notice"{{ oobAttr }}>{{ .Message }}</aside>`,
 		},
 	}
-	service := NewService(&Config{
-		FS:               fsys,
-		UseTemplateCache: true,
-	})
+	blueprint := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 	content := NewID("content", "templates/content.html")
 	notice := NewID("notice", "templates/notice.html").
 		SetDot(map[string]any{"Message": "Saved"}).
 		SetAlwaysSwapOOB(true)
-	layout := NewID("layout", "templates/layout.html").
+	shell := NewID("shell", "templates/shell.html").
 		SetDot(map[string]any{"Message": "Saved"}).
 		WithOOB(notice)
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
@@ -575,7 +547,7 @@ func TestFilteredTemplateFuncsRenderRequestHelpers(t *testing.T) {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	out, err := service.NewLayout().Set(content).Wrap(layout).RenderWithRequest(request.Context(), request)
+	out, err := RenderWithRequest(request.Context(), request, blueprint.Compose(content, shell))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -602,10 +574,10 @@ func TestPartialHelperRendersTemplatePath(t *testing.T) {
 		},
 	}
 
-	out, err := NewID("page", "templates/page.gohtml").
+	content := NewID("page", "templates/page.gohtml").
 		SetFileSystem(fsys).
-		SetDot(map[string]any{"Card": cardData{Name: "Ada"}}).
-		Render(context.Background())
+		SetDot(map[string]any{"Card": cardData{Name: "Ada"}})
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -619,14 +591,11 @@ func TestPartialHelperRendersTemplatePath(t *testing.T) {
 func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	fsys := &inMemoryFS{
 		Files: map[string]string{
-			"templates/layout.html":  `<main>{{ content }}</main>`,
+			"templates/shell.html":   `<main>{{ content }}</main>`,
 			"templates/content.html": `<p>{{ label }}</p>`,
 		},
 	}
-	svc := NewService(&Config{
-		FS:               fsys,
-		UseTemplateCache: true,
-	})
+	svc := newTestBlueprint(testBlueprintFS(fsys), testBlueprintCache(true))
 	request, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
@@ -635,13 +604,13 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	render := func(label string) string {
 		t.Helper()
 		content := NewID("content", "templates/content.html")
-		wrapper := NewID("layout", "templates/layout.html")
+		wrapper := NewID("shell", "templates/shell.html")
 		wrapper.SetFunc(template.FuncMap{
 			"label": func() string {
 				return label
 			},
 		})
-		out, renderErr := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
+		out, renderErr := RenderWithRequest(request.Context(), request, svc.Compose(content, wrapper))
 		if renderErr != nil {
 			t.Fatalf("failed to render inherited label %q: %v", label, renderErr)
 		}
@@ -657,7 +626,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 }
 
 func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
-	svc := NewService(nil)
+	svc := newTestBlueprint()
 	svc.SetFunc(template.FuncMap{
 		"partial": func() string {
 			return "blocked"
@@ -685,7 +654,7 @@ func TestRequestOOB(t *testing.T) {
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 
 		p := New("templates/index.html").ID("root")
 		p.SetDot(map[string]any{"Text": "This is the footer"})
@@ -702,7 +671,7 @@ func TestRequestOOB(t *testing.T) {
 		})
 		p.WithOOB(oob)
 
-		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Compose(content, p))
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -746,7 +715,7 @@ func TestRequestOOBSwap(t *testing.T) {
 				"templates/footer.html":  "<div{{ oobAttr }} id='footer'>{{.Text}}</div>",
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 
 		// the main template that will be rendered
 		p := New("templates/index.html").ID("root")
@@ -765,7 +734,7 @@ func TestRequestOOBSwap(t *testing.T) {
 			"Text": "Welcome to the home page",
 		})
 
-		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Compose(content, p))
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -809,7 +778,7 @@ func TestDeepNested(t *testing.T) {
 				"templates/nested.html":  `<div>{{ upper .Text }}</div>`,
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 		svc.SetFunc(templatehelpers.FuncMap())
 
 		p := New("templates/index.html").ID("root")
@@ -826,7 +795,7 @@ func TestDeepNested(t *testing.T) {
 			"Text": "Welcome to the home page",
 		}).With(nested)
 
-		out, err := svc.NewLayout().Set(content).Wrap(p).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Compose(content, p))
 		if err != nil {
 			_, _ = w.Write([]byte(err.Error()))
 			return
@@ -856,11 +825,11 @@ func TestMissingPartial(t *testing.T) {
 				"templates/index.html": `<html><body></body></html>`,
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 
 		p := New("templates/index.html").ID("root")
 
-		out, err := svc.NewLayout().Set(p).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Apply(p))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -895,7 +864,7 @@ func TestTypedDotsInTemplates(t *testing.T) {
 			"templates/content.html": `<div>{{ .PageTitle }}</div><div>{{ .User }}</div><div>{{ .Articles }}</div>`,
 		},
 	}
-	svc := NewService(&Config{FS: fsys})
+	svc := newTestBlueprint(testBlueprintFS(fsys))
 
 	content := New("templates/content.html").ID("content").SetDot(contentData{
 		PageTitle: "Home Page",
@@ -905,7 +874,7 @@ func TestTypedDotsInTemplates(t *testing.T) {
 	wrapper := New("templates/index.html").ID("root").SetDot(shell{Title: "My Page"})
 
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
-	out, err := svc.NewLayout().Set(content).Wrap(wrapper).RenderWithRequest(request.Context(), request)
+	out, err := RenderWithRequest(request.Context(), request, svc.Compose(content, wrapper))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -939,23 +908,19 @@ func TestWithSelectMap(t *testing.T) {
 		ID("content")
 	testWithSelectMap(contentPartial, "default", partialsMap)
 
-	// Create the layout partial
+	// Create the shell partial
 	index := New("index.gohtml")
 
-	// Set up the service and layout
-	svc := NewService(&Config{
-		FS: fsys,
-	})
+	// Set up the root blueprint and shell
+	svc := newTestBlueprint(testBlueprintFS(fsys))
 	svc.SetFunc(testSelectionFuncMap())
-	svc.Use(testSelectionRenderer())
-	layout := svc.NewLayout().
-		Set(contentPartial).
-		Wrap(index)
+	svc.Use(testSelectionStage())
+	root := svc.Compose(contentPartial, index)
 
 	// Set up a test server
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		err := layout.WriteWithRequest(ctx, w, r)
+		err := Write(svc.RenderContext(ctx), w, r, root)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -1038,12 +1003,12 @@ func TestSelectionPartialInheritsParentConnectorContext(t *testing.T) {
 	testWithSelectMap(content, "settings", map[string]*Partial{
 		"settings": NewID("settings", "settings.gohtml").SetFileSystem(fsys),
 	})
-	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionStage())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "settings")
 
-	out, err := content.RenderWithRequest(context.Background(), req)
+	out, err := RenderWithRequest(context.Background(), req, content)
 	if err != nil {
 		t.Fatalf("render selection: %v", err)
 	}
@@ -1061,10 +1026,10 @@ func TestSelectionIfUsesDefaultSelection(t *testing.T) {
 	testWithSelectMap(content, "summary", map[string]*Partial{
 		"summary": NewID("summary", "summary.gohtml").SetFileSystem(fsys),
 	})
-	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionStage())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
-	out, err := content.RenderWithRequest(context.Background(), req)
+	out, err := RenderWithRequest(context.Background(), req, content)
 	if err != nil {
 		t.Fatalf("render content: %v", err)
 	}
@@ -1081,14 +1046,14 @@ func TestSelectionPartialUsesErrorFragmentOnRenderError(t *testing.T) {
 
 	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
 	testWithSelectMap(content, "broken", map[string]*Partial{
-		"broken": NewID("broken", "broken.gohtml").SetFileSystem(fsys).Use(testErrorRenderer(false)),
+		"broken": NewID("broken", "broken.gohtml").SetFileSystem(fsys).Use(testErrorStage(false)),
 	})
-	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionStage())
 
 	req := httptest.NewRequest(http.MethodGet, "/tabs", nil)
 	req.Header.Set(connector.HeaderSelect.String(), "broken")
 
-	out, err := content.RenderWithRequest(context.Background(), req)
+	out, err := RenderWithRequest(context.Background(), req, content)
 	if err != nil {
 		t.Fatalf("render selection: %v", err)
 	}
@@ -1133,7 +1098,7 @@ func testSelectionFuncMap() template.FuncMap {
 	}
 }
 
-func testSelectionRenderer() RenderStage {
+func testSelectionStage() RenderStage {
 	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			ctx.SetFunc("selectionHeader", func() string {
@@ -1168,7 +1133,7 @@ func testSelectionRenderer() RenderStage {
 				}
 				out, err := ctx.Runtime.RenderPartial(selected)
 				if err != nil {
-					fallback, fallbackErr := selected.renderErrorFragment(ctx.Context, ctx.Request, err)
+					fallback, fallbackErr := renderErrorFragment(ctx.Context, ctx.Request, selected, err)
 					if fallbackErr != nil {
 						return template.HTML("error rendering selected partial '" + key + "': " + fallbackErr.Error())
 					}
@@ -1188,7 +1153,7 @@ func testLocalizationFuncMap() template.FuncMap {
 	}
 }
 
-func testLocalizationRenderer() RenderStage {
+func testLocalizationStage() RenderStage {
 	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			localizer := func() testLocalizer {
@@ -1218,7 +1183,7 @@ func testUseTargetResolver(p *Partial, resolver func(context.Context, *http.Requ
 	p.SetExtension(testTargetResolverKey{}, resolver)
 }
 
-func testTargetRenderer() RenderStage {
+func testTargetStage() RenderStage {
 	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			ctx.SetFunc("targetHeader", func() string {
@@ -1253,15 +1218,13 @@ func testTargetRenderer() RenderStage {
 	}
 }
 
-func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
+func TestBlueprintFuncMapCanAddTranslationFunctions(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("content.gohtml", `{{ tl localizer "hello" }}`)
 
-	svc := NewService(&Config{
-		FS: fsys,
-	})
+	svc := newTestBlueprint(testBlueprintFS(fsys))
 	svc.SetFunc(testLocalizationFuncMap())
-	svc.Use(testLocalizationRenderer())
+	svc.Use(testLocalizationStage())
 	svc.SetFunc(template.FuncMap{
 		"tl": func(loc testLocalizer, key string) string {
 			return loc.GetLocale() + ":" + key
@@ -1278,7 +1241,7 @@ func TestServiceFuncMapCanAddTranslationFunctions(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "nl_NL"})
 
-	out, err := svc.NewLayout().Set(content).RenderWithRequest(ctx, req)
+	out, err := RenderWithRequest(ctx, req, svc.Apply(content))
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -1306,13 +1269,7 @@ func BenchmarkWithSelectMap(b *testing.B) {
 		},
 	}
 
-	service := NewService(&Config{
-		Connector:        connector.NewPartial(nil),
-		UseTemplateCache: false,
-		FS:               fsys,
-	})
-	layout := service.NewLayout()
-
+	blueprint := newTestBlueprint(testBlueprintConnector(connector.NewPartial(nil)), testBlueprintCache(false), testBlueprintFS(fsys))
 	content := New("content.gohtml").
 		ID("content")
 	testWithSelectMap(content, "default", map[string]*Partial{
@@ -1320,11 +1277,11 @@ func BenchmarkWithSelectMap(b *testing.B) {
 		"tab2":    New("tab2.gohtml").ID("tab2"),
 		"default": New("default.gohtml").ID("default"),
 	})
-	content.SetFunc(testSelectionFuncMap()).Use(testSelectionRenderer())
+	content.SetFunc(testSelectionFuncMap()).Use(testSelectionStage())
 
 	index := New("index.gohtml")
 
-	layout.Set(content).Wrap(index)
+	root := blueprint.Compose(content, index)
 
 	req := httptest.NewRequest("GET", "/", nil)
 
@@ -1332,7 +1289,7 @@ func BenchmarkWithSelectMap(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		// Call the function you want to benchmark
-		_, err := layout.RenderWithRequest(context.Background(), req)
+		_, err := RenderWithRequest(context.Background(), req, root)
 		if err != nil {
 			b.Fatalf("Error rendering: %v", err)
 		}
@@ -1347,17 +1304,8 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 		},
 	}
 
-	// Setup configuration and service
-	cfg := &Config{
-		Connector:        connector.NewPartial(nil),
-		UseTemplateCache: false,
-		FS:               fsys,
-	}
-
-	service := NewService(cfg)
-
-	// Create a new layout
-	layout := service.NewLayout()
+	// Setup reusable root blueprint.
+	blueprint := New().SetConnector(connector.NewPartial(nil)).UseTemplateCache(false).SetFileSystem(fsys)
 
 	// Create content partial
 	content := NewID("content", "templates/content.html")
@@ -1369,8 +1317,11 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 	index := NewID("index", "templates/index.html").SetDot(map[string]any{"Title": "Benchmark Test"})
 
-	// Set the content partial in the layout
-	layout.Set(content).Wrap(index)
+	root := blueprint.Clone()
+	root.templates = index.templates
+	root.id = index.id
+	root.SetDot(map[string]any{"Title": "Benchmark Test"})
+	root.SetContent(content)
 
 	// Create a sample HTTP request
 	req := httptest.NewRequest("GET", "/", nil)
@@ -1380,7 +1331,7 @@ func BenchmarkRenderWithRequest(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		// Call the function you want to benchmark
-		_, err := layout.RenderWithRequest(context.Background(), req)
+		_, err := RenderWithRequest(context.Background(), req, root)
 		if err != nil {
 			b.Fatalf("Error rendering: %v", err)
 		}
@@ -1396,7 +1347,7 @@ func TestRenderTable(t *testing.T) {
 				"templates/row.html":   `<tr><td>Row {{ .RowNumber }}</td></tr>`,
 			},
 		}
-		svc := NewService(&Config{FS: fsys})
+		svc := newTestBlueprint(testBlueprintFS(fsys))
 		svc.SetFunc(templatehelpers.FuncMap())
 
 		// Create the table partial and set data
@@ -1405,7 +1356,7 @@ func TestRenderTable(t *testing.T) {
 			"Rows": []int{1, 2, 3, 4, 5}, // Generate 5 rows
 		})
 		// Render the table partial
-		out, err := svc.NewLayout().Set(tablePartial).RenderWithRequest(r.Context(), r)
+		out, err := RenderWithRequest(r.Context(), r, svc.Apply(tablePartial))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -1448,7 +1399,7 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 			{ID: 2, Name: "Tea"},
 		}})
 	table.SetFunc(testLocalizationFuncMap(), testTargetFuncMap())
-	table.Use(testLocalizationRenderer(), testTargetRenderer())
+	table.Use(testLocalizationStage(), testTargetStage())
 	rowPartial := NewID("row", "templates/row.html").
 		SetFileSystem(fsys)
 	table.With(rowPartial)
@@ -1462,7 +1413,7 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "nl_NL"})
 
-	full, err := table.RenderWithRequest(ctx, req)
+	full, err := RenderWithRequest(ctx, req, table)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() full error = %v", err)
 	}
@@ -1472,7 +1423,7 @@ func TestSetDotRendersNativeTemplateChildAndTarget(t *testing.T) {
 	}
 
 	req.Header.Set(connector.HeaderTarget.String(), "row-2")
-	target, err := table.RenderWithRequest(ctx, req)
+	target, err := RenderWithRequest(ctx, req, table)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() target error = %v", err)
 	}
@@ -1498,11 +1449,11 @@ func TestSetDotKeepsRequestHelpersAvailable(t *testing.T) {
 		SetBasePath("/app").
 		SetDot(page{Title: "Dashboard"}).
 		SetFunc(testLocalizationFuncMap()).
-		Use(testLocalizationRenderer())
+		Use(testLocalizationStage())
 
 	req := httptest.NewRequest(http.MethodGet, "/dashboard", nil)
 	ctx := context.WithValue(context.Background(), testLocaleContextKey{}, testLocalizer{locale: "en_US"})
-	out, err := p.RenderWithRequest(ctx, req)
+	out, err := RenderWithRequest(ctx, req, p)
 	if err != nil {
 		t.Fatalf("RenderWithRequest() error = %v", err)
 	}
@@ -1521,11 +1472,11 @@ func TestSetDotReplacesExistingDotContract(t *testing.T) {
 		"templates/page.html": `{{/* @dot github.com/example/app.Page */}}{{ .Title }}`,
 	}}
 
-	out, err := NewID("content", "templates/page.html").
+	content := NewID("content", "templates/page.html").
 		SetFileSystem(fsys).
 		SetDot(page{Title: "First"}).
-		SetDot(page{Title: "Second"}).
-		Render(context.Background())
+		SetDot(page{Title: "Second"})
+	out, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -1546,7 +1497,7 @@ func TestPartialSetFuncUsesContractStoreWithCache(t *testing.T) {
 			"label": func(name string) string { return "first:" + name },
 		})
 
-	first, err := content.Render(context.Background())
+	first, err := Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("first render: %v", err)
 	}
@@ -1558,7 +1509,7 @@ func TestPartialSetFuncUsesContractStoreWithCache(t *testing.T) {
 		SetFunc(template.FuncMap{
 			"label": func(name string) string { return "second:" + name },
 		})
-	out, err := second.Render(context.Background())
+	out, err := Render(context.Background(), second)
 	if err != nil {
 		t.Fatalf("second render: %v", err)
 	}
@@ -1568,7 +1519,7 @@ func TestPartialSetFuncUsesContractStoreWithCache(t *testing.T) {
 }
 
 func TestSetFunc(t *testing.T) {
-	svc := NewService(nil)
+	svc := newTestBlueprint()
 
 	svc.SetFunc(template.FuncMap{
 		"existingFunc": func() string { return "existing" },

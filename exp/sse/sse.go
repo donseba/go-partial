@@ -168,7 +168,7 @@ func (s *Writer) PatchPartial(ctx context.Context, r *http.Request, target strin
 		p = p.Clone()
 		p.Use(s.stages...)
 	}
-	html, err := p.RenderWithRequest(ctx, r)
+	html, err := partial.RenderWithRequest(ctx, r, p)
 	if err != nil {
 		return err
 	}

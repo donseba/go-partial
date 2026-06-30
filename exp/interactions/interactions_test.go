@@ -43,7 +43,7 @@ func TestRendererCustomizesInteractionMarkup(t *testing.T) {
 			return template.HTML(`<section data-kind="` + string(interaction.Kind) + `" ` + renderAttrs(attrs) + `></section>`), nil
 		}))
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -85,7 +85,7 @@ func TestAsyncRendersHTMXDeferredMarkup(t *testing.T) {
 		SetFunc(FuncMap()).
 		SetDot(map[string]any{"ID": 7})
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -126,7 +126,7 @@ func TestAsyncAcceptsInteractionConfig(t *testing.T) {
 		SetFunc(FuncMap()).
 		SetDot(page)
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -157,7 +157,7 @@ func TestPollRendersHTMXIntervalMarkup(t *testing.T) {
 		SetFileSystem(fsys).
 		SetFunc(FuncMap())
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -196,7 +196,7 @@ func TestOnAcceptsInteractionConfig(t *testing.T) {
 		SetFunc(FuncMap()).
 		SetDot(page)
 
-	out, err := p.Render(context.Background())
+	out, err := partial.Render(context.Background(), p)
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
@@ -232,7 +232,7 @@ func TestInteractionHelpersRenderConcurrently(t *testing.T) {
 			defer wg.Done()
 			value := strconv.Itoa(i)
 			req := httptest.NewRequest(http.MethodGet, "/?row="+value, nil)
-			out, err := p.RenderWithRequest(req.Context(), req)
+			out, err := partial.RenderWithRequest(req.Context(), req, p)
 			if err != nil {
 				errs <- err.Error()
 				return

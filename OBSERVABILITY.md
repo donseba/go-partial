@@ -15,7 +15,7 @@ The showcase keeps these separate: `/metrics` shows render measurements, while
 
 ## Attach Events
 
-Attach event consumers at the service boundary:
+Attach shared event consumers to the reusable root partial:
 
 ```go
 events := partial.NewAsyncEvents(
@@ -27,9 +27,8 @@ events := partial.NewAsyncEvents(
     mySink,
 )
 
-service := partial.NewService(&partial.Config{
-    Events: events,
-})
+root := partial.New("shell.gohtml").
+    SetEvents(events)
 ```
 
 `NewAsyncEvents` is the recommended default. It uses a bounded queue so slow
@@ -67,12 +66,12 @@ func observability(next http.Handler) http.Handler {
 ```
 
 Renders started with that context fan out to both the request-scoped sink and
-the service/partial sink, if one is configured.
+the partial tree sink, if one is configured.
 
 Calling `WithEventSink` more than once appends sinks; it does not replace the
 previous request-scoped sink.
 
-Do not close a shared service-level dispatcher from a request. A service-level
+Do not close a shared Root partial-level dispatcher from a request. A Root partial-level
 `AsyncEvents` belongs to the server lifecycle. A request-level `AsyncEvents`
 belongs to the request/middleware lifecycle.
 
@@ -104,8 +103,8 @@ logger.Sink(log, logger.WithMinLevel(partial.EventWarn))
 breadcrumbs:
 
 ```go
-service.SetFunc(logger.FuncMap())
-service.Use(logger.Stage())
+root.SetFunc(logger.FuncMap())
+root.Use(logger.Stage())
 ```
 
 Templates can then emit an info-level event:
@@ -214,7 +213,7 @@ sink := metrics.Fanout(
     metrics.NewWriterSink(os.Stdout),
 )
 
-service.Use(metrics.Stage(
+root.Use(metrics.Stage(
     sink,
     metrics.WithTag("chain", "web"),
     metrics.WithSlotName(slots.Name),
@@ -226,7 +225,8 @@ Metrics and logs can share request IDs and trace IDs through context:
 ```go
 ctx := metrics.WithRequestID(r.Context(), requestID)
 ctx = metrics.WithTraceID(ctx, traceID)
-_ = layout.WriteWithRequest(ctx, w, r)
+page := root.Clone().SetContent(content)
+_ = partial.Write(ctx, w, r, page)
 ```
 
 That lets `/metrics`, `/logger`, stdout logs, and external telemetry correlate
@@ -245,6 +245,6 @@ without coupling core to any backend.
 | `template.parse_error` | `error` | Template parsing or cache lookup failed. |
 | `template.execute_error` | `error` | Template execution failed. |
 | `func.protected` | `warn` | A user function tried to overwrite a protected helper. |
-| `content.missing_layout` | `warn` | `content` was called outside a layout wrapper. |
+| `content.missing` | `warn` | `content` was called without a configured content child. |
 | `target.missing` | `warn` | A requested target could not be resolved. |
 | `contract.invalid` | `warn` | Template contract data or helper arguments were invalid. |

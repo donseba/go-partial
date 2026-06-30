@@ -104,7 +104,7 @@ func (r *Runtime) RenderPartial(p *Partial) (template.HTML, error) {
 	if err != nil {
 		return "", err
 	}
-	result := child.renderSelfResult(r.state.Context, r.state.Request)
+	result := renderSelfResult(r.state.Context, r.state.Request, child)
 	return result.HTML, result.Err
 }
 
@@ -116,12 +116,12 @@ func (r *Runtime) RenderPartialWithFallback(p *Partial) (template.HTML, error) {
 		return "", err
 	}
 
-	result := child.renderSelfResult(r.state.Context, r.state.Request)
+	result := renderSelfResult(r.state.Context, r.state.Request, child)
 	if result.Err == nil {
 		return result.HTML, nil
 	}
 
-	fallback, fallbackErr := child.renderErrorFragment(r.state.Context, r.state.Request, result.Err)
+	fallback, fallbackErr := renderErrorFragment(r.state.Context, r.state.Request, child, result.Err)
 	if fallbackErr != nil {
 		return "", fallbackErr
 	}
@@ -155,10 +155,6 @@ func (r *Runtime) preparePartial(p *Partial) (*Partial, error) {
 	}
 	child := p.clone()
 	child.parent = r.partial
-	if !child.stagesInherited {
-		child.stages = append(append([]RenderStage(nil), r.partial.getRenderStages()...), child.stages...)
-		child.stagesInherited = true
-	}
 	return child, nil
 }
 

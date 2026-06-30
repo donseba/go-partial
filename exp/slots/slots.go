@@ -72,13 +72,6 @@ func Stage() partial.RenderStage {
 	}
 }
 
-// Renderer installs slot helpers bound to the active render context.
-//
-// Deprecated: use Stage.
-func Renderer() partial.RenderStage {
-	return Stage()
-}
-
 // Slot renders a named slot from a render context.
 //
 // go-doc:sig func(string) html/template.HTML

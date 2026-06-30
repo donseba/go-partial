@@ -45,27 +45,26 @@ func main() {
 		extlogger.Sink(nil, extlogger.WithMinLevel(partial.EventWarn)),
 		app.logs,
 	)
-	app.service = partial.NewService(&partial.Config{
-		Connector:        connector.NewHTMX(nil),
-		Events:           app.events,
-		FS:               os.DirFS("examples/showcase"),
-		Stages:           app.showcaseStages(),
-		UseTemplateCache: false,
-	})
-	app.service.SetFunc(
-		showcaseTranslationFunctions(),
-		actions.FuncMap(),
-		csrf.FuncMap(),
-		extdebug.FuncMap(),
-		flash.FuncMap(),
-		extlogger.FuncMap(),
-		interactions.FuncMap(),
-		localization.FuncMap(),
-		selection.FuncMap(),
-		slots.FuncMap(),
-		target.FuncMap(),
-		templatehelpers.FuncMap(),
-	)
+	app.root = partial.NewID("shell", "templates/shell.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetEvents(app.events).
+		SetFileSystem(os.DirFS("examples/showcase")).
+		Use(app.showcaseStages()...).
+		UseTemplateCache(false).
+		SetFunc(
+			showcaseTranslationFunctions(),
+			actions.FuncMap(),
+			csrf.FuncMap(),
+			extdebug.FuncMap(),
+			flash.FuncMap(),
+			extlogger.FuncMap(),
+			interactions.FuncMap(),
+			localization.FuncMap(),
+			selection.FuncMap(),
+			slots.FuncMap(),
+			target.FuncMap(),
+			templatehelpers.FuncMap(),
+		)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", app.home)

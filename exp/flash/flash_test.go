@@ -20,7 +20,7 @@ func TestRendererRendersDefaultTemplate(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage())
 
-	out, err := content.Render(ctx)
+	out, err := partial.Render(ctx, content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestRendererUsesOverrideTemplate(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage(WithTemplate("flash.gohtml")))
 
-	out, err := content.Render(ctx)
+	out, err := partial.Render(ctx, content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestRendererRendersDefaultTarget(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage())
 
-	out, err := content.Render(context.Background())
+	out, err := partial.Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestRendererUsesOverrideTarget(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage(WithTargetID("notices"), WithTargetTemplate("target.gohtml")))
 
-	out, err := content.Render(context.Background())
+	out, err := partial.Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestTargetIDIsNormalized(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage(WithTargetID("# 42 bad:id<script>"), WithTargetTemplate("target.gohtml")))
 
-	out, err := content.Render(context.Background())
+	out, err := partial.Render(context.Background(), content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestMessageLevelIsNormalized(t *testing.T) {
 	content.SetFunc(FuncMap())
 	content.Use(Stage())
 
-	out, err := content.Render(ctx)
+	out, err := partial.Render(ctx, content)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestRendererDoesNotBleedConcurrentMessages(t *testing.T) {
 			defer wg.Done()
 			text := fmt.Sprintf("message-%02d", i)
 			ctx := Add(context.Background(), Info(text))
-			out, err := content.Render(ctx)
+			out, err := partial.Render(ctx, content)
 			if err != nil {
 				errs <- err.Error()
 				return

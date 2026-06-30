@@ -12,15 +12,15 @@ import (
 	"github.com/donseba/go-partial/connector"
 )
 
-func TestWriteWithRequestRendersSafeRendererErrorPageOnTemplateError(t *testing.T) {
+func TestWriteRendersSafeErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
-	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorRenderer(false))
+	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorStage(false))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
 
-	err := p.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, p)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -49,15 +49,15 @@ func TestWriteWithRequestRendersSafeRendererErrorPageOnTemplateError(t *testing.
 	}
 }
 
-func TestWriteWithRequestRendersDetailedRendererErrorPageOnTemplateError(t *testing.T) {
+func TestWriteRendersDetailedErrorPageOnTemplateError(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
-	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorRenderer(true))
+	p := New("broken.gohtml").ID("broken").SetFileSystem(fsys).Use(testErrorStage(true))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
 
-	err := p.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, p)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -77,7 +77,7 @@ func TestWriteWithRequestRendersDetailedRendererErrorPageOnTemplateError(t *test
 	}
 }
 
-func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
+func TestWriteUsesCustomErrorStage(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
@@ -96,7 +96,7 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
 
-	err := p.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, p)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -105,7 +105,7 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
+func TestWriteRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
@@ -113,13 +113,13 @@ func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 		ID("content").
 		SetFileSystem(fsys).
 		SetConnector(connector.NewHTMX(nil)).
-		Use(testErrorRenderer(true))
+		Use(testErrorStage(true))
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	req.Header.Set(connector.HTMXHeaderRequest.String(), "true")
 	req.Header.Set(connector.HTMXHeaderTarget.String(), "content")
 	rec := httptest.NewRecorder()
 
-	err := p.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, p)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -136,17 +136,17 @@ func TestWriteWithRequestRendersSwappableErrorFragmentForHTMX(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
+func TestWriteAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 	fsys.AddFile("header.gohtml", `<header id="app-header"{{ oobAttr }}>Header</header>`)
 
-	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
+	wrapper := NewID("shell", "shell.gohtml").SetFileSystem(fsys)
 	wrapper.WithOOB(NewID("header", "header.gohtml").SetFileSystem(fsys).SetAlwaysSwapOOB(true))
 	content := NewID("content", "broken.gohtml").
 		SetFileSystem(fsys).
 		SetConnector(connector.NewHTMX(nil)).
-		Use(testErrorRenderer(false))
+		Use(testErrorStage(false))
 	wrapper.With(content)
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -154,7 +154,7 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 	req.Header.Set(connector.HTMXHeaderTarget.String(), "content")
 	rec := httptest.NewRecorder()
 
-	err := content.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, content)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -173,14 +173,14 @@ func TestWriteWithRequestAppendsAncestorOOBToHTMXErrorFragment(t *testing.T) {
 
 func TestRegisteredTargetTemplateErrorRendersSectionFailureResponse(t *testing.T) {
 	fsys := &inMemoryFS{}
-	fsys.AddFile("layout.gohtml", `<html><body><header>Header</header><main>{{ content }}</main><footer>Footer</footer></body></html>`)
+	fsys.AddFile("shell.gohtml", `<html><body><header>Header</header><main>{{ content }}</main><footer>Footer</footer></body></html>`)
 	fsys.AddFile("broken.gohtml", `{{ if .Missing }}missing`)
 
-	wrapper := NewID("layout", "layout.gohtml").SetFileSystem(fsys)
+	wrapper := NewID("shell", "shell.gohtml").SetFileSystem(fsys)
 	content := NewID("content", "broken.gohtml").
 		SetFileSystem(fsys).
 		SetConnector(connector.NewHTMX(nil)).
-		Use(testErrorRenderer(false))
+		Use(testErrorStage(false))
 	wrapper.With(content)
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
@@ -188,7 +188,7 @@ func TestRegisteredTargetTemplateErrorRendersSectionFailureResponse(t *testing.T
 	req.Header.Set(connector.HeaderTarget.String(), "content")
 	rec := httptest.NewRecorder()
 
-	err := content.WriteWithRequest(context.Background(), rec, req)
+	err := Write(context.Background(), rec, req, content)
 	if err == nil {
 		t.Fatal("expected original render error")
 	}
@@ -205,7 +205,7 @@ func TestRegisteredTargetTemplateErrorRendersSectionFailureResponse(t *testing.T
 	}
 }
 
-func TestWriteWithRequestAppliesFluentConnectorResponse(t *testing.T) {
+func TestWriteAppliesFluentConnectorResponse(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("notice.gohtml", `<div id="notice">Saved</div>`)
 
@@ -219,7 +219,7 @@ func TestWriteWithRequestAppliesFluentConnectorResponse(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/notice", nil)
 	rec := httptest.NewRecorder()
 
-	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
+	if err := Write(context.Background(), rec, req, p); err != nil {
 		t.Fatalf("write partial: %v", err)
 	}
 
@@ -231,7 +231,7 @@ func TestWriteWithRequestAppliesFluentConnectorResponse(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestAppliesStructConnectorResponse(t *testing.T) {
+func TestWriteAppliesStructConnectorResponse(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("notice.gohtml", `<div id="notice">Saved</div>`)
 
@@ -246,7 +246,7 @@ func TestWriteWithRequestAppliesStructConnectorResponse(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/notice", nil)
 	rec := httptest.NewRecorder()
 
-	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
+	if err := Write(context.Background(), rec, req, p); err != nil {
 		t.Fatalf("write partial: %v", err)
 	}
 
@@ -258,7 +258,7 @@ func TestWriteWithRequestAppliesStructConnectorResponse(t *testing.T) {
 	}
 }
 
-func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
+func TestWriteAppliesRenderResponse(t *testing.T) {
 	fsys := &inMemoryFS{}
 	fsys.AddFile("page.gohtml", `ok`)
 
@@ -274,8 +274,8 @@ func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	if err := p.WriteWithRequest(context.Background(), rec, req); err != nil {
-		t.Fatalf("WriteWithRequest() error = %v", err)
+	if err := Write(context.Background(), rec, req, p); err != nil {
+		t.Fatalf("Write() error = %v", err)
 	}
 
 	if rec.Code != http.StatusAccepted {
@@ -283,6 +283,91 @@ func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Render-Response"); got != "applied" {
 		t.Fatalf("X-Render-Response = %q", got)
+	}
+	if rec.Body.String() != "ok" {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestPackageRenderMatchesPartialRender(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("page.gohtml", `hello {{.}}`)
+
+	p := New("page.gohtml").SetFileSystem(fsys).SetDot("world")
+
+	got, err := Render(context.Background(), p)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+	if got != "hello world" {
+		t.Fatalf("Render() = %q, want %q", got, "hello world")
+	}
+}
+
+func TestPackageRenderWithRequestRendersTargetAndOOB(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("page.gohtml", `<main>{{ template "content.gohtml" . }}</main>`)
+	fsys.AddFile("content.gohtml", `<section id="content">Content</section>`)
+	fsys.AddFile("notice.gohtml", `<aside id="notice"{{ oobAttr }}>Notice</aside>`)
+
+	page := NewID("page", "page.gohtml").
+		SetFileSystem(fsys).
+		SetConnector(connector.NewHTMX(nil))
+	content := NewID("content", "content.gohtml").SetFileSystem(fsys)
+	page.With(content)
+	page.WithOOB(NewID("notice", "notice.gohtml").SetFileSystem(fsys).SetAlwaysSwapOOB(true))
+
+	req := httptest.NewRequest(http.MethodGet, "/page", nil)
+	req.Header.Set(connector.HTMXHeaderRequest.String(), "true")
+	req.Header.Set(connector.HTMXHeaderTarget.String(), "content")
+
+	out, err := RenderWithRequest(context.Background(), req, page)
+	if err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+	body := string(out)
+	if !strings.Contains(body, `<section id="content">Content</section>`) {
+		t.Fatalf("expected target output, got %q", body)
+	}
+	if !strings.Contains(body, `id="notice" hx-swap-oob="true"`) {
+		t.Fatalf("expected OOB output, got %q", body)
+	}
+}
+
+func TestPackageWriteAppliesResponseBehavior(t *testing.T) {
+	fsys := &inMemoryFS{}
+	fsys.AddFile("page.gohtml", `ok`)
+
+	p := New("page.gohtml").
+		SetFileSystem(fsys).
+		SetConnector(connector.NewHTMX(nil)).
+		SetResponseHeaders(map[string]string{"X-Partial": "configured"}).
+		Use(RenderStageHooks{
+			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
+				ctx.Response.Status = http.StatusAccepted
+				ctx.Response.Headers["X-Stage"] = "applied"
+				return out, err
+			},
+		})
+	p.Response().Retarget("#page")
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	if err := Write(context.Background(), rec, req, p); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+	}
+	if got := rec.Header().Get("X-Partial"); got != "configured" {
+		t.Fatalf("X-Partial = %q", got)
+	}
+	if got := rec.Header().Get("X-Stage"); got != "applied" {
+		t.Fatalf("X-Stage = %q", got)
+	}
+	if got := rec.Header().Get(connector.HTMXHeaderRetarget.String()); got != "#page" {
+		t.Fatalf("HX-Retarget = %q", got)
 	}
 	if rec.Body.String() != "ok" {
 		t.Fatalf("body = %q", rec.Body.String())
@@ -308,7 +393,7 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 		SetFileSystem(fsys).
 		SetDot(map[string]any{"Rows": rows}).
 		SetFunc(testTargetFuncMap()).
-		Use(testTargetRenderer())
+		Use(testTargetStage())
 	rowPartial := NewID("row", "row.gohtml").SetFileSystem(fsys)
 	table.With(rowPartial)
 	testUseTargetResolver(table, func(ctx context.Context, r *http.Request, target string) (*Partial, bool) {
@@ -330,7 +415,7 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/rows", nil)
 	req.Header.Set(connector.HeaderTarget.String(), "row-2")
 
-	out, err := table.RenderWithRequest(context.Background(), req)
+	out, err := RenderWithRequest(context.Background(), req, table)
 	if err != nil {
 		t.Fatalf("render with dynamic target: %v", err)
 	}
@@ -340,7 +425,7 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 	}
 }
 
-func testErrorRenderer(detailed bool) RenderStage {
+func testErrorStage(detailed bool) RenderStage {
 	return RenderStageHooks{
 		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx.Kind != renderKindError {

@@ -26,7 +26,7 @@ func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 				return template.HTML(customDebugHTML(ctx.Data)), nil
 			},
 		})
-	customHTML, err := custom.Render(app.requestContext(r))
+	customHTML, err := partial.Render(app.requestContext(r), custom)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
