@@ -73,7 +73,7 @@ func targetIs(ctx *partial.RenderContext, values ...string) bool {
 // Renderer installs target helpers and applies configured target resolvers.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		PreflightFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
 			}

@@ -132,6 +132,30 @@ type SSEStatus struct {
 	Done bool
 }
 
+type MetricsPage struct {
+	Title      string
+	Total      int
+	Latest     []MetricsRecordView
+	ChainTag   string
+	TraceLabel string
+}
+
+type MetricsRecordView struct {
+	Kind       string
+	Name       string
+	RequestID  string
+	PartialID  string
+	PartialTag string
+	Templates  string
+	Swap       string
+	Method     string
+	Path       string
+	Size       string
+	Duration   string
+	Error      string
+	Chain      string
+}
+
 type TabItem struct {
 	Key   string
 	Label string
@@ -209,4 +233,5 @@ type App struct {
 	cartMu       sync.Mutex
 	counter      int
 	flowSessions map[string]*pageflow.SessionData
+	metrics      *showcaseMetrics
 }

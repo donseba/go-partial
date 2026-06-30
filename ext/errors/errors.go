@@ -38,6 +38,8 @@ type (
 
 	// Option configures the error renderer.
 	Option func(*config)
+
+	stateKey struct{}
 )
 
 const (
@@ -117,12 +119,26 @@ func Renderer(options ...Option) partial.Renderer {
 	}
 
 	return partial.RendererHooks{
-		InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+			if ctx == nil || ctx.Kind != RenderKindError {
+				return ctx, nil
+			}
+
+			data := BuildData(ctx, cfg.mode)
+			ctx.Error = data.Error
+			ctx.Data = data
+			if ctx.Values == nil {
+				ctx.Values = make(partial.RenderValues)
+			}
+			ctx.Values.Set(stateKey{}, data)
+			return ctx, nil
+		},
+		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindError {
 				return next(ctx)
 			}
 
-			data := BuildData(ctx, cfg.mode)
+			data := stateData(ctx, cfg.mode)
 			tmplSource := pageTemplate
 			if ctx.Name == "fragment" {
 				tmplSource = fragmentTemplate
@@ -139,7 +155,33 @@ func Renderer(options ...Option) partial.Renderer {
 			}
 			return template.HTML(buf.String()), nil
 		},
+		FinalizeFunc: func(ctx *partial.RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
+			if ctx == nil || ctx.Kind != RenderKindError || renderErr == nil {
+				return out, renderErr
+			}
+
+			data := stateData(ctx, cfg.mode)
+			if data.Error == nil {
+				return out, renderErr
+			}
+			return out, stderrors.Join(renderErr, data.Error)
+		},
 	}
+}
+
+func stateData(ctx *partial.RenderContext, mode Mode) Data {
+	if ctx == nil {
+		return BuildData(nil, mode)
+	}
+	if ctx.Values != nil {
+		if data, ok := ctx.Values.Get(stateKey{}).(Data); ok {
+			return data
+		}
+	}
+	if data, ok := ctx.Data.(Data); ok {
+		return data
+	}
+	return BuildData(ctx, mode)
 }
 
 // BuildData converts a render context into error template data.

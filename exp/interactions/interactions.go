@@ -69,7 +69,7 @@ func Renderer(markup ...MarkupRenderer) partial.Renderer {
 	}
 
 	return partial.RendererHooks{
-		InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindInteraction {
 				return next(ctx)
 			}

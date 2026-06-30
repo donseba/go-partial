@@ -19,18 +19,18 @@ can stay small and advanced behavior can move into `exp`.
 
 ```go
 type Renderer interface {
-    Preflight(*RenderContext) (*RenderContext, error)
-    InFlight(*RenderContext, RenderNext) (template.HTML, error)
-    Postflight(*RenderContext, template.HTML, error) (template.HTML, error)
+    Prepare(*RenderContext) (*RenderContext, error)
+    Render(*RenderContext, RenderNext) (template.HTML, error)
+    Finalize(*RenderContext, template.HTML, error) (template.HTML, error)
 }
 ```
 
 Render order:
 
 ```text
-preflight A -> preflight B -> preflight C
-inflight A -> inflight B -> inflight C -> template renderer
-postflight C -> postflight B -> postflight A
+prepare A -> prepare B -> prepare C
+render A -> render B -> render C -> template renderer
+finalize C -> finalize B -> finalize A
 ```
 
 ## Migration Checklist
@@ -43,7 +43,7 @@ postflight C -> postflight B -> postflight A
 - [x] Move default error rendering to `ext/errors`.
 - [x] Move default debug rendering to `ext/debug`.
 - [x] Remove old `ErrorRenderer` and `DebugRenderer` function types.
-- [x] Re-express target resolution as renderer preflight.
+- [x] Re-express target resolution as renderer prepare work.
 - [x] Move localization helpers to `exp/localization`.
 - [x] Move csrf helpers to `exp/csrf`.
 - [x] Move selection helper to `exp/selection`.
@@ -58,5 +58,19 @@ postflight C -> postflight B -> postflight A
 - `RenderContext.Data` carries kind-specific payloads such as debug values,
   interaction data, or error data.
 - `RenderContext.Kind` tells generic renderers which task they are handling.
-- `Postflight` may transform the HTML result, not only clean up.
+- `Finalize` may transform the HTML result, not only clean up.
 - Pre-release freedom means compatibility shims can be temporary.
+
+## Later Discussion
+
+- FuncMap and renderer registration ergonomics. Current usage is explicit but
+  verbose when an application opts into several `exp` and `ext` packages.
+- Renderer ordering conventions. Some renderers are prepare-only, some
+  intercept render tasks, and error/debug renderers handle dedicated render
+  kinds. The chain behavior should be documented before release.
+- Naming consistency for setup helpers. `WithX(partial, ...)` attaches behavior
+  to a partial tree, while `WithX(ctx, ...)` attaches request-scoped values.
+  Keep that distinction clear in docs and APIs.
+- `RenderResponse` should either be honored by `WriteWithRequest` or removed.
+  It is intended for renderers such as `ext/errors` to set status/headers, but
+  the write path must make that contract real.

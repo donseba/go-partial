@@ -29,7 +29,7 @@ The root package is intentionally small: rendering lifecycle, partial trees, lay
 Optional packages are split by stability:
 
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
-- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, target resolvers, template helpers, and SSE.
+- `exp/...` contains experimental opt-in features, such as localization, CSRF, selection, actions, pageflow, interactions, metrics, target resolvers, template helpers, and SSE.
 
 Core does not import these packages. Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers.
 

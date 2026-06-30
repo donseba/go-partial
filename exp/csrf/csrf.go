@@ -50,7 +50,7 @@ func CSRF(ctx ...*partial.RenderContext) Token {
 // Renderer installs the csrf template helper from the render context.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		PreflightFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("csrf", func() Token { return CSRF(ctx) })
 			return ctx, nil
 		},

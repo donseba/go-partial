@@ -16,11 +16,11 @@ func TestRendererRendersDebugBox(t *testing.T) {
 		Data: map[string]any{"name": "Ada"},
 	}
 
-	out, err := Renderer().InFlight(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
+	out, err := Renderer().Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return "", nil
 	})
 	if err != nil {
-		t.Fatalf("InFlight() error = %v", err)
+		t.Fatalf("Render() error = %v", err)
 	}
 
 	body := string(out)
@@ -70,7 +70,7 @@ func TestFuncMapCanUseCustomRenderer(t *testing.T) {
 		SetFunc(FuncMap()).
 		SetDot(map[string]any{"Name": "Ada"}).
 		Use(partial.RendererHooks{
-			InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != RenderKindDebug {
 					return next(ctx)
 				}
@@ -99,7 +99,7 @@ func TestFuncMapDebugRendererSurvivesPartialClone(t *testing.T) {
 		SetFunc(FuncMap()).
 		SetDot(map[string]any{"Name": "Ada"}).
 		Use(partial.RendererHooks{
-			InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != RenderKindDebug {
 					return next(ctx)
 				}

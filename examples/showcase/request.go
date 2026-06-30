@@ -11,15 +11,17 @@ import (
 
 	"github.com/donseba/go-partial/exp/csrf"
 	"github.com/donseba/go-partial/exp/localization"
+	"github.com/donseba/go-partial/exp/metrics"
 	"github.com/donseba/go-partial/exp/pageflow"
 )
 
 func (app *App) requestContext(r *http.Request) context.Context {
 	ctx := localization.WithLocalizer(r.Context(), showcaseLocalizer{locale: app.localeFromRequest(r)})
-	return csrf.WithToken(ctx, showcaseCsrf{
+	ctx = csrf.WithToken(ctx, showcaseCsrf{
 		key:   csrf.DefaultTokenKey,
 		token: randomID(),
 	})
+	return metrics.WithRequestID(ctx, randomID())
 }
 
 func (app *App) flowSession(w http.ResponseWriter, r *http.Request) *pageflow.SessionData {

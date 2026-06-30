@@ -151,6 +151,16 @@ func (p *Partial) TemplatePaths() []string {
 	return slices.Clone(p.templates)
 }
 
+// IsOOB reports whether the partial is currently being rendered out-of-band.
+func (p *Partial) IsOOB() bool {
+	if p == nil {
+		return false
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.renderOOB
+}
+
 // Reset resets the partial to its initial state.
 func (p *Partial) Reset() *Partial {
 	p.contracts = nil

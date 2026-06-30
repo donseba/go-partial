@@ -97,7 +97,7 @@ func actionIs(ctx *partial.RenderContext, values ...string) bool {
 // Renderer installs action helpers and executes configured partial actions.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		PreflightFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
 			}

@@ -21,15 +21,15 @@ type (
 	RenderNext func(*RenderContext) (template.HTML, error)
 
 	Renderer interface {
-		Preflight(*RenderContext) (*RenderContext, error)
-		InFlight(*RenderContext, RenderNext) (template.HTML, error)
-		Postflight(*RenderContext, template.HTML, error) (template.HTML, error)
+		Prepare(*RenderContext) (*RenderContext, error)
+		Render(*RenderContext, RenderNext) (template.HTML, error)
+		Finalize(*RenderContext, template.HTML, error) (template.HTML, error)
 	}
 
 	RendererHooks struct {
-		PreflightFunc  func(*RenderContext) (*RenderContext, error)
-		InFlightFunc   func(*RenderContext, RenderNext) (template.HTML, error)
-		PostflightFunc func(*RenderContext, template.HTML, error) (template.HTML, error)
+		PrepareFunc  func(*RenderContext) (*RenderContext, error)
+		RenderFunc   func(*RenderContext, RenderNext) (template.HTML, error)
+		FinalizeFunc func(*RenderContext, template.HTML, error) (template.HTML, error)
 	}
 )
 
@@ -44,30 +44,30 @@ const (
 	renderKindError RenderKind = "error"
 )
 
-func (h RendererHooks) Preflight(ctx *RenderContext) (*RenderContext, error) {
-	if h.PreflightFunc == nil {
+func (h RendererHooks) Prepare(ctx *RenderContext) (*RenderContext, error) {
+	if h.PrepareFunc == nil {
 		return ctx, nil
 	}
-	return h.PreflightFunc(ctx)
+	return h.PrepareFunc(ctx)
 }
 
-func (h RendererHooks) InFlight(ctx *RenderContext, next RenderNext) (template.HTML, error) {
-	if h.InFlightFunc == nil {
+func (h RendererHooks) Render(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+	if h.RenderFunc == nil {
 		return next(ctx)
 	}
-	return h.InFlightFunc(ctx, next)
+	return h.RenderFunc(ctx, next)
 }
 
-func (h RendererHooks) Postflight(ctx *RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
-	if h.PostflightFunc == nil {
+func (h RendererHooks) Finalize(ctx *RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
+	if h.FinalizeFunc == nil {
 		return out, renderErr
 	}
-	return h.PostflightFunc(ctx, out, renderErr)
+	return h.FinalizeFunc(ctx, out, renderErr)
 }
 
 func TemplateRenderer() Renderer {
 	return RendererHooks{
-		InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return "", fmt.Errorf("template renderer requires a partial")
 			}
@@ -153,12 +153,12 @@ func renderWithChain(state *RenderContext, renderers []Renderer, terminal Render
 
 	var err error
 	for _, renderer := range active {
-		state, err = renderer.Preflight(state)
+		state, err = renderer.Prepare(state)
 		if err != nil {
 			return "", err
 		}
 		if state == nil {
-			return "", fmt.Errorf("renderer preflight returned nil context")
+			return "", fmt.Errorf("renderer prepare returned nil context")
 		}
 	}
 
@@ -167,13 +167,13 @@ func renderWithChain(state *RenderContext, renderers []Renderer, terminal Render
 		renderer := active[i]
 		previous := next
 		next = func(ctx *RenderContext) (template.HTML, error) {
-			return renderer.InFlight(ctx, previous)
+			return renderer.Render(ctx, previous)
 		}
 	}
 
 	out, renderErr := next(state)
 	for i := len(active) - 1; i >= 0; i-- {
-		out, renderErr = active[i].Postflight(state, out, renderErr)
+		out, renderErr = active[i].Finalize(state, out, renderErr)
 	}
 
 	return out, renderErr

@@ -25,7 +25,7 @@
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">custom := partial.NewID("custom-debug", "debug_custom.gohtml").
     SetFunc(debug.FuncMap()).
     Use(partial.RendererHooks{
-        InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+        RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
             if ctx.Kind != debug.RenderKindDebug {
                 return next(ctx)
             }

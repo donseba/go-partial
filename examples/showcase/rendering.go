@@ -14,10 +14,14 @@ import (
 	partial "github.com/donseba/go-partial"
 	"github.com/donseba/go-partial/connector"
 	"github.com/donseba/go-partial/exp/interactions"
+	"github.com/donseba/go-partial/exp/metrics"
 )
 
 func (app *App) render(w http.ResponseWriter, r *http.Request, id string, tmpl string, data any) {
 	content := partial.NewID(id, tmpl)
+	if id == "content" {
+		metrics.WithPartialTag(content, "main")
+	}
 	if data != nil {
 		content.SetDot(data)
 	}
@@ -32,7 +36,7 @@ func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *p
 func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	content.SetConnector(connector.NewHTMX(nil))
 	content.SetFileSystem(os.DirFS("examples/showcase"))
-	content.Use(showcaseRenderers()...)
+	content.Use(app.showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := content.WriteWithRequest(app.requestContext(r), w, r); err != nil {
 		log.Printf("render error: %v", err)
@@ -48,7 +52,7 @@ func (app *App) writeLayout(w http.ResponseWriter, r *http.Request, layout *part
 
 func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
 	content.SetFileSystem(os.DirFS("examples/showcase"))
-	content.Use(showcaseRenderers()...)
+	content.Use(app.showcaseRenderers()...)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	out, err := content.Render(app.requestContext(r))
 	if err != nil {
@@ -60,7 +64,7 @@ func (app *App) writeStandalone(w http.ResponseWriter, r *http.Request, content 
 }
 
 func (app *App) wrapper() *partial.Partial {
-	wrapper := partial.NewID("layout", "templates/layout.gohtml")
+	wrapper := metrics.WithPartialTag(partial.NewID("layout", "templates/layout.gohtml"), "shell")
 	header := HeaderPage{
 		AppName: "go-partial showcase",
 		Now:     time.Now().Format("02 Jan 06 15:04 MST"),
@@ -71,7 +75,7 @@ func (app *App) wrapper() *partial.Partial {
 		AppName: "go-partial showcase",
 		Header:  header,
 	})
-	wrapper.WithOOB(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true))
+	wrapper.WithOOB(metrics.WithPartialTag(partial.NewID("header", "templates/header.gohtml").SetDot(header).SetAlwaysSwapOOB(true), "sidebar"))
 	return wrapper
 }
 

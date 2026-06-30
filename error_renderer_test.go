@@ -84,7 +84,7 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 		ID("broken").
 		SetFileSystem(fsys).
 		Use(RendererHooks{
-			InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindError {
 					return next(ctx)
 				}
@@ -206,7 +206,7 @@ func TestRegisteredTargetTemplateErrorRendersSectionFallback(t *testing.T) {
 
 func testErrorRenderer(detailed bool) Renderer {
 	return RendererHooks{
-		InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx.Kind != renderKindError {
 				return next(ctx)
 			}

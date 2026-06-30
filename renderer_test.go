@@ -20,17 +20,17 @@ func TestRendererChainOrder(t *testing.T) {
 
 	renderer := func(name string) Renderer {
 		return RendererHooks{
-			PreflightFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				calls = append(calls, "pre:"+name)
 				return ctx, nil
 			},
-			InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				calls = append(calls, "in-before:"+name)
 				out, err := next(ctx)
 				calls = append(calls, "in-after:"+name)
 				return template.HTML(name + "[" + string(out) + "]"), err
 			},
-			PostflightFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
+			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
 				calls = append(calls, "post:"+name)
 				return template.HTML(name + "-post(" + string(out) + ")"), err
 			},
@@ -65,7 +65,7 @@ func TestRendererChainOrder(t *testing.T) {
 	}
 }
 
-func TestRendererPreflightEnrichesTemplateContext(t *testing.T) {
+func TestRendererPrepareEnrichesTemplateContext(t *testing.T) {
 	fsys := fstest.MapFS{
 		"page.gohtml": &fstest.MapFile{Data: []byte(`{{(ctx).Values.Get "message"}}`)},
 	}
@@ -73,8 +73,8 @@ func TestRendererPreflightEnrichesTemplateContext(t *testing.T) {
 	out, err := New("page.gohtml").
 		SetFileSystem(fsys).
 		Use(RendererHooks{
-			PreflightFunc: func(ctx *RenderContext) (*RenderContext, error) {
-				ctx.Values.Set("message", "from preflight")
+			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
+				ctx.Values.Set("message", "from prepare")
 				return ctx, nil
 			},
 		}).
@@ -83,7 +83,7 @@ func TestRendererPreflightEnrichesTemplateContext(t *testing.T) {
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	if got, want := string(out), "from preflight"; got != want {
+	if got, want := string(out), "from prepare"; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
 }
@@ -96,7 +96,7 @@ func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
 
 	svc := NewService(&Config{FS: fsys})
 	svc.Use(RendererHooks{
-		PostflightFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
+		FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
 			return template.HTML("[" + string(out) + "]"), err
 		},
 	})
@@ -124,7 +124,7 @@ func TestRendererCanHandleErrorKind(t *testing.T) {
 		ID("broken").
 		SetFileSystem(fsys).
 		Use(RendererHooks{
-			InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindError {
 					return next(ctx)
 				}
@@ -169,7 +169,7 @@ func TestRendererCanHandleRuntimeRenderKind(t *testing.T) {
 			},
 		}).
 		Use(RendererHooks{
-			InFlightFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindInspect {
 					return next(ctx)
 				}

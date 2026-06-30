@@ -45,7 +45,6 @@ var stringFuncMap = template.FuncMap{
 var urlFuncMap = template.FuncMap{
 	"urlEncode": url.QueryEscape,
 	"urlDecode": url.QueryUnescape,
-	"safeURL":   safeURL,
 }
 
 // go-doc:funcmap
@@ -205,13 +204,6 @@ func keys(m map[string]any) []string {
 		out = append(out, k)
 	}
 	return out
-}
-
-func safeURL(s string) template.URL {
-	if s == "" {
-		return template.URL("")
-	}
-	return template.URL(url.QueryEscape(s))
 }
 
 func inc(args ...any) any {

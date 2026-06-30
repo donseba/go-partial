@@ -11,6 +11,7 @@ import (
 	"github.com/donseba/go-partial/exp/csrf"
 	"github.com/donseba/go-partial/exp/interactions"
 	"github.com/donseba/go-partial/exp/localization"
+	"github.com/donseba/go-partial/exp/metrics"
 	"github.com/donseba/go-partial/exp/pageflow"
 	"github.com/donseba/go-partial/exp/selection"
 	"github.com/donseba/go-partial/exp/target"
@@ -21,12 +22,6 @@ import (
 
 func main() {
 	app := &App{
-		service: partial.NewService(&partial.Config{
-			Connector:        connector.NewHTMX(nil),
-			FS:               os.DirFS("examples/showcase"),
-			Renderers:        showcaseRenderers(),
-			UseTemplateCache: false,
-		}),
 		rows: []Row{
 			{ID: 1, Name: "Coffee", Price: "12.50", Status: "Ready", Owner: "Ada"},
 			{ID: 2, Name: "Tea", Price: "4.25", Status: "Brewing", Owner: "Ada"},
@@ -35,7 +30,14 @@ func main() {
 		products:     fakeProducts(),
 		carts:        make(map[string]map[int]int),
 		flowSessions: make(map[string]*pageflow.SessionData),
+		metrics:      newShowcaseMetrics(80),
 	}
+	app.service = partial.NewService(&partial.Config{
+		Connector:        connector.NewHTMX(nil),
+		FS:               os.DirFS("examples/showcase"),
+		Renderers:        app.showcaseRenderers(),
+		UseTemplateCache: false,
+	})
 	app.service.SetFunc(
 		showcaseTranslationFunctions(),
 		actions.FuncMap(),
@@ -76,6 +78,7 @@ func main() {
 	mux.HandleFunc("/flow", app.flow)
 	mux.HandleFunc("/sse", app.sse)
 	mux.HandleFunc("/sse/stream", app.sseStream)
+	mux.HandleFunc("/metrics", app.metricsPage)
 	mux.HandleFunc("/infinite", app.infinite)
 	mux.HandleFunc("/infinite/load", app.infiniteLoad)
 	mux.HandleFunc("/shop", app.shop)
@@ -91,7 +94,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8090", mux))
 }
 
-func showcaseRenderers() []partial.Renderer {
+func (app *App) showcaseRenderers() []partial.Renderer {
 	return []partial.Renderer{
 		exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
 		extdebug.Renderer(),
@@ -99,6 +102,7 @@ func showcaseRenderers() []partial.Renderer {
 		csrf.Renderer(),
 		interactions.Renderer(showcaseInteractionRenderer()),
 		localization.Renderer(),
+		metrics.Renderer(app.metrics, metrics.WithTag("chain", "showcase")),
 		selection.Renderer(),
 		target.Renderer(),
 	}

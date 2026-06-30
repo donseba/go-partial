@@ -54,7 +54,7 @@ func Locale(ctx ...*partial.RenderContext) string {
 // Renderer installs locale and localizer template helpers.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		PreflightFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("localizer", func() Localizer { return LocalizerValue(ctx) })
 			ctx.SetFunc("locale", func() string { return Locale(ctx) })
 			return ctx, nil

@@ -60,7 +60,7 @@ const debugTemplate = `<section class="go-partial-debug" role="note" style="back
 // Renderer returns a renderer that handles debug render contexts.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindDebug {
 				return next(ctx)
 			}

@@ -85,7 +85,7 @@ func selectionIs(ctx *partial.RenderContext, values ...string) bool {
 // Renderer installs selection helpers and renders selected child partials.
 func Renderer() partial.Renderer {
 	return partial.RendererHooks{
-		PreflightFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
 			}

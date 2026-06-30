@@ -19,7 +19,7 @@ func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 		SetFunc(extdebug.FuncMap()).
 		SetDot(DebugCustomPage{Name: "Ada", Role: "Editor"}).
 		Use(partial.RendererHooks{
-			InFlightFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != extdebug.RenderKindDebug {
 					return next(ctx)
 				}
