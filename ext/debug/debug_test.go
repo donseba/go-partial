@@ -3,7 +3,11 @@ package debug
 import (
 	"context"
 	"html/template"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -120,5 +124,41 @@ func TestFuncMapDebugRendererSurvivesPartialClone(t *testing.T) {
 func TestFormatValueUsesJSONWhenPossible(t *testing.T) {
 	if got := FormatValue(map[string]any{"a": 1}); !strings.Contains(got, `"a": 1`) {
 		t.Fatalf("FormatValue() = %q", got)
+	}
+}
+
+func TestFuncMapRendersConcurrently(t *testing.T) {
+	fsys := fstest.MapFS{
+		"debug.gohtml": &fstest.MapFile{Data: []byte(`{{ debug runtime (url).RawQuery }}`)},
+	}
+	p := partial.NewID("debug", "debug.gohtml").
+		SetFileSystem(fsys).
+		SetFunc(FuncMap()).
+		Use(Renderer())
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
+			out, err := p.RenderWithRequest(req.Context(), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			body := string(out)
+			if !strings.Contains(body, `class="go-partial-debug"`) || !strings.Contains(body, "value="+value) {
+				errs <- "debug " + value + " got " + body
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }

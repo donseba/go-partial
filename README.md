@@ -12,7 +12,7 @@ This package provides a request-aware rendering layer for Go templates. It lets 
 - **Template Caching**: Enable caching of parsed templates for improved performance.
 - **Out-of-Band Rendering**: Support for rendering out-of-band (OOB) partials.
 - **File System Support**: Use custom fs.FS implementations for template file access.
-- **Thread-Safe**: Designed for concurrent use in web applications.
+- **Concurrent Rendering**: Configure partial trees up front, then reuse them safely across concurrent requests.
 
 ## Installation
 To install the package, run:
@@ -606,7 +606,13 @@ In your templates, prefer this model:
 go-partial does not wrap your model in `.Data`, `.Service`, `.Layout`, or `.Global`. Shared application values should be explicit typed roots, for example `SetModel(serviceInfo)` with a matching go-doc declaration. Request-scoped values live behind helper functions so changing dot never hides them.
 
 ## Concurrency and Template Caching
-The package includes concurrency safety measures for template caching:
+Configure services, layouts, partial trees, functions, renderers, headers, and filesystems before serving requests. After configuration, `RenderWithRequest` and `WriteWithRequest` can be called concurrently on the same partial or layout tree. Request-specific values such as `request`, `url`, `ctx`, `runtime`, renderer values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
+
+Do not call configuration methods such as `SetFunc`, `Use`, `With`, `SetDot`, `SetFileSystem`, `SetConnector`, or `SetResponseHeaders` while the same tree is being rendered. Build or clone a separate tree when configuration needs to change at runtime.
+
+Mutable builder and stream/session helpers are intentionally single-owner values. Do not share `connector.ResponseBuilder`, `connector.Trigger`, `connector.Swap`, `sse.Writer`, or `pageflow.SessionData` across goroutines without your own synchronization.
+
+The package also includes concurrency safety measures for template caching:
 
 - Parsed templates are cached per service.
 - Mutexes prevent duplicate parsing for the same service/template/function shape.

@@ -19,6 +19,10 @@ type (
 	HeaderValue string
 	EventName   string
 
+	// Writer streams server-sent events to one http.ResponseWriter.
+	//
+	// Writer is bound to a single response stream and is not safe for concurrent
+	// writes unless the caller serializes access.
 	Writer struct {
 		w         http.ResponseWriter
 		flusher   http.Flusher

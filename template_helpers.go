@@ -15,20 +15,20 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 			child.parent = p
 			child.templates = []string{templatePath}
 
-			if ok := applyPartialTemplateArgs(child, id, args...); !ok {
+			if ok := applyPartialTemplateArgs(state, child, id, args...); !ok {
 				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
 			}
 
-			result := child.renderSelfResult(state.Context, p.getRequest())
+			result := child.renderSelfResult(state.Context, state.Request)
 			if result.Err != nil {
-				child.emit(Event{
+				state.EmitForPartial(child, Event{
 					Kind:    EventRenderError,
 					Level:   EventError,
 					Message: "error rendering template partial",
 					Error:   result.Err,
 					Fields:  map[string]any{"path": templatePath},
 				})
-				fallback, fallbackErr := child.renderErrorFragment(state.Context, p.getRequest(), result.Err)
+				fallback, fallbackErr := child.renderErrorFragment(state.Context, state.Request, result.Err)
 				if fallbackErr != nil {
 					return template.HTML(fmt.Sprintf("error rendering partial '%s': %v", id, fallbackErr))
 				}
@@ -38,7 +38,7 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 			return result.HTML
 		}
 
-		p.emit(Event{
+		state.EmitForPartial(p, Event{
 			Kind:    EventTemplateMissing,
 			Level:   EventWarn,
 			Message: "partial template path not found",
@@ -63,7 +63,7 @@ func partialTemplatePath(p *Partial, name string) (string, bool) {
 	return templatePath, true
 }
 
-func applyPartialTemplateArgs(p *Partial, id string, args ...any) bool {
+func applyPartialTemplateArgs(state *RenderContext, p *Partial, id string, args ...any) bool {
 	switch len(args) {
 	case 0:
 		return true
@@ -72,7 +72,7 @@ func applyPartialTemplateArgs(p *Partial, id string, args ...any) bool {
 		return true
 	}
 
-	dot, ok := partialDotMapArg(p, id, args...)
+	dot, ok := partialDotMapArg(state, p, id, args...)
 	if !ok {
 		return false
 	}
@@ -83,7 +83,7 @@ func applyPartialTemplateArgs(p *Partial, id string, args ...any) bool {
 func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 	return func() template.HTML {
 		if p.layoutContentID == "" {
-			p.emit(Event{
+			state.EmitForPartial(p, Event{
 				Kind:    EventContentMissingLayout,
 				Level:   EventWarn,
 				Message: "content helper used outside layout wrapper",
@@ -92,9 +92,9 @@ func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 			return template.HTML("content is only available on layout wrappers")
 		}
 
-		html, err := p.renderChildPartial(state.Context, p.layoutContentID)
+		html, err := p.renderChildPartial(state.Context, state.Request, p.layoutContentID)
 		if err != nil {
-			p.emit(Event{
+			state.EmitForPartial(p, Event{
 				Kind:    EventRenderError,
 				Level:   EventError,
 				Message: "error rendering layout content",
@@ -108,9 +108,9 @@ func contentFunc(p *Partial, state *RenderContext) func() template.HTML {
 	}
 }
 
-func partialDotMapArg(p *Partial, id string, args ...any) (map[string]any, bool) {
+func partialDotMapArg(state *RenderContext, p *Partial, id string, args ...any) (map[string]any, bool) {
 	if len(args)%2 != 0 {
-		p.emit(Event{
+		state.EmitForPartial(p, Event{
 			Kind:    EventContractInvalid,
 			Level:   EventWarn,
 			Message: "invalid dot data for partial, pass key/value pairs",
@@ -123,7 +123,7 @@ func partialDotMapArg(p *Partial, id string, args ...any) (map[string]any, bool)
 	for i := 0; i < len(args); i += 2 {
 		key, ok := args[i].(string)
 		if !ok {
-			p.emit(Event{
+			state.EmitForPartial(p, Event{
 				Kind:    EventContractInvalid,
 				Level:   EventWarn,
 				Message: "invalid dot data key for partial",

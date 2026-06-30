@@ -40,7 +40,6 @@ type (
 		filesystem  fs.FS
 		content     *Partial
 		wrapper     *Partial
-		request     *http.Request
 		staticFuncs template.FuncMap
 		customFuncs template.FuncMap
 		connector   connector.Connector
@@ -219,11 +218,6 @@ func (l *Layout) getCustomFuncMap() template.FuncMap {
 
 // RenderWithRequest renders the partial with the given http.Request.
 func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (template.HTML, error) {
-	l.request = r
-	if l.connector == nil {
-		l.connector = connector.NewPartial(nil)
-	}
-
 	if l.wrapper != nil {
 		return l.wrapper.RenderWithRequest(ctx, r)
 	} else {
@@ -233,15 +227,12 @@ func (l *Layout) RenderWithRequest(ctx context.Context, r *http.Request) (templa
 
 // WriteWithRequest writes the layout to the response writer.
 func (l *Layout) WriteWithRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	l.request = r
-	if l.connector == nil {
-		l.connector = connector.NewPartial(nil)
+	conn := l.connector
+	if conn == nil {
+		conn = connector.NewPartial(nil)
 	}
 
-	if l.connector.RenderPartial(r) {
-		if l.wrapper != nil {
-			l.content.parent = l.wrapper
-		}
+	if conn.RenderPartial(r) {
 		err := l.content.WriteWithRequest(ctx, w, r)
 		if err != nil {
 			emitSafely(l.events, nil, Event{
@@ -310,7 +301,6 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		p.renderersInherited = true
 	}
 	p.templateCache = l.service.templateCache
-	p.request = l.request
 
 	for _, child := range p.children {
 		l.applyConfigToPartial(child)

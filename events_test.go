@@ -2,12 +2,17 @@ package partial
 
 import (
 	"context"
+	"errors"
+	"html/template"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"testing/fstest"
 	"time"
 )
+
+var errTestRender = errors.New("test render error")
 
 func TestAsyncEventsEmitDoesNotBlockOnSlowSink(t *testing.T) {
 	started := make(chan struct{})
@@ -129,6 +134,70 @@ func TestRequestContextEventSinkReceivesLifecycleEvents(t *testing.T) {
 	}
 }
 
+func TestRequestContextEventSinkReceivesTemplateHelperEvents(t *testing.T) {
+	files := fstest.MapFS{
+		"page.gohtml": {Data: []byte(`{{ partial runtime "missing.gohtml" }}`)},
+	}
+	var events []Event
+	page := NewID("page", "page.gohtml").SetFileSystem(files)
+	req := httptestRequest("GET", "/page")
+	ctx := WithEventSink(req.Context(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		events = append(events, event)
+	}))
+
+	if _, err := page.RenderWithRequest(ctx, req); err != nil {
+		t.Fatalf("RenderWithRequest() error = %v", err)
+	}
+
+	if !hasEvent(events, EventTemplateMissing) {
+		t.Fatalf("request context events = %#v, want template missing event", events)
+	}
+}
+
+func TestRequestContextEventSinkReceivesTemplateParseError(t *testing.T) {
+	files := fstest.MapFS{
+		"broken.gohtml": {Data: []byte(`{{ if .Missing }}broken`)},
+	}
+	var events []Event
+	page := NewID("broken", "broken.gohtml").SetFileSystem(files)
+	req := httptestRequest("GET", "/broken")
+	ctx := WithEventSink(req.Context(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		events = append(events, event)
+	}))
+
+	if _, err := page.RenderWithRequest(ctx, req); err == nil {
+		t.Fatal("RenderWithRequest() error = nil, want parse error")
+	}
+	if !hasEvent(events, EventTemplateParseError) {
+		t.Fatalf("request context events = %#v, want template parse error", events)
+	}
+}
+
+func TestRequestContextEventSinkReceivesTemplateExecuteError(t *testing.T) {
+	files := fstest.MapFS{
+		"broken.gohtml": {Data: []byte(`{{ fail }}`)},
+	}
+	var events []Event
+	page := NewID("broken", "broken.gohtml").
+		SetFileSystem(files).
+		SetFunc(template.FuncMap{
+			"fail": func() (string, error) {
+				return "", errTestRender
+			},
+		})
+	req := httptestRequest("GET", "/broken")
+	ctx := WithEventSink(req.Context(), EventSinkFunc(func(ctx *RenderContext, event Event) {
+		events = append(events, event)
+	}))
+
+	if _, err := page.RenderWithRequest(ctx, req); err == nil {
+		t.Fatal("RenderWithRequest() error = nil, want execute error")
+	}
+	if !hasEvent(events, EventTemplateExecuteError) {
+		t.Fatalf("request context events = %#v, want template execute error", events)
+	}
+}
+
 func TestRequestContextEventSinkFansOutWithPartialSink(t *testing.T) {
 	files := fstest.MapFS{
 		"page.gohtml": {Data: []byte(`hello`)},
@@ -171,6 +240,30 @@ func TestWithEventSinkAppendsRequestScopedSinks(t *testing.T) {
 
 	if first.Load() != 1 || second.Load() != 1 {
 		t.Fatalf("first = %d second = %d, want 1/1", first.Load(), second.Load())
+	}
+}
+
+func TestAsyncEventsAcceptsConcurrentEmits(t *testing.T) {
+	var count atomic.Int64
+	events := NewAsyncEvents(EventsConfig{Buffer: 256}, EventSinkFunc(func(ctx *RenderContext, event Event) {
+		count.Add(1)
+	}))
+
+	const emits = 128
+	var wg sync.WaitGroup
+	for i := range emits {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			events.Emit(nil, Event{Kind: "test.concurrent"})
+		}(i)
+	}
+	wg.Wait()
+	if err := events.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if got := count.Load(); got != emits {
+		t.Fatalf("count = %d, want %d", got, emits)
 	}
 }
 

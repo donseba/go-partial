@@ -5,7 +5,10 @@ import (
 	"context"
 	"html/template"
 	"log/slog"
+	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -76,5 +79,73 @@ func TestLoggerTemplateHelperEmitsEvent(t *testing.T) {
 	}
 	if got.Fields["section"] != "hero" || got.Fields["source"] != "template" {
 		t.Fatalf("fields = %#v", got.Fields)
+	}
+}
+
+func TestSinkHandlesConcurrentEvents(t *testing.T) {
+	var out bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&out, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	sink := Sink(log, WithMinLevel(partial.EventDebug))
+
+	const emits = 64
+	var wg sync.WaitGroup
+	for i := range emits {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sink.Emit(nil, partial.Event{
+				Kind:      "render.finish",
+				Level:     partial.EventInfo,
+				Message:   "rendered " + strconv.Itoa(i),
+				PartialID: "content",
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	if got := strings.Count(out.String(), "render.finish"); got != emits {
+		t.Fatalf("logged events = %d, want %d", got, emits)
+	}
+}
+
+func TestLoggerTemplateHelperEmitsConcurrentEvents(t *testing.T) {
+	files := fstest.MapFS{
+		"page.gohtml": {Data: []byte(`{{ logger "from template" "value" (url).RawQuery }}`)},
+	}
+	var count sync.Map
+	page := partial.NewID("page", "page.gohtml").
+		SetFileSystem(files).
+		SetFunc(FuncMap()).
+		SetEventSink(partial.EventSinkFunc(func(ctx *partial.RenderContext, event partial.Event) {
+			if event.Kind == EventTemplateLog {
+				count.Store(event.Fields["value"], true)
+			}
+		})).
+		Use(Renderer())
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest("GET", "/?value="+value, nil)
+			if _, err := page.RenderWithRequest(req.Context(), req); err != nil {
+				errs <- err.Error()
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	for i := range renders {
+		value := strconv.Itoa(i)
+		if _, ok := count.Load("value=" + value); !ok {
+			t.Fatalf("missing event value %s", value)
+		}
 	}
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -83,5 +85,46 @@ func TestTemplateActionUsesErrorFallback(t *testing.T) {
 	}
 	if !strings.Contains(body, "broken.gohtml") {
 		t.Fatalf("expected action partial template in error output, got %q", body)
+	}
+}
+
+func TestTemplateActionRendersConcurrently(t *testing.T) {
+	fsys := fstest.MapFS{
+		"page.gohtml":   &fstest.MapFile{Data: []byte(`{{ actionValue }}:{{ action }}`)},
+		"result.gohtml": &fstest.MapFile{Data: []byte(`{{ (request).URL.Query.Get "value" }}`)},
+	}
+	p := partial.NewID("page", "page.gohtml").
+		SetFileSystem(fsys).
+		SetFunc(FuncMap()).
+		Use(Renderer())
+	WithTemplateAction(p, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
+		return partial.NewID("result", "result.gohtml").SetFileSystem(fsys), nil
+	})
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
+			req.Header.Set(connector.HeaderAction.String(), "save-"+value)
+			out, err := p.RenderWithRequest(req.Context(), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			want := "save-" + value + ":" + value
+			if got := string(out); got != want {
+				errs <- "action " + value + " got " + got + " want " + want
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }

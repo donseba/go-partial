@@ -88,6 +88,13 @@ func TestRendererPrepareEnrichesTemplateContext(t *testing.T) {
 	}
 }
 
+func TestRenderTemplateRequiresRenderContext(t *testing.T) {
+	_, err := NewID("page", "page.gohtml").renderTemplate(nil)
+	if err == nil {
+		t.Fatal("renderTemplate(nil) error = nil, want error")
+	}
+}
+
 func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
 	fsys := fstest.MapFS{
 		"content.gohtml": &fstest.MapFile{Data: []byte(`content`)},

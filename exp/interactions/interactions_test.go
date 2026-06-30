@@ -3,7 +3,11 @@ package interactions
 import (
 	"context"
 	"html/template"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -207,5 +211,42 @@ func TestOnAcceptsInteractionConfig(t *testing.T) {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected %q in %q", expected, body)
 		}
+	}
+}
+
+func TestInteractionHelpersRenderConcurrently(t *testing.T) {
+	fsys := fstest.MapFS{
+		"async.gohtml": &fstest.MapFile{Data: []byte(`{{ async runtime "/table/:row" "row" (url).RawQuery }}`)},
+	}
+	p := partial.NewID("async", "async.gohtml").
+		SetConnector(connector.NewHTMX(nil)).
+		SetFileSystem(fsys).
+		SetFunc(FuncMap())
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest(http.MethodGet, "/?row="+value, nil)
+			out, err := p.RenderWithRequest(req.Context(), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			body := string(out)
+			want := `/table/row=` + value
+			if !strings.Contains(body, want) {
+				errs <- "interaction " + value + " missing " + want + " in " + body
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"html/template"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -48,3 +50,38 @@ func TestFuncMapProvidesParsePlaceholders(t *testing.T) {
 }
 
 var _ template.HTML
+
+func TestRendererAddsLocaleHelpersConcurrently(t *testing.T) {
+	fsys := fstest.MapFS{
+		"page.gohtml": &fstest.MapFile{Data: []byte(`{{ locale }}`)},
+	}
+	p := partial.NewID("page", "page.gohtml").
+		SetFileSystem(fsys).
+		SetFunc(FuncMap()).
+		Use(Renderer())
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := "locale_" + strconv.Itoa(i)
+			req := httptest.NewRequest("GET", "/", nil)
+			out, err := p.RenderWithRequest(WithLocalizer(req.Context(), testLocalizer{locale: value}), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			if got := string(out); got != value {
+				errs <- "locale got " + got + " want " + value
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+}

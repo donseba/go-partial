@@ -272,21 +272,44 @@ func (ctx *RenderContext) Emit(event Event) {
 	emitSafely(ctx.Events, ctx, event)
 }
 
+// EmitForPartial sends an event for a specific partial while preserving the
+// active render context, including request-scoped event sinks.
+func (ctx *RenderContext) EmitForPartial(p *Partial, event Event) {
+	if ctx == nil {
+		return
+	}
+	if event.PartialID == "" && p != nil {
+		event.PartialID = p.PartialID()
+	}
+	if event.ParentID == "" && p != nil {
+		event.ParentID = p.ParentID()
+	}
+	ctx.Emit(event)
+}
+
 func (ctx *RenderContext) prepareEvent(event Event) Event {
+	return preparePartialEvent(ctx.Partial, event).withName(ctx.Name)
+}
+
+func preparePartialEvent(p *Partial, event Event) Event {
 	if event.Time.IsZero() {
 		event.Time = time.Now()
 	}
 	if event.Level == "" {
 		event.Level = EventInfo
 	}
-	if event.PartialID == "" && ctx.Partial != nil {
-		event.PartialID = ctx.Partial.PartialID()
+	if event.PartialID == "" && p != nil {
+		event.PartialID = p.PartialID()
 	}
-	if event.ParentID == "" && ctx.Partial != nil {
-		event.ParentID = ctx.Partial.ParentID()
+	if event.ParentID == "" && p != nil {
+		event.ParentID = p.ParentID()
 	}
+	return event
+}
+
+func (event Event) withName(name string) Event {
 	if event.Name == "" {
-		event.Name = ctx.Name
+		event.Name = name
 	}
 	return event
 }

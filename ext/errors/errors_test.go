@@ -5,7 +5,9 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -144,5 +146,46 @@ func TestRendererFinalizeKeepsOriginalRenderErrorWhenErrorTemplateFails(t *testi
 	}
 	if !errors.Is(err, originalErr) {
 		t.Fatalf("Finalize() error = %v, want original error", err)
+	}
+}
+
+func TestRendererHandlesConcurrentFailures(t *testing.T) {
+	p := partial.New("broken.gohtml").
+		ID("broken").
+		SetFileSystem(fstest.MapFS{
+			"broken.gohtml": &fstest.MapFile{Data: []byte(`{{ fail }}`)},
+		}).
+		SetFunc(template.FuncMap{
+			"fail": func() (string, error) {
+				return "", errors.New("boom")
+			},
+		}).
+		Use(Renderer(WithMode(ModeDetailed)))
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest(http.MethodGet, "/broken?value="+value, nil)
+			rec := httptest.NewRecorder()
+			err := p.WriteWithRequest(req.Context(), rec, req)
+			if err == nil {
+				errs <- "missing error " + value
+				return
+			}
+			body := rec.Body.String()
+			if rec.Code != http.StatusInternalServerError || !strings.Contains(body, "Template render error") {
+				errs <- "bad response " + value + ": " + body
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }

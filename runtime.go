@@ -26,7 +26,7 @@ func newRuntime(p *Partial, state *RenderContext) *Runtime {
 // Context returns the context for the active render.
 func (r *Runtime) Context() context.Context {
 	if r == nil || r.state == nil {
-		return context.Background()
+		return defaultRenderContext()
 	}
 	return r.state.Context
 }
@@ -85,9 +85,9 @@ func (r *Runtime) SetValue(key any, value any) {
 // Connector returns the connector for the active partial.
 func (r *Runtime) Connector() connector.Connector {
 	if r == nil || r.partial == nil {
-		return nil
+		return connector.NewPartial(nil)
 	}
-	return r.partial.getConnector()
+	return r.partial.getConnectorOrDefault()
 }
 
 // Partial renders a template path through the current partial tree.

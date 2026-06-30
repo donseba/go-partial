@@ -2,7 +2,11 @@ package slots
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
@@ -109,5 +113,41 @@ func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 	}
 	if !seenParent || childRecords != 1 {
 		t.Fatalf("records = %#v, want parent and child", records)
+	}
+}
+
+func TestSlotRendersConcurrently(t *testing.T) {
+	parent := partial.NewID("page", "page.gohtml").
+		SetFileSystem(fstest.MapFS{
+			"page.gohtml":    &fstest.MapFile{Data: []byte(`<main>{{ slot "toolbar" }}</main>`)},
+			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`<nav>{{ (request).URL.Query.Get "value" }}</nav>`)}},
+		).
+		Use(Renderer())
+	Set(parent, "toolbar", partial.NewID("toolbar", "toolbar.gohtml"))
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest(http.MethodGet, "/?value="+value, nil)
+			out, err := parent.RenderWithRequest(req.Context(), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			want := `<main><nav>` + value + `</nav></main>`
+			if got := string(out); got != want {
+				errs <- "slot " + value + " got " + got + " want " + want
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
 	}
 }

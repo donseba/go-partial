@@ -8,6 +8,8 @@ import (
 	"html/template"
 	"io"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -276,6 +278,84 @@ func TestWriterSinkWritesJSONLines(t *testing.T) {
 	}
 	if got["eventKind"] != "render.error" || got["eventLevel"] != "error" || got["eventMessage"] != "render failed" {
 		t.Fatalf("unexpected event fields: %#v", got)
+	}
+}
+
+func TestRendererRecordsConcurrentRenders(t *testing.T) {
+	var mu sync.Mutex
+	records := make(map[string]Record)
+	p := partial.New("page.gohtml").
+		ID("metrics-page").
+		SetFileSystem(fstest.MapFS{
+			"page.gohtml": &fstest.MapFile{Data: []byte(`{{ (request).URL.Query.Get "value" }}`)},
+		}).
+		Use(Renderer(SinkFunc(func(record Record) {
+			mu.Lock()
+			defer mu.Unlock()
+			records[record.RequestID] = record
+		})))
+
+	const renders = 64
+	var wg sync.WaitGroup
+	errs := make(chan string, renders)
+	for i := range renders {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			value := strconv.Itoa(i)
+			req := httptest.NewRequest("GET", "/metrics?value="+value, nil)
+			out, err := p.RenderWithRequest(WithRequestID(req.Context(), "req-"+value), req)
+			if err != nil {
+				errs <- err.Error()
+				return
+			}
+			if got := string(out); got != value {
+				errs <- "render " + value + " got " + got
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+	for i := range renders {
+		requestID := "req-" + strconv.Itoa(i)
+		record, ok := records[requestID]
+		if !ok {
+			t.Fatalf("missing record %s", requestID)
+		}
+		if record.Path != "/metrics" || record.RequestID != requestID {
+			t.Fatalf("record %s = %#v", requestID, record)
+		}
+	}
+}
+
+func TestWriterSinkRecordsConcurrently(t *testing.T) {
+	var out bytes.Buffer
+	sink := NewWriterSink(&out)
+
+	const writes = 64
+	var wg sync.WaitGroup
+	for i := range writes {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			sink.Record(Record{
+				Kind:      partial.RenderKindPartial,
+				RequestID: "req-" + strconv.Itoa(i),
+				PartialID: "content",
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	if err := sink.Err(); err != nil {
+		t.Fatalf("Err() = %v", err)
+	}
+	lines := bytes.Split(bytes.TrimSpace(out.Bytes()), []byte("\n"))
+	if len(lines) != writes {
+		t.Fatalf("lines = %d, want %d", len(lines), writes)
 	}
 }
 

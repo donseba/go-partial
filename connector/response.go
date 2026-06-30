@@ -21,6 +21,10 @@ type Response struct {
 	TriggerAfterSwap   string
 }
 
+// ResponseBuilder mutates a Response through fluent methods.
+//
+// It is intended for single-goroutine request/configuration use. Do not share a
+// builder across goroutines without external synchronization.
 type ResponseBuilder struct {
 	response *Response
 }
@@ -147,6 +151,9 @@ func setResponseHeader(headers map[string]string, key HeaderKey, value string) {
 	}
 }
 
+// Trigger builds an HTMX-compatible trigger header value.
+//
+// Trigger is mutable and is not safe for concurrent mutation.
 type Trigger struct {
 	events map[string]any
 }
@@ -181,6 +188,9 @@ func (t *Trigger) String() string {
 	return string(out)
 }
 
+// Swap builds an HTMX-compatible swap header value.
+//
+// Swap is mutable and is not safe for concurrent mutation.
 type Swap struct {
 	style       SwapStyle
 	swap        time.Duration

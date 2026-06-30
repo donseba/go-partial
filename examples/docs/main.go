@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -188,7 +187,7 @@ func (app *App) render(w http.ResponseWriter, r *http.Request, tmpl string, conf
 
 	layout := app.service.NewLayout().Set(content).Wrap(wrapper)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := layout.WriteWithRequest(context.Background(), w, r); err != nil {
+	if err := layout.WriteWithRequest(r.Context(), w, r); err != nil {
 		log.Printf("render error: %v", err)
 	}
 }

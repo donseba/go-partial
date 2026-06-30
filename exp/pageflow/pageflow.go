@@ -20,6 +20,9 @@ type PageFlow struct {
 }
 
 // SessionData stores per-session progress and data for a PageFlow.
+//
+// SessionData is mutable session state. Do not share one SessionData value
+// across goroutines without external synchronization.
 type SessionData struct {
 	StepData  map[string]map[string]any
 	Validated map[string]bool

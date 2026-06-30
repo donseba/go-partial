@@ -134,7 +134,11 @@ func (ctx *RenderContext) SetFunc(name string, fn any) {
 
 func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind RenderKind) *RenderContext {
 	if ctx == nil {
-		ctx = context.Background()
+		if r != nil {
+			ctx = r.Context()
+		} else {
+			ctx = defaultRenderContext()
+		}
 	}
 
 	var currentURL *url.URL
@@ -156,6 +160,10 @@ func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind Ren
 	}
 	state.Runtime = newRuntime(p, state)
 	return state
+}
+
+func defaultRenderContext() context.Context {
+	return context.TODO()
 }
 
 func renderWithChain(state *RenderContext, renderers []Renderer, terminal RenderNext) (template.HTML, error) {
