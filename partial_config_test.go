@@ -246,7 +246,7 @@ func TestConcurrentCachedLayoutRendersDoNotBleedRequestData(t *testing.T) {
 				return ctx.Request.URL.Query().Get("value")
 			},
 		}).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				ctx.SetFunc("requestValue", func() string {
 					return ctx.Request.URL.Query().Get("value")
@@ -291,7 +291,7 @@ func TestConcurrentRendererValuesAreIsolated(t *testing.T) {
 	}
 	p := NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				value := ctx.Request.URL.Query().Get("value")
 				ctx.Values.Set(requestContextTestKey{}, value)
@@ -318,7 +318,7 @@ func TestConcurrentRendererValuesAreIsolated(t *testing.T) {
 				return
 			}
 			if got := string(out); got != want {
-				errs <- "renderer " + want + " got " + got
+				errs <- "RenderStage " + want + " got " + got
 			}
 		}(i)
 	}
@@ -432,7 +432,7 @@ func TestRenderWithRequestUsesRequestContextWhenContextIsNil(t *testing.T) {
 	}
 	p := NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				ctx.SetFunc("requestContextValue", func() string {
 					return fmt.Sprint(ctx.Context.Value(requestContextTestKey{}))
@@ -461,7 +461,7 @@ func TestRenderNilContextProvidesDefaultContext(t *testing.T) {
 	}
 	p := NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				ctx.SetFunc("contextReady", func() string {
 					if ctx.Context == nil {
@@ -500,7 +500,7 @@ func TestConcurrentServiceCacheLayoutOOBAndTargetStress(t *testing.T) {
 	service.SetFunc(template.FuncMap{
 		"renderMarker": func() string { return "" },
 	})
-	service.Use(RendererHooks{
+	service.Use(RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			marker := ctx.Request.URL.Query().Get("value")
 			ctx.Values.Set(requestContextTestKey{}, marker)

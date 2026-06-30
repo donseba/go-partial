@@ -97,7 +97,7 @@ func TestWriterPatchPartialUsesRenderers(t *testing.T) {
 		SetFileSystem(fsys)
 
 	rec := httptest.NewRecorder()
-	writer := NewWriter(rec).Use(partial.RendererHooks{
+	writer := NewWriter(rec).Use(partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("marker", func() string { return "rendered" })
 			return ctx, nil
@@ -111,7 +111,7 @@ func TestWriterPatchPartialUsesRenderers(t *testing.T) {
 
 	body := rec.Body.String()
 	if !strings.Contains(body, `data: {"target":"#notice","html":"<div>rendered</div>"}`+"\n\n") {
-		t.Fatalf("expected renderer-enhanced partial patch, got %q", body)
+		t.Fatalf("expected RenderStage-enhanced partial patch, got %q", body)
 	}
 }
 

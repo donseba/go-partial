@@ -54,9 +54,9 @@ func FuncMap() template.FuncMap {
 	}
 }
 
-// Renderer installs slot helpers bound to the active render context.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage installs slot helpers bound to the active render context.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil {
 				return ctx, nil
@@ -70,6 +70,13 @@ func Renderer() partial.Renderer {
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs slot helpers bound to the active render context.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 // Slot renders a named slot from a render context.

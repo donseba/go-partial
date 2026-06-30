@@ -6,7 +6,7 @@
 
     <h2 class="text-xl font-bold text-slate-50">Register helpers</h2>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.SetFunc(flash.FuncMap())
-service.Use(flash.Renderer())</code></pre>
+service.Use(flash.Stage())</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Add messages</h2>
     <p class="leading-7 text-slate-400">Flash messages live on context. In handlers, start from <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">r.Context()</code>, add messages, then render with the derived request context.</p>
@@ -35,7 +35,7 @@ _ = layout.WriteWithRequest(ctx, w, r)</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Override markup</h2>
     <p class="leading-7 text-slate-400">The default message and target templates are embedded. Applications can replace either one with templates from their own filesystem or fully configured partials.</p>
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.Use(flash.Renderer(
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">service.Use(flash.Stage(
     flash.WithTemplate("templates/flash.gohtml"),
     flash.WithTargetTemplate("templates/flash_target.gohtml"),
     flash.WithTargetID("flash-messages"),

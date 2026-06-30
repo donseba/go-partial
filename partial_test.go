@@ -1133,8 +1133,8 @@ func testSelectionFuncMap() template.FuncMap {
 	}
 }
 
-func testSelectionRenderer() Renderer {
-	return RendererHooks{
+func testSelectionRenderer() RenderStage {
+	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			ctx.SetFunc("selectionHeader", func() string {
 				return ctx.Runtime.Connector().GetSelectHeader()
@@ -1188,8 +1188,8 @@ func testLocalizationFuncMap() template.FuncMap {
 	}
 }
 
-func testLocalizationRenderer() Renderer {
-	return RendererHooks{
+func testLocalizationRenderer() RenderStage {
+	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			localizer := func() testLocalizer {
 				if loc, ok := ctx.Context.Value(testLocaleContextKey{}).(testLocalizer); ok {
@@ -1218,8 +1218,8 @@ func testUseTargetResolver(p *Partial, resolver func(context.Context, *http.Requ
 	p.SetExtension(testTargetResolverKey{}, resolver)
 }
 
-func testTargetRenderer() Renderer {
-	return RendererHooks{
+func testTargetRenderer() RenderStage {
+	return RenderStageHooks{
 		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 			ctx.SetFunc("targetHeader", func() string {
 				return ctx.Runtime.Connector().GetTargetHeader()

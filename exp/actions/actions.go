@@ -94,9 +94,9 @@ func actionIs(ctx *partial.RenderContext, values ...string) bool {
 	return slices.Contains(values, ActionValue(ctx))
 }
 
-// Renderer installs action helpers and executes configured partial actions.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage installs action helpers and executes configured partial actions.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
@@ -123,6 +123,13 @@ func Renderer() partial.Renderer {
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs action helpers and executes configured partial actions.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 func firstRenderContext(ctx []*partial.RenderContext) *partial.RenderContext {

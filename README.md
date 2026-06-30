@@ -31,9 +31,9 @@ Optional packages are split by stability:
 - `ext/...` contains extension packages that are useful but not required by core, such as `ext/errors` and `ext/debug`.
 - `exp/...` contains experimental opt-in features, such as localization, CSRF, flash messages, selection, actions, pageflow, interactions, metrics, OpenTelemetry, slots, target resolvers, template helpers, and SSE.
 
-Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A renderer follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
+Applications choose the pieces they want with `SetFunc(...)`, `Use(...)`, or package-specific setup helpers. A render stage follows the same lifecycle everywhere: `Prepare` can add request-scoped context, `Render` wraps or replaces template rendering, and `Finalize` observes or transforms the result.
 
-Renderers may set generic response metadata through `ctx.Response`. `WriteWithRequest` applies that status and those headers after rendering. Templates do not receive helpers for setting headers or status; templates produce HTML.
+Render stages may set generic response metadata through `ctx.Response`. `WriteWithRequest` applies that status and those headers after rendering. Templates do not receive helpers for setting headers or status; templates produce HTML.
 
 ## Metrics Output
 `exp/metrics` records render lifecycle data through a small `Sink` interface. Use your own sink for storage, or write JSON lines to any `io.Writer`:
@@ -44,7 +44,7 @@ sink := metrics.Fanout(
     metrics.NewWriterSink(os.Stdout),
 )
 
-service.Use(metrics.Renderer(sink, metrics.WithTag("chain", "web")))
+service.Use(metrics.Stage(sink, metrics.WithTag("chain", "web")))
 ```
 
 The writer sink is intentionally plain: it works with stdout, files, buffers, pipes, or app-owned adapters that forward records to SSE, queues, or databases.
@@ -97,31 +97,31 @@ Several integrations are available, detailed information can be found in the [IN
 - SSE writer, for streaming rendered HTML patches
 
 ## Error Output
-`WriteWithRequest` can render an HTML error page when template parsing or execution fails, but only when an error renderer is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
+`WriteWithRequest` can render an HTML error page when template parsing or execution fails, but only when an error stage is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
 
 Normal requests receive a `500` full HTML page. HTMX/partial requests receive a swappable error fragment with status `200`, because HTMX does not swap `500` responses by default.
 
-Register the error renderer globally:
+Register the error stage globally:
 
 ```go
 service := partial.NewService(nil).
-    Use(exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)))
+    Use(exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)))
 ```
 
 Or on one partial:
 
 ```go
-content.Use(exterrors.Renderer())
+content.Use(exterrors.Stage())
 ```
 
-`RenderWithRequest` still returns the render error directly. `WriteWithRequest` asks the renderer chain for a failure response; without `ext/errors`, it returns the original render error.
+`RenderWithRequest` still returns the render error directly. `WriteWithRequest` asks the render stage chain for a failure response; without `ext/errors`, it returns the original render error.
 
 ## Localization
 Templates receive a request localizer through the `localizer` and `locale` helpers from `exp/localization`. The interface only requires `GetLocale()`. Translation behavior should come from user-provided template functions registered with `Service.SetFunc`:
 
 ```go
 service.SetFunc(localization.FuncMap(), translator.FuncMap())
-service.Use(localization.Renderer())
+service.Use(localization.Stage())
 ```
 
 ```go
@@ -171,11 +171,11 @@ The `debug` template helper renders a styled diagnostic box using an embedded te
 {{ debug runtime . }}
 ```
 
-Register the debug helper and renderer globally, per layout, or per partial:
+Register the debug helper and stage globally, per layout, or per partial:
 
 ```go
 service.SetFunc(debug.FuncMap())
-service.Use(debug.Renderer())
+service.Use(debug.Stage())
 ```
 
 ## Server-Sent Events
@@ -371,7 +371,7 @@ wires them into editor tooling for this repo so helper calls such as
 `{{ async runtime "/stats" }}` and `{{ async runtime Stats }}` can both be
 completed and validated. The `runtime` argument is a per-render value injected
 by go-partial; it exposes request context, the active connector, partial tree,
-and diagnostic renderers to helpers without package globals.
+and diagnostic stages to helpers without package globals.
 
 Use the inline endpoint form when the endpoint is naturally local to the
 template, especially inside loops:
@@ -610,7 +610,7 @@ In your templates, prefer this model:
 go-partial does not wrap your model in `.Data`, `.Service`, `.Layout`, or `.Global`. Shared application values should be explicit typed roots, for example `SetModel(serviceInfo)` with a matching go-doc declaration. Request-scoped values live behind helper functions so changing dot never hides them.
 
 ## Concurrency and Template Caching
-Configure services, layouts, partial trees, functions, renderers, headers, and filesystems before serving requests. After configuration, `RenderWithRequest` and `WriteWithRequest` can be called concurrently on the same partial or layout tree. Request-specific values such as `request`, `url`, `ctx`, `runtime`, renderer values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
+Configure services, layouts, partial trees, functions, render stages, headers, and filesystems before serving requests. After configuration, `RenderWithRequest` and `WriteWithRequest` can be called concurrently on the same partial or layout tree. Request-specific values such as `request`, `url`, `ctx`, `runtime`, stage values, selected targets, and template helper bindings are scoped to the active render and are not stored on the reusable partial configuration.
 
 In HTTP handlers, pass the request context, normally `r.Context()` or a context derived from it. That lets cancellation, deadlines, localization, CSRF state, event sinks, metrics IDs, and other middleware values follow the render. `Render(ctx)` without a request is for tests, offline rendering, and small utilities.
 

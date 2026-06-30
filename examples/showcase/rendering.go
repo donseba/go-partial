@@ -71,7 +71,7 @@ func (app *App) standaloneService(conn connector.Connector) *partial.Service {
 		Connector:        conn,
 		Events:           app.events,
 		FS:               os.DirFS("examples/showcase"),
-		Renderers:        app.showcaseRenderers(),
+		Stages:           app.showcaseStages(),
 		UseTemplateCache: false,
 	})
 }

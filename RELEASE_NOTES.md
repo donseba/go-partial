@@ -50,7 +50,7 @@ github.com/donseba/go-partial/exp/flash
 ```
 
 Register it with `service.SetFunc(flash.FuncMap())` and
-`service.Use(flash.Renderer())`. Templates can render `{{ flashTarget }}` once
+`service.Use(flash.Stage())`. Templates can render `{{ flashTarget }}` once
 in a layout and `{{ flash }}` in request or fragment templates. Message and
 target templates are embedded by default and can be replaced with
 `flash.WithTemplate`, `flash.WithPartial`, `flash.WithTargetTemplate`,

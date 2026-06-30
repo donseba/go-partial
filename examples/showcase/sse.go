@@ -16,7 +16,7 @@ func (app *App) sse(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) sseStream(w http.ResponseWriter, r *http.Request) {
-	events := sse.NewWriter(w).Use(app.showcaseRenderers()...)
+	events := sse.NewWriter(w).Use(app.showcaseStages()...)
 	_ = events.Comment("go-partial showcase stream")
 	events.Flush()
 	ctx := app.requestContext(r)

@@ -47,14 +47,21 @@ func CSRF(ctx ...*partial.RenderContext) Token {
 	return FromContext(ctx[0].Context)
 }
 
-// Renderer installs the csrf template helper from the render context.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage installs the csrf template helper from the render context.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("csrf", func() Token { return CSRF(ctx) })
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs the csrf template helper from the render context.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 // WithToken stores a Token on a context.

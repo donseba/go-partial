@@ -18,7 +18,7 @@ func (app *App) debugPage(w http.ResponseWriter, r *http.Request) {
 		SetFileSystem(os.DirFS("examples/showcase")).
 		SetFunc(extdebug.FuncMap()).
 		SetDot(DebugCustomPage{Name: "Ada", Role: "Editor"}).
-		Use(partial.RendererHooks{
+		Use(partial.RenderStageHooks{
 			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != extdebug.RenderKindDebug {
 					return next(ctx)

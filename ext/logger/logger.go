@@ -40,9 +40,9 @@ func FuncMap() template.FuncMap {
 	}
 }
 
-// Renderer installs the request-scoped logger template helper.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage installs the request-scoped logger template helper.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("logger", func(message string, pairs ...any) string {
 				return Logger(ctx, message, pairs...)
@@ -50,6 +50,13 @@ func Renderer() partial.Renderer {
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs the request-scoped logger template helper.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 // Logger emits an info-level diagnostic event from template code.

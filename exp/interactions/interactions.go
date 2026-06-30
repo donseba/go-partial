@@ -61,14 +61,14 @@ func FuncMap() template.FuncMap {
 	}
 }
 
-// Renderer returns a partial renderer for interaction markup.
-func Renderer(markup ...MarkupRenderer) partial.Renderer {
+// Stage returns a partial render stage for interaction markup.
+func Stage(markup ...MarkupRenderer) partial.RenderStage {
 	renderer := DefaultMarkupRenderer()
 	if len(markup) > 0 && markup[0] != nil {
 		renderer = markup[0]
 	}
 
-	return partial.RendererHooks{
+	return partial.RenderStageHooks{
 		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindInteraction {
 				return next(ctx)
@@ -80,6 +80,13 @@ func Renderer(markup ...MarkupRenderer) partial.Renderer {
 			return renderer(data.Runtime, data.Interaction, data.Attrs)
 		},
 	}
+}
+
+// Renderer returns a partial renderer for interaction markup.
+//
+// Deprecated: use Stage.
+func Renderer(markup ...MarkupRenderer) partial.RenderStage {
+	return Stage(markup...)
 }
 
 // NewAsync creates an async interaction contract value.

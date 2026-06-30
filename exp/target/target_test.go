@@ -22,7 +22,7 @@ func TestRendererResolvesDynamicTarget(t *testing.T) {
 	table := partial.NewID("content", "table.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
 		if target != "row-2" {
@@ -52,7 +52,7 @@ func TestRendererAddsTargetHelpers(t *testing.T) {
 	p := partial.NewID("content", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set(connector.HeaderTarget.String(), "content")
 
@@ -73,7 +73,7 @@ func TestRendererResolvesTargetsConcurrently(t *testing.T) {
 	table := partial.NewID("content", "table.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
 		return partial.NewID(target, "row.gohtml").SetFileSystem(fsys).SetDot(map[string]any{
 			"ID": target,

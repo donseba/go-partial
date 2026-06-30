@@ -31,7 +31,7 @@ func TestRendererRecordsRenderMetrics(t *testing.T) {
 			"page.gohtml": &fstest.MapFile{Data: []byte(`Hello {{ .Name }}`)},
 		}).
 		SetDot(map[string]string{"Name": "Ada"}).
-		Use(Renderer(SinkFunc(func(record Record) {
+		Use(Stage(SinkFunc(func(record Record) {
 			records = append(records, record)
 		}), WithClock(now), WithTag("area", "showcase")))
 	WithPartialLabel(p, "main panel")
@@ -102,7 +102,7 @@ func TestRendererUsesCorrelationHeaderFallbacks(t *testing.T) {
 		SetFileSystem(fstest.MapFS{
 			"page.gohtml": &fstest.MapFile{Data: []byte(`ok`)},
 		}).
-		Use(Renderer(SinkFunc(func(next Record) {
+		Use(Stage(SinkFunc(func(next Record) {
 			record = next
 		})))
 
@@ -133,8 +133,8 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 			"content.gohtml": &fstest.MapFile{Data: []byte(`<main>content</main>`)},
 			"header.gohtml":  &fstest.MapFile{Data: []byte(`<aside{{ oobAttr }}>header</aside>`)},
 		},
-		Renderers: []partial.Renderer{
-			Renderer(SinkFunc(func(record Record) {
+		Stages: []partial.RenderStage{
+			Stage(SinkFunc(func(record Record) {
 				records = append(records, record)
 			})),
 		},
@@ -192,7 +192,7 @@ func TestRendererMarksOOBPartials(t *testing.T) {
 func TestRendererRecordsRenderErrors(t *testing.T) {
 	renderErr := errors.New("boom")
 	var records []Record
-	renderer := Renderer(SinkFunc(func(record Record) {
+	RenderStage := Stage(SinkFunc(func(record Record) {
 		records = append(records, record)
 	}))
 	ctx := &partial.RenderContext{
@@ -200,14 +200,14 @@ func TestRendererRecordsRenderErrors(t *testing.T) {
 		Values: make(partial.RenderValues),
 	}
 
-	ctx, err := renderer.Prepare(ctx)
+	ctx, err := RenderStage.Prepare(ctx)
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
-	out, err := renderer.Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
+	out, err := RenderStage.Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return template.HTML("partial output"), renderErr
 	})
-	_, err = renderer.Finalize(ctx, out, err)
+	_, err = RenderStage.Finalize(ctx, out, err)
 	if !errors.Is(err, renderErr) {
 		t.Fatalf("Finalize() error = %v, want %v", err, renderErr)
 	}
@@ -289,7 +289,7 @@ func TestRendererRecordsConcurrentRenders(t *testing.T) {
 		SetFileSystem(fstest.MapFS{
 			"page.gohtml": &fstest.MapFile{Data: []byte(`{{ (request).URL.Query.Get "value" }}`)},
 		}).
-		Use(Renderer(SinkFunc(func(record Record) {
+		Use(Stage(SinkFunc(func(record Record) {
 			mu.Lock()
 			defer mu.Unlock()
 			records[record.RequestID] = record

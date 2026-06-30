@@ -39,7 +39,7 @@ func TestRendererCustomizesInteractionMarkup(t *testing.T) {
 		SetConnector(connector.NewHTMX(nil)).
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer(func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
+		Use(Stage(func(runtime *partial.Runtime, interaction connector.Interaction, attrs map[string]string) (template.HTML, error) {
 			return template.HTML(`<section data-kind="` + string(interaction.Kind) + `" ` + renderAttrs(attrs) + `></section>`), nil
 		}))
 

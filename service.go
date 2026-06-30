@@ -19,7 +19,12 @@ type (
 		UseTemplateCache bool
 		Events           EventSink
 		FS               fs.FS
-		Renderers        []Renderer
+		// Stages configures the render stage chain shared by new layouts.
+		Stages []RenderStage
+		// Renderers configures the render stage chain.
+		//
+		// Deprecated: use Stages.
+		Renderers []RenderStage
 	}
 
 	// Service stores shared rendering configuration for layouts.
@@ -30,7 +35,7 @@ type (
 		connector     connector.Connector
 		events        EventSink
 		templateCache *templateutil.Store
-		renderers     []Renderer
+		stages        []RenderStage
 		funcsLock     sync.RWMutex
 	}
 
@@ -44,7 +49,7 @@ type (
 		customFuncs template.FuncMap
 		connector   connector.Connector
 		events      EventSink
-		renderers   []Renderer
+		stages      []RenderStage
 		funcsLock   sync.RWMutex
 	}
 )
@@ -67,9 +72,14 @@ func NewService(cfg *Config) *Service {
 		customFuncs:   make(template.FuncMap),
 		connector:     cfg.Connector,
 		events:        cfg.Events,
-		renderers:     append([]Renderer(nil), cfg.Renderers...),
+		stages:        appendRenderStages(cfg.Stages, cfg.Renderers),
 		templateCache: templateutil.NewStore(),
 	}
+}
+
+func appendRenderStages(stages []RenderStage, deprecated []RenderStage) []RenderStage {
+	out := append([]RenderStage(nil), stages...)
+	return append(out, deprecated...)
 }
 
 // NewLayout returns a new layout.
@@ -82,19 +92,19 @@ func (svc *Service) NewLayout() *Layout {
 		filesystem:  fsys,
 		connector:   svc.connector,
 		events:      svc.events,
-		renderers:   append([]Renderer(nil), svc.renderers...),
+		stages:      append([]RenderStage(nil), svc.stages...),
 		staticFuncs: functions,
 		customFuncs: customFuncs,
 	}
 }
 
-// Use appends renderers to every layout created by this service.
-func (svc *Service) Use(renderers ...Renderer) *Service {
+// Use appends render stages to every layout created by this service.
+func (svc *Service) Use(stages ...RenderStage) *Service {
 	if svc == nil {
 		return nil
 	}
-	svc.renderers = append(svc.renderers, renderers...)
-	svc.config.Renderers = append(svc.config.Renderers, renderers...)
+	svc.stages = append(svc.stages, stages...)
+	svc.config.Stages = append(svc.config.Stages, stages...)
 	return svc
 }
 
@@ -141,17 +151,17 @@ func mergeStaticFuncMap(dst template.FuncMap, src template.FuncMap, events Event
 	return merged
 }
 
-// Use appends renderers to the layout render chain.
-func (l *Layout) Use(renderers ...Renderer) *Layout {
+// Use appends render stages to the layout render chain.
+func (l *Layout) Use(stages ...RenderStage) *Layout {
 	if l == nil {
 		return nil
 	}
-	l.renderers = append(l.renderers, renderers...)
+	l.stages = append(l.stages, stages...)
 	if l.content != nil {
-		l.content.Use(renderers...)
+		l.content.Use(stages...)
 	}
 	if l.wrapper != nil {
-		l.wrapper.Use(renderers...)
+		l.wrapper.Use(stages...)
 	}
 	return l
 }
@@ -296,9 +306,9 @@ func (l *Layout) applyConfigToPartial(p *Partial) {
 		p.fsSet = true
 	}
 	p.useCache = l.service.config.UseTemplateCache
-	if len(l.renderers) > 0 && !p.renderersInherited {
-		p.renderers = append(append([]Renderer(nil), l.renderers...), p.renderers...)
-		p.renderersInherited = true
+	if len(l.stages) > 0 && !p.stagesInherited {
+		p.stages = append(append([]RenderStage(nil), l.stages...), p.stages...)
+		p.stagesInherited = true
 	}
 	p.templateCache = l.service.templateCache
 

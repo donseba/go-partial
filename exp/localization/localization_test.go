@@ -27,7 +27,7 @@ func TestRendererAddsLocaleHelpers(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	req := httptest.NewRequest("GET", "/", nil)
 	ctx := WithLocalizer(context.Background(), testLocalizer{locale: "nl_NL"})
@@ -58,7 +58,7 @@ func TestRendererAddsLocaleHelpersConcurrently(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	const renders = 64
 	var wg sync.WaitGroup

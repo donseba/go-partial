@@ -24,9 +24,9 @@ type (
 	// Writer is bound to a single response stream and is not safe for concurrent
 	// writes unless the caller serializes access.
 	Writer struct {
-		w         http.ResponseWriter
-		flusher   http.Flusher
-		renderers []partial.Renderer
+		w       http.ResponseWriter
+		flusher http.Flusher
+		stages  []partial.RenderStage
 	}
 
 	Patch struct {
@@ -81,12 +81,12 @@ func NewWriter(w http.ResponseWriter) *Writer {
 	return writer
 }
 
-// Use appends renderers to partials rendered by this writer.
-func (s *Writer) Use(renderers ...partial.Renderer) *Writer {
+// Use appends render stages to partials rendered by this writer.
+func (s *Writer) Use(stages ...partial.RenderStage) *Writer {
 	if s == nil {
 		return s
 	}
-	s.renderers = append(s.renderers, renderers...)
+	s.stages = append(s.stages, stages...)
 	return s
 }
 
@@ -164,9 +164,9 @@ func (s *Writer) PatchPartial(ctx context.Context, r *http.Request, target strin
 	if p == nil {
 		return fmt.Errorf("partial is not initialized")
 	}
-	if len(s.renderers) > 0 {
+	if len(s.stages) > 0 {
 		p = p.Clone()
-		p.Use(s.renderers...)
+		p.Use(s.stages...)
 	}
 	html, err := p.RenderWithRequest(ctx, r)
 	if err != nil {

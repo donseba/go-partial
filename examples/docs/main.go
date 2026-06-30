@@ -43,8 +43,8 @@ func main() {
 		service: partial.NewService(&partial.Config{
 			Connector: connector.NewHTMX(nil),
 			FS:        os.DirFS("examples/docs"),
-			Renderers: []partial.Renderer{
-				exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
+			Stages: []partial.RenderStage{
+				exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)),
 			},
 		}),
 	}

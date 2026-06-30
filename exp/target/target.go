@@ -70,9 +70,9 @@ func targetIs(ctx *partial.RenderContext, values ...string) bool {
 	return slices.Contains(values, TargetValue(ctx))
 }
 
-// Renderer installs target helpers and applies configured target resolvers.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage installs target helpers and applies configured target resolvers.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
@@ -103,6 +103,13 @@ func Renderer() partial.Renderer {
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs target helpers and applies configured target resolvers.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 func firstRenderContext(ctx []*partial.RenderContext) *partial.RenderContext {

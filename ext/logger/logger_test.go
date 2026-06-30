@@ -62,7 +62,7 @@ func TestLoggerTemplateHelperEmitsEvent(t *testing.T) {
 				got = event
 			}
 		})).
-		Use(Renderer())
+		Use(Stage())
 
 	html, err := page.Render(context.Background())
 	if err != nil {
@@ -121,7 +121,7 @@ func TestLoggerTemplateHelperEmitsConcurrentEvents(t *testing.T) {
 				count.Store(event.Fields["value"], true)
 			}
 		})).
-		Use(Renderer())
+		Use(Stage())
 
 	const renders = 64
 	var wg sync.WaitGroup

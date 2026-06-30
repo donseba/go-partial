@@ -105,7 +105,7 @@ ctx.Emit(partial.Event{
 
 Implemented attachment points:
 
-- `RenderContext.Emit(event)` is convenient for renderers.
+- `RenderContext.Emit(event)` is convenient for Stages.
 - `Config.Events` attaches sinks at the service boundary.
 - `partial.WithEventSink(ctx, sink)` attaches request-scoped sinks. Repeated
   calls append with fanout.
@@ -166,7 +166,7 @@ The logger sink should not decide render behavior. It only observes.
 
 ## Metrics
 
-`exp/metrics` can continue using the renderer lifecycle for precise timing and
+`exp/metrics` can continue using the Render stage lifecycle for precise timing and
 HTML size. Diagnostic events can add semantic context:
 
 - which target resolver was attempted
@@ -192,7 +192,7 @@ GET /metrics
       exp.metrics.record
 ```
 
-Renderer lifecycle events are best for call-stack timing. Extension events are
+Render stage lifecycle events are best for call-stack timing. Extension events are
 best for semantic breadcrumbs.
 
 `exp/otel` keeps OpenTelemetry policy outside core. It records go-partial events

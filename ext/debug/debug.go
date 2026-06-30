@@ -22,7 +22,7 @@ func FuncMap() template.FuncMap {
 	}
 }
 
-// Debug renders a diagnostic value through the active renderer chain.
+// Debug renders a diagnostic value through the active render stage chain.
 //
 // go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, value any) html/template.HTML
 func Debug(runtime *partial.Runtime, value any) template.HTML {
@@ -57,9 +57,9 @@ const debugTemplate = `<section class="go-partial-debug" role="note" style="back
 <pre style="background:#eeece4;border:1px solid #d8d5ca;border-radius:6px;color:#252522;font-family:ui-monospace,SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;line-height:1.45;margin:0;overflow:auto;padding:12px;white-space:pre-wrap">{{ .Output }}</pre>
 </section>`
 
-// Renderer returns a renderer that handles debug render contexts.
-func Renderer() partial.Renderer {
-	return partial.RendererHooks{
+// Stage returns a render stage that handles debug render contexts.
+func Stage() partial.RenderStage {
+	return partial.RenderStageHooks{
 		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindDebug {
 				return next(ctx)
@@ -77,6 +77,13 @@ func Renderer() partial.Renderer {
 			return template.HTML(buf.String()), nil
 		},
 	}
+}
+
+// Renderer returns a renderer that handles debug render contexts.
+//
+// Deprecated: use Stage.
+func Renderer() partial.RenderStage {
+	return Stage()
 }
 
 // BuildData converts a render context into debug template data.

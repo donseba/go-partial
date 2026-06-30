@@ -86,6 +86,6 @@
         <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
         <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := metrics.WithRequestID(r.Context(), requestID)
 sink := metrics.Fanout(app.metrics, metrics.NewWriterSink(os.Stdout))
-metrics.Renderer(sink, metrics.WithTag("chain", "showcase"))</code></pre>
+metrics.Stage(sink, metrics.WithTag("chain", "showcase"))</code></pre>
     </article>
 </section>

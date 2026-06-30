@@ -30,29 +30,29 @@ var (
 type (
 	// Partial represents a renderable component with optional child partials and data.
 	Partial struct {
-		id                 string
-		parent             *Partial
-		layoutContentID    string
-		renderOOB          bool
-		alwaysSwapOOB      bool
-		fs                 fs.FS
-		fsSet              bool
-		connector          connector.Connector
-		events             EventSink
-		useCache           bool
-		templates          []string
-		staticFuncs        template.FuncMap
-		basePath           string
-		contracts          []contractInformation
-		extensions         map[any]any
-		responseHeaders    map[string]string
-		response           connector.Response
-		renderers          []Renderer
-		renderersInherited bool
-		templateCache      *templateutil.Store
-		mu                 sync.RWMutex
-		children           map[string]*Partial
-		oobChildren        map[string]struct{}
+		id              string
+		parent          *Partial
+		layoutContentID string
+		renderOOB       bool
+		alwaysSwapOOB   bool
+		fs              fs.FS
+		fsSet           bool
+		connector       connector.Connector
+		events          EventSink
+		useCache        bool
+		templates       []string
+		staticFuncs     template.FuncMap
+		basePath        string
+		contracts       []contractInformation
+		extensions      map[any]any
+		responseHeaders map[string]string
+		response        connector.Response
+		stages          []RenderStage
+		stagesInherited bool
+		templateCache   *templateutil.Store
+		mu              sync.RWMutex
+		children        map[string]*Partial
+		oobChildren     map[string]struct{}
 	}
 
 	// RenderContext contains request-scoped values exposed by the ctx template helper.
@@ -210,8 +210,8 @@ func (p *Partial) Extension(key any) (any, bool) {
 	return nil, false
 }
 
-// Use appends renderers to this partial's render chain.
-func (p *Partial) Use(renderers ...Renderer) *Partial {
+// Use appends stages to this partial's render chain.
+func (p *Partial) Use(stages ...RenderStage) *Partial {
 	if p == nil {
 		return nil
 	}
@@ -219,7 +219,7 @@ func (p *Partial) Use(renderers ...Renderer) *Partial {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.renderers = append(p.renderers, renderers...)
+	p.stages = append(p.stages, stages...)
 
 	return p
 }
@@ -242,7 +242,7 @@ func (p *Partial) SetBasePath(basePath string) *Partial {
 // Templates receive this value as "." and can still use core render helpers such
 // as ctx, request, url, basePath, runtime, partial, and content. Extension
 // helpers such as debug, locale, and csrf remain available when their FuncMaps
-// and renderers are used.
+// and stages are used.
 func (p *Partial) SetDot(value any) *Partial {
 	if p == nil {
 		return nil
@@ -989,7 +989,7 @@ func (p *Partial) emitWithContext(ctx context.Context, r *http.Request, event Ev
 	state.Emit(event)
 }
 
-func (p *Partial) getRenderers() []Renderer {
+func (p *Partial) getRenderStages() []RenderStage {
 	if p == nil {
 		return nil
 	}
@@ -997,7 +997,7 @@ func (p *Partial) getRenderers() []Renderer {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	return slices.Clone(p.renderers)
+	return slices.Clone(p.stages)
 }
 
 func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) renderResult {
@@ -1060,7 +1060,7 @@ func (p *Partial) renderWithTargetResult(ctx context.Context, r *http.Request) r
 func (p *Partial) renderResolvedTargetResult(ctx context.Context, r *http.Request, target string) (renderResult, bool) {
 	state := newRenderContext(ctx, p, r, RenderKindTarget)
 	state.Name = target
-	result := renderWithChainResult(state, p.getRenderers(), func(state *RenderContext) (template.HTML, error) {
+	result := renderWithChainResult(state, p.getRenderStages(), func(state *RenderContext) (template.HTML, error) {
 		if state.Partial == nil || state.Partial == p {
 			return "", nil
 		}
@@ -1160,7 +1160,7 @@ func (p *Partial) renderErrorResult(ctx context.Context, r *http.Request, render
 	state.Error = renderErr
 	state.Data = renderErr
 
-	return renderWithChainResult(state, p.getRenderers(), func(state *RenderContext) (template.HTML, error) {
+	return renderWithChainResult(state, p.getRenderStages(), func(state *RenderContext) (template.HTML, error) {
 		return "", state.Error
 	})
 }
@@ -1168,9 +1168,9 @@ func (p *Partial) renderErrorResult(ctx context.Context, r *http.Request, render
 func (p *Partial) renderSelfResult(ctx context.Context, r *http.Request) renderResult {
 	state := newRenderContext(ctx, p, r, RenderKindPartial)
 
-	renderers := append(p.getRenderers(), templateRenderer())
-	result := renderWithChainResult(state, renderers, func(state *RenderContext) (template.HTML, error) {
-		return "", errors.New("template renderer did not produce output")
+	stages := append(p.getRenderStages(), templateRenderStage())
+	result := renderWithChainResult(state, stages, func(state *RenderContext) (template.HTML, error) {
+		return "", errors.New("template RenderStage did not produce output")
 	})
 	result.Headers = p.getResponseHeaders()
 	return result
@@ -1450,28 +1450,28 @@ func (p *Partial) clone() *Partial {
 	defer p.mu.RUnlock()
 
 	clone := &Partial{
-		id:                 p.id,
-		parent:             p.parent,
-		layoutContentID:    p.layoutContentID,
-		renderOOB:          p.renderOOB,
-		alwaysSwapOOB:      p.alwaysSwapOOB,
-		fs:                 p.fs,
-		fsSet:              p.fsSet,
-		connector:          p.connector,
-		events:             p.events,
-		useCache:           p.useCache,
-		templates:          slices.Clone(p.templates),
-		staticFuncs:        maps.Clone(p.staticFuncs),
-		basePath:           p.basePath,
-		contracts:          slices.Clone(p.contracts),
-		extensions:         maps.Clone(p.extensions),
-		responseHeaders:    maps.Clone(p.responseHeaders),
-		response:           p.response,
-		renderers:          slices.Clone(p.renderers),
-		renderersInherited: p.renderersInherited,
-		templateCache:      p.templateCache,
-		children:           maps.Clone(p.children),
-		oobChildren:        maps.Clone(p.oobChildren),
+		id:              p.id,
+		parent:          p.parent,
+		layoutContentID: p.layoutContentID,
+		renderOOB:       p.renderOOB,
+		alwaysSwapOOB:   p.alwaysSwapOOB,
+		fs:              p.fs,
+		fsSet:           p.fsSet,
+		connector:       p.connector,
+		events:          p.events,
+		useCache:        p.useCache,
+		templates:       slices.Clone(p.templates),
+		staticFuncs:     maps.Clone(p.staticFuncs),
+		basePath:        p.basePath,
+		contracts:       slices.Clone(p.contracts),
+		extensions:      maps.Clone(p.extensions),
+		responseHeaders: maps.Clone(p.responseHeaders),
+		response:        p.response,
+		stages:          slices.Clone(p.stages),
+		stagesInherited: p.stagesInherited,
+		templateCache:   p.templateCache,
+		children:        maps.Clone(p.children),
+		oobChildren:     maps.Clone(p.oobChildren),
 	}
 
 	return clone

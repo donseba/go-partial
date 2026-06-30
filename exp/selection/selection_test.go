@@ -25,7 +25,7 @@ func TestRendererRendersSelectedPartial(t *testing.T) {
 		SetFileSystem(fsys).
 		SetConnector(connector.NewPartial(nil)).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithSelectMap(content, "summary", map[string]*partial.Partial{
 		"summary": partial.NewID("summary", "summary.gohtml").SetFileSystem(fsys),
 		"details": partial.NewID("details", "details.gohtml").SetFileSystem(fsys),
@@ -50,7 +50,7 @@ func TestSelectionIsUsesDefault(t *testing.T) {
 		SetFileSystem(fsys).
 		SetConnector(connector.NewPartial(nil)).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithSelectMap(content, "summary", nil)
 
 	out, err := content.Render(context.Background())
@@ -71,7 +71,7 @@ func TestRendererUsesErrorFallbackForSelectedPartial(t *testing.T) {
 		SetFileSystem(fsys).
 		SetConnector(connector.NewPartial(nil)).
 		SetFunc(FuncMap()).
-		Use(Renderer(), exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)))
+		Use(Stage(), exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)))
 	WithSelectMap(content, "broken", map[string]*partial.Partial{
 		"broken": partial.NewID("broken", "broken.gohtml").SetFileSystem(fsys),
 	})
@@ -102,7 +102,7 @@ func TestRendererRendersConcurrentSelections(t *testing.T) {
 		SetFileSystem(fsys).
 		SetConnector(connector.NewPartial(nil)).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithSelectMap(content, "a", map[string]*partial.Partial{
 		"a": partial.NewID("a", "a.gohtml").SetFileSystem(fsys),
 		"b": partial.NewID("b", "b.gohtml").SetFileSystem(fsys),

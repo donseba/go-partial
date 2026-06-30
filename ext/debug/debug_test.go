@@ -20,7 +20,7 @@ func TestRendererRendersDebugBox(t *testing.T) {
 		Data: map[string]any{"name": "Ada"},
 	}
 
-	out, err := Renderer().Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
+	out, err := Stage().Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return "", nil
 	})
 	if err != nil {
@@ -48,7 +48,7 @@ func TestFuncMapRendersDebugBox(t *testing.T) {
 			"a": 1,
 			"b": "test",
 		}).
-		Use(Renderer())
+		Use(Stage())
 
 	out, err := p.Render(context.Background())
 	if err != nil {
@@ -73,7 +73,7 @@ func TestFuncMapCanUseCustomRenderer(t *testing.T) {
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
 		SetDot(map[string]any{"Name": "Ada"}).
-		Use(partial.RendererHooks{
+		Use(partial.RenderStageHooks{
 			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != RenderKindDebug {
 					return next(ctx)
@@ -102,7 +102,7 @@ func TestFuncMapDebugRendererSurvivesPartialClone(t *testing.T) {
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
 		SetDot(map[string]any{"Name": "Ada"}).
-		Use(partial.RendererHooks{
+		Use(partial.RenderStageHooks{
 			RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 				if ctx.Kind != RenderKindDebug {
 					return next(ctx)
@@ -117,7 +117,7 @@ func TestFuncMapDebugRendererSurvivesPartialClone(t *testing.T) {
 	}
 
 	if string(out) != `<aside class="child-debug">Ada</aside>` {
-		t.Fatalf("expected child debug renderer to survive clone, got %q", out)
+		t.Fatalf("expected child debug RenderStage to survive clone, got %q", out)
 	}
 }
 
@@ -134,7 +134,7 @@ func TestFuncMapRendersConcurrently(t *testing.T) {
 	p := partial.NewID("debug", "debug.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	const renders = 64
 	var wg sync.WaitGroup

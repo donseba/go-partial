@@ -133,7 +133,7 @@ When `SetDot` is used, `.` belongs to your app model. Request-specific data rema
 {{ basePath }}
 ```
 
-`ctx` returns the active `partial.RenderContext`. Request helpers such as `request`, `url`, `locale`, `csrf`, and `basePath` are installed by the active renderer chain.
+`ctx` returns the active `partial.RenderContext`. Request helpers such as `request`, `url`, `locale`, `csrf`, and `basePath` are installed by the active render stage chain.
 
 ## `partial`
 
@@ -180,7 +180,7 @@ Flash helpers live in `github.com/donseba/go-partial/exp/flash` and are opt-in:
 
 ```go
 service.SetFunc(flash.FuncMap())
-service.Use(flash.Renderer())
+service.Use(flash.Stage())
 ```
 
 Add messages to the request context before rendering:
@@ -221,7 +221,7 @@ before templates receive them.
 
 ## Interaction Helpers
 
-Interaction helpers render connector-aware loading or request markup for endpoints. The active connector supplies protocol attributes, and the interaction renderer owns the final HTML wrapper.
+Interaction helpers render connector-aware loading or request markup for endpoints. The active connector supplies protocol attributes, and the interaction stage owns the final HTML wrapper.
 
 Interaction helpers live in `github.com/donseba/go-partial/exp/interactions`
 and are opt-in. Register them explicitly:
@@ -372,7 +372,7 @@ Connector helpers expose the active target, selection, and action values:
 URL, runtime, content, request/context, and OOB helpers stay in core because
 they are tied directly to the render path. Connector helpers such as
 `targetValue`, `selectionValue`, and `actionValue` are installed by their
-`exp` renderers when the application opts into those packages.
+`exp` render stages when the application opts into those packages.
 
 Generic helpers such as strings, maps, dates, and counters are convenience
 helpers. Register them from the optional provider when you want them:
@@ -397,11 +397,11 @@ mark content as trusted HTML.
 
 ## Translation Helpers
 
-Translation helpers are user-owned. The localization renderer exposes `localizer` and `locale`, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
+Translation helpers are user-owned. The localization stage exposes `localizer` and `locale`, and your app can add functions such as `tl`, `tn`, `ctl`, and `ctn`.
 
 ```go
 service.SetFunc(localization.FuncMap(), translator.FuncMap())
-service.Use(localization.Renderer())
+service.Use(localization.Stage())
 ```
 
 ```gotemplate

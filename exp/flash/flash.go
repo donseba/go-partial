@@ -118,8 +118,8 @@ func HasFlashes(ctx ...*partial.RenderContext) bool {
 	return len(Flashes(ctx...)) > 0
 }
 
-// Renderer installs flash template helpers.
-func Renderer(opts ...Option) partial.Renderer {
+// Stage installs flash template helpers.
+func Stage(opts ...Option) partial.RenderStage {
 	cfg := options{
 		partial:       defaultPartial("flash", "default.gohtml"),
 		targetPartial: defaultPartial("flash-target", "target.gohtml"),
@@ -140,7 +140,7 @@ func Renderer(opts ...Option) partial.Renderer {
 		cfg.targetID = defaultTargetID
 	}
 
-	return partial.RendererHooks{
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			ctx.SetFunc("flashes", func() []Message { return Messages(ctx.Context) })
 			ctx.SetFunc("hasFlashes", func() bool { return Has(ctx.Context) })
@@ -149,6 +149,13 @@ func Renderer(opts ...Option) partial.Renderer {
 			return ctx, nil
 		},
 	}
+}
+
+// Renderer installs flash template helpers.
+//
+// Deprecated: use Stage.
+func Renderer(opts ...Option) partial.RenderStage {
+	return Stage(opts...)
 }
 
 // WithTemplate renders flash messages with a user template from the active

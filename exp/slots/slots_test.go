@@ -21,7 +21,7 @@ func TestSlotRendersChildPartial(t *testing.T) {
 			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`<nav>{{ .Label }}</nav>`)},
 		}).
 		SetDot(map[string]string{"Title": "Page"}).
-		Use(Renderer())
+		Use(Stage())
 	child := partial.NewID("toolbar", "toolbar.gohtml").
 		SetDot(map[string]string{"Label": "Actions"})
 	Set(parent, "toolbar", child)
@@ -41,7 +41,7 @@ func TestHasSlot(t *testing.T) {
 			"page.gohtml":    &fstest.MapFile{Data: []byte(`{{ if hasSlot "toolbar" }}yes{{ end }}{{ if hasSlot "missing" }}no{{ end }}`)},
 			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`toolbar`)},
 		}).
-		Use(Renderer())
+		Use(Stage())
 	Set(parent, "toolbar", partial.NewID("toolbar", "toolbar.gohtml"))
 
 	out, err := parent.Render(context.Background())
@@ -58,7 +58,7 @@ func TestMissingSlotRendersEmpty(t *testing.T) {
 		SetFileSystem(fstest.MapFS{
 			"page.gohtml": &fstest.MapFile{Data: []byte(`before{{ slot "missing" }}after`)},
 		}).
-		Use(Renderer())
+		Use(Stage())
 
 	out, err := parent.Render(context.Background())
 	if err != nil {
@@ -76,7 +76,7 @@ func TestSlotCreatesChildRenderMetrics(t *testing.T) {
 			"page.gohtml":    &fstest.MapFile{Data: []byte(`<main>{{ slot "toolbar" }}</main>`)},
 			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`<nav>Actions</nav>`)},
 		}).
-		Use(Renderer(), metrics.Renderer(metrics.SinkFunc(func(record metrics.Record) {
+		Use(Stage(), metrics.Stage(metrics.SinkFunc(func(record metrics.Record) {
 			records = append(records, record)
 		}), metrics.WithSlotName(Name)))
 	child := metrics.WithPartialLabel(partial.NewID("toolbar", "toolbar.gohtml"), "actions")
@@ -122,7 +122,7 @@ func TestSlotRendersConcurrently(t *testing.T) {
 			"page.gohtml":    &fstest.MapFile{Data: []byte(`<main>{{ slot "toolbar" }}</main>`)},
 			"toolbar.gohtml": &fstest.MapFile{Data: []byte(`<nav>{{ (request).URL.Query.Get "value" }}</nav>`)}},
 		).
-		Use(Renderer())
+		Use(Stage())
 	Set(parent, "toolbar", partial.NewID("toolbar", "toolbar.gohtml"))
 
 	const renders = 64

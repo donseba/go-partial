@@ -23,7 +23,7 @@ func TestWithActionCanReplacePartial(t *testing.T) {
 	p := partial.NewID("start", "start.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithAction(p, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
 		return partial.NewID("next", "next.gohtml").SetFileSystem(fsys), nil
 	})
@@ -45,7 +45,7 @@ func TestTemplateActionAndHelpers(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithTemplateAction(p, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
 		return partial.NewID("result", "result.gohtml").SetFileSystem(fsys), nil
 	})
@@ -69,7 +69,7 @@ func TestTemplateActionUsesErrorFallback(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer(), exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)))
+		Use(Stage(), exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)))
 	WithTemplateAction(p, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
 		return partial.NewID("broken", "broken.gohtml").SetFileSystem(fsys), nil
 	})
@@ -96,7 +96,7 @@ func TestTemplateActionRendersConcurrently(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 	WithTemplateAction(p, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
 		return partial.NewID("result", "result.gohtml").SetFileSystem(fsys), nil
 	})

@@ -73,7 +73,7 @@ func TestWriteWithRequestRendersDetailedRendererErrorPageOnTemplateError(t *test
 		t.Fatalf("expected template error location in failure response, got %q", body)
 	}
 	if strings.Contains(body, "stack trace:") {
-		t.Fatalf("expected detailed renderer to omit stack trace, got %q", body)
+		t.Fatalf("expected detailed RenderStage to omit stack trace, got %q", body)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestWriteWithRequestUsesCustomErrorRenderer(t *testing.T) {
 	p := New("broken.gohtml").
 		ID("broken").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindError {
 					return next(ctx)
@@ -264,7 +264,7 @@ func TestWriteWithRequestAppliesRenderResponse(t *testing.T) {
 
 	p := New("page.gohtml").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
 				ctx.Response.Status = http.StatusAccepted
 				ctx.Response.Headers["X-Render-Response"] = "applied"
@@ -340,8 +340,8 @@ func TestTargetResolverRendersDynamicRowTarget(t *testing.T) {
 	}
 }
 
-func testErrorRenderer(detailed bool) Renderer {
-	return RendererHooks{
+func testErrorRenderer(detailed bool) RenderStage {
+	return RenderStageHooks{
 		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx.Kind != renderKindError {
 				return next(ctx)

@@ -105,7 +105,7 @@ breadcrumbs:
 
 ```go
 service.SetFunc(logger.FuncMap())
-service.Use(logger.Renderer())
+service.Use(logger.Stage())
 ```
 
 Templates can then emit an info-level event:
@@ -214,7 +214,7 @@ sink := metrics.Fanout(
     metrics.NewWriterSink(os.Stdout),
 )
 
-service.Use(metrics.Renderer(
+service.Use(metrics.Stage(
     sink,
     metrics.WithTag("chain", "web"),
     metrics.WithSlotName(slots.Name),

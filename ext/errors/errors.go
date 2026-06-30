@@ -109,8 +109,8 @@ func WithMode(mode Mode) Option {
 	}
 }
 
-// Renderer returns a renderer that handles error render contexts.
-func Renderer(options ...Option) partial.Renderer {
+// Stage returns a render stage that handles error render contexts.
+func Stage(options ...Option) partial.RenderStage {
 	cfg := config{mode: ModeSafe}
 	for _, option := range options {
 		if option != nil {
@@ -118,7 +118,7 @@ func Renderer(options ...Option) partial.Renderer {
 		}
 	}
 
-	return partial.RendererHooks{
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Kind != RenderKindError {
 				return ctx, nil
@@ -179,6 +179,13 @@ func Renderer(options ...Option) partial.Renderer {
 			return out, stderrors.Join(renderErr, data.Error)
 		},
 	}
+}
+
+// Renderer returns a renderer that handles error render contexts.
+//
+// Deprecated: use Stage.
+func Renderer(options ...Option) partial.RenderStage {
+	return Stage(options...)
 }
 
 func stateData(ctx *partial.RenderContext, mode Mode) Data {

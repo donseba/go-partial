@@ -9,19 +9,19 @@ import (
 )
 
 type (
-	// RenderKind identifies the current render task for renderer hooks.
+	// RenderKind identifies the current render task for render stages.
 	RenderKind string
 
-	// RenderValues stores request-scoped values shared by renderers and helpers.
+	// RenderValues stores request-scoped values shared by render stages and helpers.
 	RenderValues map[any]any
 
-	// RenderResponse stores generic response metadata set by renderers.
+	// RenderResponse stores generic response metadata set by render stages.
 	RenderResponse struct {
 		Headers map[string]string
 		Status  int
 	}
 
-	// RenderNext calls the next renderer in the chain.
+	// RenderNext calls the next render stage in the chain.
 	RenderNext func(*RenderContext) (template.HTML, error)
 
 	renderResult struct {
@@ -31,25 +31,35 @@ type (
 		Err      error
 	}
 
-	// Renderer observes or changes a render lifecycle.
+	// RenderStage observes or changes a render lifecycle.
 	//
 	// Prepare runs before the terminal template render and is the right place to
 	// add request-scoped template funcs, resolve context values, or start timing.
 	// Render wraps the terminal render and can replace or decorate the produced
 	// HTML. Finalize runs after Render, even when Render returned an error, and is
 	// the right place for cleanup, metrics, or error response shaping.
-	Renderer interface {
+	RenderStage interface {
 		Prepare(*RenderContext) (*RenderContext, error)
 		Render(*RenderContext, RenderNext) (template.HTML, error)
 		Finalize(*RenderContext, template.HTML, error) (template.HTML, error)
 	}
 
-	// RendererHooks adapts individual lifecycle functions to Renderer.
-	RendererHooks struct {
+	// RenderStageHooks adapts individual lifecycle functions to RenderStage.
+	RenderStageHooks struct {
 		PrepareFunc  func(*RenderContext) (*RenderContext, error)
 		RenderFunc   func(*RenderContext, RenderNext) (template.HTML, error)
 		FinalizeFunc func(*RenderContext, template.HTML, error) (template.HTML, error)
 	}
+
+	// Renderer observes or changes a render lifecycle.
+	//
+	// Deprecated: use RenderStage.
+	Renderer = RenderStage
+
+	// RendererHooks adapts individual lifecycle functions to Renderer.
+	//
+	// Deprecated: use RenderStageHooks.
+	RendererHooks = RenderStageHooks
 )
 
 const (
@@ -65,29 +75,29 @@ const (
 	renderKindError RenderKind = "error"
 )
 
-func (h RendererHooks) Prepare(ctx *RenderContext) (*RenderContext, error) {
+func (h RenderStageHooks) Prepare(ctx *RenderContext) (*RenderContext, error) {
 	if h.PrepareFunc == nil {
 		return ctx, nil
 	}
 	return h.PrepareFunc(ctx)
 }
 
-func (h RendererHooks) Render(ctx *RenderContext, next RenderNext) (template.HTML, error) {
+func (h RenderStageHooks) Render(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 	if h.RenderFunc == nil {
 		return next(ctx)
 	}
 	return h.RenderFunc(ctx, next)
 }
 
-func (h RendererHooks) Finalize(ctx *RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
+func (h RenderStageHooks) Finalize(ctx *RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
 	if h.FinalizeFunc == nil {
 		return out, renderErr
 	}
 	return h.FinalizeFunc(ctx, out, renderErr)
 }
 
-func templateRenderer() Renderer {
-	return RendererHooks{
+func templateRenderStage() RenderStage {
+	return RenderStageHooks{
 		RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return "", fmt.Errorf("template renderer requires a partial")
@@ -166,30 +176,30 @@ func defaultRenderContext() context.Context {
 	return context.TODO()
 }
 
-func renderWithChain(state *RenderContext, renderers []Renderer, terminal RenderNext) (template.HTML, error) {
-	result := renderWithChainResult(state, renderers, terminal)
+func renderWithChain(state *RenderContext, stages []RenderStage, terminal RenderNext) (template.HTML, error) {
+	result := renderWithChainResult(state, stages, terminal)
 	return result.HTML, result.Err
 }
 
-func renderWithChainResult(state *RenderContext, renderers []Renderer, terminal RenderNext) renderResult {
+func renderWithChainResult(state *RenderContext, stages []RenderStage, terminal RenderNext) renderResult {
 	if state == nil {
 		return renderResult{Err: fmt.Errorf("render context is not configured")}
 	}
 	if terminal == nil {
-		return renderResult{Response: state.Response, Err: fmt.Errorf("terminal renderer is not configured")}
+		return renderResult{Response: state.Response, Err: fmt.Errorf("terminal render stage is not configured")}
 	}
 
-	active := make([]Renderer, 0, len(renderers))
-	for _, renderer := range renderers {
-		if renderer != nil {
-			active = append(active, renderer)
+	active := make([]RenderStage, 0, len(stages))
+	for _, stage := range stages {
+		if stage != nil {
+			active = append(active, stage)
 		}
 	}
 
 	var err error
-	for _, renderer := range active {
+	for _, stage := range active {
 		response := state.Response
-		state, err = renderer.Prepare(state)
+		state, err = stage.Prepare(state)
 		if err != nil {
 			if state != nil {
 				response = state.Response
@@ -197,7 +207,7 @@ func renderWithChainResult(state *RenderContext, renderers []Renderer, terminal 
 			return renderResult{Response: response, Err: err}
 		}
 		if state == nil {
-			return renderResult{Err: fmt.Errorf("renderer prepare returned nil context")}
+			return renderResult{Err: fmt.Errorf("render stage prepare returned nil context")}
 		}
 		if state.Response == nil {
 			state.Response = &RenderResponse{Headers: make(map[string]string)}
@@ -206,10 +216,10 @@ func renderWithChainResult(state *RenderContext, renderers []Renderer, terminal 
 
 	next := terminal
 	for i := len(active) - 1; i >= 0; i-- {
-		renderer := active[i]
+		stage := active[i]
 		previous := next
 		next = func(ctx *RenderContext) (template.HTML, error) {
-			return renderer.Render(ctx, previous)
+			return stage.Render(ctx, previous)
 		}
 	}
 

@@ -29,7 +29,7 @@ func TestRendererAddsCSRFHelper(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	req := httptest.NewRequest("GET", "/", nil)
 	out, err := p.RenderWithRequest(WithToken(context.Background(), staticToken{}), req)
@@ -57,7 +57,7 @@ func TestRendererAddsCSRFHelperConcurrently(t *testing.T) {
 	p := partial.NewID("page", "page.gohtml").
 		SetFileSystem(fsys).
 		SetFunc(FuncMap()).
-		Use(Renderer())
+		Use(Stage())
 
 	const renders = 64
 	var wg sync.WaitGroup

@@ -93,12 +93,12 @@ func (r *Runtime) Connector() connector.Connector {
 // Partial renders a template path through the current partial tree.
 func (r *Runtime) Partial(path string, args ...any) template.HTML {
 	if r == nil || r.partial == nil || r.state == nil {
-		return escapedRuntimeError(fmt.Errorf("go-partial runtime partial renderer is not configured"))
+		return escapedRuntimeError(fmt.Errorf("go-partial runtime partial render stage is not configured"))
 	}
 	return partialFunc(r.partial, r.state)(path, args...)
 }
 
-// RenderPartial renders a child partial through the current renderer chain.
+// RenderPartial renders a child partial through the current render stage chain.
 func (r *Runtime) RenderPartial(p *Partial) (template.HTML, error) {
 	child, err := r.preparePartial(p)
 	if err != nil {
@@ -108,7 +108,7 @@ func (r *Runtime) RenderPartial(p *Partial) (template.HTML, error) {
 	return result.HTML, result.Err
 }
 
-// RenderPartialWithFallback renders a partial through the current renderer
+// RenderPartialWithFallback renders a partial through the current render stage
 // chain and returns the configured error fragment when rendering fails.
 func (r *Runtime) RenderPartialWithFallback(p *Partial) (template.HTML, error) {
 	child, err := r.preparePartial(p)
@@ -128,13 +128,13 @@ func (r *Runtime) RenderPartialWithFallback(p *Partial) (template.HTML, error) {
 	return fallback, nil
 }
 
-// RenderWith renders a non-template task through the active renderer chain.
+// RenderWith renders a non-template task through the active render stage chain.
 func (r *Runtime) RenderWith(kind RenderKind, name string, data any, terminal RenderNext) (template.HTML, error) {
 	if r == nil || r.partial == nil || r.state == nil {
-		return "", fmt.Errorf("go-partial runtime renderer is not configured")
+		return "", fmt.Errorf("go-partial runtime render stage is not configured")
 	}
 	if terminal == nil {
-		return "", fmt.Errorf("terminal renderer is not configured")
+		return "", fmt.Errorf("terminal render stage is not configured")
 	}
 
 	state := newRenderContext(r.state.Context, r.partial, r.state.Request, kind)
@@ -143,21 +143,21 @@ func (r *Runtime) RenderWith(kind RenderKind, name string, data any, terminal Re
 	state.Values = r.state.Values.Clone()
 	state.Response = r.state.Response
 	state.Runtime = newRuntime(r.partial, state)
-	return renderWithChain(state, r.partial.getRenderers(), terminal)
+	return renderWithChain(state, r.partial.getRenderStages(), terminal)
 }
 
 func (r *Runtime) preparePartial(p *Partial) (*Partial, error) {
 	if r == nil || r.partial == nil || r.state == nil {
-		return nil, fmt.Errorf("go-partial runtime partial renderer is not configured")
+		return nil, fmt.Errorf("go-partial runtime partial render stage is not configured")
 	}
 	if p == nil {
 		return nil, fmt.Errorf("partial is not initialized")
 	}
 	child := p.clone()
 	child.parent = r.partial
-	if !child.renderersInherited {
-		child.renderers = append(append([]Renderer(nil), r.partial.getRenderers()...), child.renderers...)
-		child.renderersInherited = true
+	if !child.stagesInherited {
+		child.stages = append(append([]RenderStage(nil), r.partial.getRenderStages()...), child.stages...)
+		child.stagesInherited = true
 	}
 	return child, nil
 }

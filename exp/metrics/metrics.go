@@ -208,8 +208,8 @@ func WithSlotName(slotName func(*partial.Partial) string) Option {
 	}
 }
 
-// Renderer returns a passive renderer that records render timing and output size.
-func Renderer(sink Sink, options ...Option) partial.Renderer {
+// Stage returns a passive render stage that records render timing and output size.
+func Stage(sink Sink, options ...Option) partial.RenderStage {
 	cfg := config{
 		sink: sink,
 		now:  time.Now,
@@ -220,7 +220,7 @@ func Renderer(sink Sink, options ...Option) partial.Renderer {
 		}
 	}
 
-	return partial.RendererHooks{
+	return partial.RenderStageHooks{
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil {
 				return ctx, nil
@@ -241,6 +241,13 @@ func Renderer(sink Sink, options ...Option) partial.Renderer {
 			return out, renderErr
 		},
 	}
+}
+
+// Renderer returns a passive renderer that records render timing and output size.
+//
+// Deprecated: use Stage.
+func Renderer(sink Sink, options ...Option) partial.RenderStage {
+	return Stage(sink, options...)
 }
 
 // EventSink returns a diagnostic event consumer that records events as metrics records.

@@ -18,8 +18,8 @@ func TestRendererChainOrder(t *testing.T) {
 		"page.gohtml": &fstest.MapFile{Data: []byte(`hello {{.}}`)},
 	}
 
-	renderer := func(name string) Renderer {
-		return RendererHooks{
+	stage := func(name string) RenderStage {
+		return RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				calls = append(calls, "pre:"+name)
 				return ctx, nil
@@ -40,7 +40,7 @@ func TestRendererChainOrder(t *testing.T) {
 	out, err := New("page.gohtml").
 		SetFileSystem(fsys).
 		SetDot("world").
-		Use(renderer("a"), renderer("b")).
+		Use(stage("a"), stage("b")).
 		Render(context.Background())
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
@@ -72,7 +72,7 @@ func TestRendererPrepareEnrichesTemplateContext(t *testing.T) {
 
 	out, err := New("page.gohtml").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
 				ctx.Values.Set("message", "from prepare")
 				return ctx, nil
@@ -102,7 +102,7 @@ func TestServiceRendererAppliesToLayoutPartials(t *testing.T) {
 	}
 
 	svc := NewService(&Config{FS: fsys})
-	svc.Use(RendererHooks{
+	svc.Use(RenderStageHooks{
 		FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
 			return template.HTML("[" + string(out) + "]"), err
 		},
@@ -130,7 +130,7 @@ func TestRendererCanHandleErrorKind(t *testing.T) {
 	p := New("broken.gohtml").
 		ID("broken").
 		SetFileSystem(fsys).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindError {
 					return next(ctx)
@@ -175,7 +175,7 @@ func TestRendererCanHandleRuntimeRenderKind(t *testing.T) {
 				return out
 			},
 		}).
-		Use(RendererHooks{
+		Use(RenderStageHooks{
 			RenderFunc: func(ctx *RenderContext, next RenderNext) (template.HTML, error) {
 				if ctx.Kind != renderKindInspect {
 					return next(ctx)

@@ -5,9 +5,9 @@
     <p class="max-w-4xl text-lg leading-8 text-slate-300">Interaction helpers describe how a server-rendered partial should reach the browser. They are delivery hints; your page data can stay on dot.</p>
 
     <h2 class="text-xl font-bold text-slate-50">The model</h2>
-    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/interactions</code> is experimental helper sugar for client-triggered regions. Each helper accepts either a simple endpoint string or a configured interaction value. The connector turns that interaction into protocol attributes, and the interaction renderer owns the final HTML wrapper.</p>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/interactions</code> is experimental helper sugar for client-triggered regions. Each helper accepts either a simple endpoint string or a configured interaction value. The connector turns that interaction into protocol attributes, and the interaction stage owns the final HTML wrapper.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">helper call -&gt; connector.Interaction -&gt; connector attributes -&gt; exp/interactions renderer HTML</code></pre>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">helper call -&gt; connector.Interaction -&gt; connector attributes -&gt; exp/interactions stage HTML</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Helpers</h2>
     <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
@@ -58,9 +58,9 @@
 {{ "{{ async runtime \"/table/row/:row\" \"row\" .Row.ID }}" }}</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Custom markup</h2>
-    <p class="leading-7 text-slate-400">The default renderer is intentionally simple. Applications can replace it when registering the optional interaction helper functions. The connector still supplies the protocol attributes, so your renderer owns the element, classes, loading state, and accessibility text.</p>
+    <p class="leading-7 text-slate-400">The default stage is intentionally simple. Applications can replace it when registering the optional interaction helper functions. The connector still supplies the protocol attributes, so your stage owns the element, classes, loading state, and accessibility text.</p>
 
-    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.Use(interactions.Renderer(func(
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">svc.Use(interactions.Stage(func(
     runtime *partial.Runtime,
     interaction connector.Interaction,
     attrs map[string]string,

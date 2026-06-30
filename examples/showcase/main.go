@@ -49,7 +49,7 @@ func main() {
 		Connector:        connector.NewHTMX(nil),
 		Events:           app.events,
 		FS:               os.DirFS("examples/showcase"),
-		Renderers:        app.showcaseRenderers(),
+		Stages:           app.showcaseStages(),
 		UseTemplateCache: false,
 	})
 	app.service.SetFunc(
@@ -144,22 +144,22 @@ func main() {
 	}
 }
 
-func (app *App) showcaseRenderers() []partial.Renderer {
-	return []partial.Renderer{
-		exterrors.Renderer(exterrors.WithMode(exterrors.ModeDetailed)),
-		extdebug.Renderer(),
-		extlogger.Renderer(),
-		actions.Renderer(),
-		csrf.Renderer(),
-		flash.Renderer(
+func (app *App) showcaseStages() []partial.RenderStage {
+	return []partial.RenderStage{
+		exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed)),
+		extdebug.Stage(),
+		extlogger.Stage(),
+		actions.Stage(),
+		csrf.Stage(),
+		flash.Stage(
 			flash.WithTemplate("templates/flash.gohtml"),
 			flash.WithTargetTemplate("templates/flash_target.gohtml"),
 		),
-		interactions.Renderer(showcaseInteractionRenderer()),
-		localization.Renderer(),
-		metrics.Renderer(metrics.Fanout(app.metrics, app.metricStreams), metrics.WithTag("chain", "showcase"), metrics.WithSlotName(slots.Name)),
-		selection.Renderer(),
-		slots.Renderer(),
-		target.Renderer(),
+		interactions.Stage(showcaseInteractionRenderer()),
+		localization.Stage(),
+		metrics.Stage(metrics.Fanout(app.metrics, app.metricStreams), metrics.WithTag("chain", "showcase"), metrics.WithSlotName(slots.Name)),
+		selection.Stage(),
+		slots.Stage(),
+		target.Stage(),
 	}
 }

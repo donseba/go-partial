@@ -18,7 +18,7 @@ func TestRendererRendersDefaultTemplate(t *testing.T) {
 		"page.gohtml": `{{ flash }}`,
 	}))
 	content.SetFunc(FuncMap())
-	content.Use(Renderer())
+	content.Use(Stage())
 
 	out, err := content.Render(ctx)
 	if err != nil {
@@ -41,7 +41,7 @@ func TestRendererUsesOverrideTemplate(t *testing.T) {
 	})
 	content := partial.NewID("content", "page.gohtml").SetFileSystem(fsys)
 	content.SetFunc(FuncMap())
-	content.Use(Renderer(WithTemplate("flash.gohtml")))
+	content.Use(Stage(WithTemplate("flash.gohtml")))
 
 	out, err := content.Render(ctx)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestRendererRendersDefaultTarget(t *testing.T) {
 		"page.gohtml": `{{ flashTarget }}`,
 	}))
 	content.SetFunc(FuncMap())
-	content.Use(Renderer())
+	content.Use(Stage())
 
 	out, err := content.Render(context.Background())
 	if err != nil {
@@ -76,7 +76,7 @@ func TestRendererUsesOverrideTarget(t *testing.T) {
 	})
 	content := partial.NewID("content", "page.gohtml").SetFileSystem(fsys)
 	content.SetFunc(FuncMap())
-	content.Use(Renderer(WithTargetID("notices"), WithTargetTemplate("target.gohtml")))
+	content.Use(Stage(WithTargetID("notices"), WithTargetTemplate("target.gohtml")))
 
 	out, err := content.Render(context.Background())
 	if err != nil {
@@ -94,7 +94,7 @@ func TestTargetIDIsNormalized(t *testing.T) {
 	})
 	content := partial.NewID("content", "page.gohtml").SetFileSystem(fsys)
 	content.SetFunc(FuncMap())
-	content.Use(Renderer(WithTargetID("# 42 bad:id<script>"), WithTargetTemplate("target.gohtml")))
+	content.Use(Stage(WithTargetID("# 42 bad:id<script>"), WithTargetTemplate("target.gohtml")))
 
 	out, err := content.Render(context.Background())
 	if err != nil {
@@ -111,7 +111,7 @@ func TestMessageLevelIsNormalized(t *testing.T) {
 		"page.gohtml": `{{ flash }}`,
 	}))
 	content.SetFunc(FuncMap())
-	content.Use(Renderer())
+	content.Use(Stage())
 
 	out, err := content.Render(ctx)
 	if err != nil {
@@ -144,7 +144,7 @@ func TestRendererDoesNotBleedConcurrentMessages(t *testing.T) {
 		"page.gohtml": `{{ flash }}`,
 	}))
 	content.SetFunc(FuncMap())
-	content.Use(Renderer())
+	content.Use(Stage())
 
 	const workers = 16
 	var wg sync.WaitGroup

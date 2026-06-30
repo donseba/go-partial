@@ -1,6 +1,6 @@
 // Package partial provides request-aware rendering for Go templates.
 //
-// Partial trees, layouts, services, renderers, connectors, and template caches
+// Partial trees, layouts, services, Stages, connectors, and template caches
 // are safe to reuse across concurrent renders after configuration is complete.
 // Request-scoped state is carried by RenderContext and is not stored on the
 // reusable Partial configuration.

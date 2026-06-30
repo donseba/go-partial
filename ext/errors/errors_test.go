@@ -41,7 +41,7 @@ func TestRendererRendersDetailedFragment(t *testing.T) {
 		Error:   errors.New("template: broken.gohtml:1: unexpected EOF"),
 	}
 
-	out, err := Renderer(WithMode(ModeDetailed)).Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
+	out, err := Stage(WithMode(ModeDetailed)).Render(ctx, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return "", nil
 	})
 	if err != nil {
@@ -70,9 +70,9 @@ func TestRendererUsesAllLifecyclePhases(t *testing.T) {
 		Error:   errors.New("template: broken.gohtml:1: unexpected EOF"),
 		Values:  make(partial.RenderValues),
 	}
-	renderer := Renderer(WithMode(ModeDetailed))
+	RenderStage := Stage(WithMode(ModeDetailed))
 
-	prepared, err := renderer.Prepare(ctx)
+	prepared, err := RenderStage.Prepare(ctx)
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
@@ -84,14 +84,14 @@ func TestRendererUsesAllLifecyclePhases(t *testing.T) {
 		t.Fatal("Prepare() data.Detailed = false, want true")
 	}
 
-	out, err := renderer.Render(prepared, func(ctx *partial.RenderContext) (template.HTML, error) {
+	out, err := RenderStage.Render(prepared, func(ctx *partial.RenderContext) (template.HTML, error) {
 		return "", nil
 	})
 	if err != nil {
 		t.Fatalf("Render() error = %v", err)
 	}
 
-	out, err = renderer.Finalize(prepared, out, err)
+	out, err = RenderStage.Finalize(prepared, out, err)
 	if err != nil {
 		t.Fatalf("Finalize() error = %v", err)
 	}
@@ -106,7 +106,7 @@ func TestWriteWithRequestUsesErrorRenderResponse(t *testing.T) {
 		SetFileSystem(fstest.MapFS{
 			"broken.gohtml": &fstest.MapFile{Data: []byte(`{{ if .Missing }}missing`)},
 		}).
-		Use(Renderer(WithMode(ModeDetailed)))
+		Use(Stage(WithMode(ModeDetailed)))
 
 	req := httptest.NewRequest(http.MethodGet, "/broken", nil)
 	rec := httptest.NewRecorder()
@@ -134,15 +134,15 @@ func TestRendererFinalizeKeepsOriginalRenderErrorWhenErrorTemplateFails(t *testi
 		Error:  originalErr,
 		Values: make(partial.RenderValues),
 	}
-	renderer := Renderer()
+	RenderStage := Stage()
 
-	prepared, err := renderer.Prepare(ctx)
+	prepared, err := RenderStage.Prepare(ctx)
 	if err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
-	_, err = renderer.Finalize(prepared, "", rendererErr)
+	_, err = RenderStage.Finalize(prepared, "", rendererErr)
 	if !errors.Is(err, rendererErr) {
-		t.Fatalf("Finalize() error = %v, want renderer error", err)
+		t.Fatalf("Finalize() error = %v, want RenderStage error", err)
 	}
 	if !errors.Is(err, originalErr) {
 		t.Fatalf("Finalize() error = %v, want original error", err)
@@ -160,7 +160,7 @@ func TestRendererHandlesConcurrentFailures(t *testing.T) {
 				return "", errors.New("boom")
 			},
 		}).
-		Use(Renderer(WithMode(ModeDetailed)))
+		Use(Stage(WithMode(ModeDetailed)))
 
 	const renders = 64
 	var wg sync.WaitGroup
