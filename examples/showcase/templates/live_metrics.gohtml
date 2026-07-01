@@ -1,0 +1,78 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.LiveMetricsPage
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Experimental observability</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This page connects <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">exp/metrics</code> to an app-owned sink, sends each record over <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">exp/sse</code>, and lets htmx prepend the rendered row.</p>
+    </header>
+
+    <div class="grid grid-cols-[minmax(0,1fr)_300px] gap-4">
+        <section class="grid min-h-96 content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-stone-950">Live request feed</h2>
+                    <p class="leading-7 text-stone-600">New render records are prepended as they arrive.</p>
+                </div>
+                <span class="inline-flex rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[13px] font-bold text-teal-900">SSE connected</span>
+            </div>
+
+            <div class="max-h-[34rem] overflow-y-auto rounded-lg border border-stone-300">
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 bg-stone-100 text-[12px] uppercase text-stone-600">
+                        <tr>
+                            <th class="border-b border-stone-300 px-3 py-2">Time</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Kind</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Partial</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Swap</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Request</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Duration</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Size</th>
+                            <th class="border-b border-stone-300 px-3 py-2">Chain</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-metrics-feed"
+                           hx-ext="sse"
+                           sse-connect="/metrics/live/stream"
+                           sse-swap="partial:patch"
+                           hx-swap="afterbegin">
+                        <tr>
+                            <td class="px-3 py-5 text-stone-600" colspan="8">Waiting for render records. Click the sample button or navigate around the showcase.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="grid content-start gap-4 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">Generate traffic</h2>
+            <p class="leading-7 text-stone-600">This button renders a tiny partial through the normal showcase render stage chain, so the live stream receives the resulting metrics record.</p>
+            <button type="button"
+                    class="inline-flex min-h-9 w-fit cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-bold text-stone-950 hover:border-teal-700 hover:text-teal-900"
+                    hx-get="/metrics/live/ping"
+                    hx-target="#live-metrics-ping"
+                    hx-swap="outerHTML">
+                Render sample
+            </button>
+            <div id="live-metrics-ping" class="rounded-md border border-stone-300 bg-stone-50 p-3 text-sm text-stone-600">No sample rendered yet.</div>
+        </aside>
+    </div>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">sink := metrics.Fanout(app.metrics, app.metricStreams)
+metrics.Stage(sink, metrics.WithTag("chain", "showcase"))
+
+events := sse.NewWriter(w)
+_ = events.Event(sse.EventPatch, renderedMetricRow)</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;div hx-ext="sse"
+     sse-connect="/metrics/live/stream"
+     sse-swap="partial:patch"
+     hx-swap="afterbegin"&gt;&lt;/tbody&gt;</code></pre>
+    </article>
+</section>

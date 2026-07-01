@@ -1,0 +1,68 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Localization</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Localization is intentionally split in two: <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code> carries the active locale, while translation functions such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">tl</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">tn</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctl</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctn</code> are user-provided template functions.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Core interface</h2>
+    <p class="leading-7 text-slate-400">The built-in interface only requires a locale string. That keeps the core package independent from any translation catalog format.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Localizer interface {
+    GetLocale() string
+}</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Attach a request localizer</h2>
+    <p class="leading-7 text-slate-400">Store a localizer in the request context before calling <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.Write</code>. Templates receive it through the <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">locale</code> helpers.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Localizer struct {
+    Locale string
+}
+
+func (l Localizer) GetLocale() string { return l.Locale }
+
+ctx := localization.WithLocalizer(r.Context(), localizer)
+_ = partial.Write(ctx, w, r, content)</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Register translation functions</h2>
+    <p class="leading-7 text-slate-400">The translation behavior should live in the root partial template function map. go-partial does not own a translation API; add the functions your application wants with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Partial.SetFunc</code>.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
+    SetConnector(connector.NewHTMX(nil)).
+    SetFileSystem(os.DirFS("web"))
+root.SetFunc(localization.FuncMap(), myTranslations.FuncMap())
+root.Use(localization.Stage())</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Use it in templates</h2>
+    <p class="leading-7 text-slate-400">This keeps the localizer interface small. The functions receive <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code>, read its locale, and resolve the translation however the provider wants.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;h1&gt;{{ "{{ tl localizer \"Hello, World!\" }}" }}&lt;/h1&gt;
+&lt;p&gt;{{ "{{ tn localizer \"You have one message.\" \"You have %d messages.\" 5 5 }}" }}&lt;/p&gt;
+&lt;button&gt;{{ "{{ ctl localizer \"button\" \"save\" }}" }}&lt;/button&gt;
+&lt;small&gt;{{ "{{ locale }}" }}&lt;/small&gt;</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">With go-translator</h2>
+    <p class="leading-7 text-slate-400"><a href="https://github.com/donseba/go-translator">github.com/donseba/go-translator</a> is a good fit for this hook. It supports dynamic languages from PO files, template integration, plural forms, contextual translations, and prefix handling.</p>
+
+    <p class="leading-7 text-slate-400">go-translator already exposes <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">tr.FuncMap()</code>, including <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">tl</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">tn</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctl</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ctn</code>. Wire those functions into the Root partial:</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">tr := translator.NewTranslator("translations", "templates")
+_ = tr.AddLanguage("en_US")
+_ = tr.AddLanguage("nl_NL")
+
+root := partial.New("shell.gohtml").
+    SetConnector(connector.NewHTMX(nil))
+root.SetFunc(localization.FuncMap(), tr.FuncMap())
+root.Use(localization.Stage())</code></pre>
+
+    <p class="leading-7 text-slate-400">This keeps the core package out of translation semantics. Your translation package owns pluralization, context, fallback language, catalog loading, and missing-key behavior.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Why this shape</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
+        <li>Applications can use go-translator, map catalogs, database-backed translations, gettext, or another library.</li>
+        <li>The stage does not need to know about pluralization, interpolation, or fallback rules.</li>
+        <li>HTMX language switches can re-render only the content region while the wrapper and OOB navigation stay intact.</li>
+    </ul>
+
+    <h2 class="text-xl font-bold text-slate-50">Showcase</h2>
+    <p class="leading-7 text-slate-400">The showcase app includes a live localization page with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">en_US</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">nl_NL</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">fr_FR</code> examples.</p>
+</article>

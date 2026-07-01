@@ -1,0 +1,26 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.FlowDetailsPage
+*/}}
+<form class="grid gap-4" method="post" hx-post="/flow" hx-target="#content" hx-swap="innerHTML">
+    <div>
+        <h2 class="text-lg font-bold text-stone-950">Details</h2>
+        <p class="leading-7 text-stone-600">This step stores its own data and can read data collected by earlier steps on the confirmation screen.</p>
+    </div>
+    {{ if .Error }}<p class="leading-7 text-stone-600 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">{{ .Error }}</p>{{ end }}
+    <label class="grid gap-1.5 font-bold text-stone-600">
+        Project name
+        <input class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="name" value="{{ .Name }}" placeholder="Static launch">
+    </label>
+    <label class="grid gap-1.5 font-bold text-stone-600">
+        Plan
+        <select class="min-h-9 rounded-md border border-stone-300 bg-white px-3 py-2 font-inherit text-stone-950" name="plan">
+            <option value="static" {{ if eq .Plan "static" }}selected{{ end }}>Static website</option>
+            <option value="dynamic" {{ if eq .Plan "dynamic" }}selected{{ end }}>Dynamic app</option>
+        </select>
+    </label>
+    <div class="flex flex-wrap gap-2">
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit" name="direction" value="back">Back</button>
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit">Continue</button>
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="submit" name="direction" value="reset">Reset</button>
+    </div>
+</form>

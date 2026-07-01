@@ -16,6 +16,7 @@
 
 # Dependency directories (remove the comment below to include it)
 vendor/
+node_modules/
 
 # Go workspace file
 go.work
@@ -25,3 +26,12 @@ go.work.sum
 .env
 
 .git/
+/references/
+.idea/
+.go-doc/*
+!.go-doc/config.json
+.partial/
+docs/
+!examples/docs/
+!examples/docs/static/
+!examples/docs/static/site.tailwind.css

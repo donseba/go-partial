@@ -1,0 +1,13 @@
+{{/*
+@dot github.com/donseba/go-partial/exp/flash.Data
+*/}}
+{{ if .Messages }}
+<div class="partial-flash" role="status" aria-live="polite">
+    {{ range .Messages }}
+    <div class="partial-flash__message partial-flash__message--{{ .Level }}" data-flash-level="{{ .Level }}">
+        <strong class="partial-flash__level">{{ .Level }}</strong>
+        <span class="partial-flash__text">{{ .Text }}</span>
+    </div>
+    {{ end }}
+</div>
+{{ end }}

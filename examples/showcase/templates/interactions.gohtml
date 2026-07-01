@@ -1,0 +1,145 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.InteractionPage
+
+@interaction Async github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Poll github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction On github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Refresh github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Profile github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction ProfileRefresh github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Stream github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Prefetch github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction Reveal github.com/donseba/go-partial/exp/interactions.Interaction
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Client interactions</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">These helpers declare client-side delivery behavior while the server still owns the rendered partials.</p>
+    </header>
+
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">async</h2>
+            <p class="leading-7 text-stone-600">Load immediately after the shell is visible.</p>
+            {{ async runtime Async }}
+        </article>
+
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">poll</h2>
+            <p class="leading-7 text-stone-600">Refresh this region every few seconds.</p>
+            {{ poll runtime Poll }}
+        </article>
+
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">on</h2>
+            <p class="leading-7 text-stone-600">Refresh a target when a named browser event is dispatched.</p>
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button" onclick="document.body.dispatchEvent(new CustomEvent('showcase:ping'))">Dispatch event</button>
+                <span>Event <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">showcase:ping</code></span>
+            </div>
+            <div id="on-target" class="grid gap-1.5 rounded-lg border border-stone-300 bg-stone-50 p-3">
+                <strong>Event target</strong>
+                <p class="leading-7 text-stone-600">This panel is waiting for a custom browser event.</p>
+            </div>
+            {{ on runtime On }}
+        </article>
+
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">refresh</h2>
+            <p class="leading-7 text-stone-600">Click the control to update only the target region below.</p>
+            <div class="flex flex-wrap items-center gap-2.5">
+                {{ refresh runtime Refresh }}
+                <span>Target <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">#refresh-panel</code></span>
+            </div>
+            <div id="refresh-panel" class="grid gap-1.5 rounded-lg border border-stone-300 bg-stone-50 p-3">
+                <strong>Refresh target</strong>
+                <p class="leading-7 text-stone-600">This panel is waiting for an explicit refresh request.</p>
+            </div>
+        </article>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Endless scroll uses reveal</h2>
+        <p class="leading-7 text-stone-600">The infinite scroll page is the same idea in a loop: a sentinel uses reveal-style loading, swaps itself with the next chunk, and the next chunk contains a new sentinel.</p>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;div hx-get="/infinite/load"
+     hx-trigger="revealed"
+     hx-swap="outerHTML"&gt;
+    Loading more rows...
+&lt;/div&gt;</code></pre>
+    </article>
+
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">named async</h2>
+            <p class="leading-7 text-stone-600">An async region with a stable ID that can be refreshed or targeted later.</p>
+            {{ async runtime Profile }}
+            {{ refresh runtime ProfileRefresh }}
+        </article>
+
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">stream</h2>
+            <p class="leading-7 text-stone-600">Receive a server-rendered fragment from an SSE message.</p>
+            {{ stream runtime Stream }}
+        </article>
+
+        <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+            <h2 class="text-lg font-bold text-stone-950">prefetch</h2>
+            <p class="leading-7 text-stone-600">Emit a browser hint without creating visible UI or a swap target.</p>
+            <dl class="grid gap-2 rounded-lg border border-stone-300 bg-stone-50 p-3">
+                <div>
+                    <dt>rel</dt>
+                    <dd><code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">prefetch</code></dd>
+                </div>
+                <div>
+                    <dt>href</dt>
+                    <dd><code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">/interactions/async</code></dd>
+                </div>
+                <div>
+                    <dt>output</dt>
+                    <dd>Invisible <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">&lt;link&gt;</code> element</dd>
+                </div>
+            </dl>
+            {{ prefetch runtime Prefetch }}
+        </article>
+    </div>
+
+    <article class="grid content-start gap-3 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">reveal</h2>
+        <p class="leading-7 text-stone-600">Scroll down to trigger this region when it enters the viewport.</p>
+        <div class="flex min-h-[900px] items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-200/60 text-center text-stone-600">Keep scrolling. This spacer exists so reveal does not fire immediately.</div>
+        {{ reveal runtime Reveal }}
+    </article>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Renderable intent</h2>
+        <p class="leading-7 text-stone-600">The helpers produce an interaction model. The connector supplies protocol attributes, and the interaction stage owns the final HTML wrapper.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content.SetDot(InteractionPage{Title: "Interaction helpers"}).
+    SetContract("interaction",
+        interactions.NewPoll("/interactions/poll").Every(3 * time.Second),
+    )
+
+func (app *App) interactionsPoll(w http.ResponseWriter, r *http.Request) {
+    content := partial.NewID("interaction-poll", "templates/interaction_result.gohtml")
+    app.writeStandalone(w, r, content)
+}</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ async runtime Async }}" }}
+{{ "{{ reveal runtime Reveal }}" }}
+{{ "{{ poll runtime Poll }}" }}
+{{ "{{ on runtime On }}" }}
+{{ "{{ stream runtime Stream }}" }}
+{{ "{{ prefetch runtime Prefetch }}" }}
+{{ "{{ refresh runtime Refresh }}" }}
+{{ "{{ async runtime Profile }}" }}
+{{ "{{ refresh runtime ProfileRefresh }}" }}</code></pre>
+    </article>
+</section>
+

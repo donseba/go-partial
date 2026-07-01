@@ -1,0 +1,40 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Error fallback</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This page keeps the shell alive while one target intentionally fails during an HTMX request.</p>
+    </header>
+
+    <div id="broken-section" class="rounded-lg border border-stone-300 bg-white p-4 grid gap-3.5">
+        <button class="inline-flex min-h-9 w-fit cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-bold text-stone-950 hover:border-teal-700 hover:text-teal-900"
+                hx-get="/error/section"
+                hx-target="#broken-section"
+                hx-swap="outerHTML">
+            Render broken section
+        </button>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Section-level failure</h2>
+        <p class="leading-7 text-stone-600">The broken target is requested through the normal partial render stage. When it fails, the default error stage replaces the requested section.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">func errorSection(w http.ResponseWriter, r *http.Request) {
+    writeContent(w, r, partial.NewID("broken-section", "templates/broken.gohtml"))
+}</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button hx-get="/error/section"
+        hx-target="#broken-section"
+        hx-swap="outerHTML"&gt;
+    Render broken section
+&lt;/button&gt;</code></pre>
+    </article>
+</section>

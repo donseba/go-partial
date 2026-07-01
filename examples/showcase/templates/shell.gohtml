@@ -1,0 +1,59 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.ShellPage
+*/}}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .AppName }}</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+    <link rel="stylesheet" href="/static/site.css">
+</head>
+<body class="m-0 bg-[#f5f5f1] font-sans text-stone-900">
+    <div class="grid min-h-screen grid-cols-[248px_minmax(0,1fr)] bg-[#f5f5f1] text-stone-900">
+        {{ slot "header" }}
+
+        <main id="content" class="w-full max-w-6xl px-8 py-9 pb-24">
+            {{ content }}
+        </main>
+    </div>
+
+    <aside id="cart-popup" class="fixed bottom-5 right-5 z-50 hidden w-[420px] max-w-[min(420px,calc(100vw-40px))] gap-3.5 rounded-lg border border-stone-300 bg-white p-4 shadow-2xl" aria-live="polite"></aside>
+    {{ flashTarget }}
+    <script>
+        (() => {
+            const bindFlash = (node) => {
+                if (!(node instanceof HTMLElement) || !node.matches("[data-flash-message]") || node.dataset.flashBound) {
+                    return
+                }
+                node.dataset.flashBound = "true"
+                node.style.transition = "opacity 180ms ease, transform 180ms ease"
+                const timeout = Number.parseInt(node.dataset.flashTimeout || "4200", 10)
+                window.setTimeout(() => {
+                    node.style.opacity = "0"
+                    node.style.transform = "translateY(-4px)"
+                    window.setTimeout(() => node.remove(), 220)
+                }, Number.isFinite(timeout) ? timeout : 4200)
+            }
+
+            const bindTree = (root) => {
+                bindFlash(root)
+                if (root instanceof Element) {
+                    root.querySelectorAll("[data-flash-message]").forEach(bindFlash)
+                }
+            }
+
+            const target = document.getElementById("flash-messages")
+            if (!target) {
+                return
+            }
+            bindTree(target)
+            new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => mutation.addedNodes.forEach(bindTree))
+            }).observe(target, { childList: true, subtree: true })
+        })()
+    </script>
+</body>
+</html>

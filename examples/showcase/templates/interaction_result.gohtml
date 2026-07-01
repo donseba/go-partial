@@ -1,0 +1,8 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.InteractionResult
+*/}}
+<div id="{{ .ID }}" class="grid gap-2 border border-stone-300 border-l-4 border-l-teal-700 bg-teal-50/40 p-3.5 text-stone-950">
+    <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">{{ .Label }}</span>
+    <h3 class="text-lg font-bold text-stone-950">{{ .Message }}</h3>
+    <p class="leading-7 text-stone-600">Rendered at {{ .Time }}</p>
+</div>

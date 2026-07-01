@@ -1,0 +1,25 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Installation</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Install the package, choose a connector, and point go-partial at your template filesystem.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">go get github.com/donseba/go-partial</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Recommended setup</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
+    SetConnector(connector.NewHTMX(nil)).
+    SetFileSystem(os.DirFS("web")).
+    UseTemplateCache(true).
+    Use(errors.Stage(errors.WithMode(errors.ModeDetailed)))</code></pre>
+
+    <p class="leading-7 text-slate-400">During development you can leave template caching off. In production, cache parsed templates and keep data request-scoped. Error output defaults to safe mode; opt into detailed mode for local development diagnostics.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Template structure</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">web/
+  shell.gohtml
+  header.gohtml
+  pages/
+    home.gohtml
+    settings.gohtml</code></pre>
+</article>

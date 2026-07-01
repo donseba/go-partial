@@ -1,0 +1,76 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Selection and action</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Selection and action both read request intent from the configured connector, but they solve different problems. Selection chooses one registered partial. Action lets Go code decide what to render.</p>
+
+    <h2 id="selection" class="scroll-mt-8 text-xl font-bold text-slate-50">Selection</h2>
+    <p class="leading-7 text-slate-400">Use selection when the possible outputs are known ahead of time, such as tabs, alternate panels, or a details/summary switch. Register the choices in Go, then render the selected partial from the template.</p>
+
+    <p class="leading-7 text-slate-400">This snippet creates two selectable registered partials and says <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">summary</code> is the default when the request does not send a selection value.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">summary := partial.NewID("summary", "summary.gohtml")
+details := partial.NewID("details", "details.gohtml")
+
+content := partial.NewID("content", "selection.gohtml")
+selection.WithSelectMap(content, "summary", map[string]*partial.Partial{
+    "summary": summary,
+    "details": details,
+})</code></pre>
+
+    <p class="leading-7 text-slate-400">The parent template owns the surrounding controls and asks go-partial to render the selected partial at the panel location. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selectionHeader</code> prints the header name from the active connector, so the template does not need to know whether the app uses HTMX, Unpoly, Turbo, or a custom client.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button hx-get="/selection" hx-target="#content" hx-headers='{"{{ "{{ selectionHeader }}" }}":"summary"}'&gt;
+    Summary
+&lt;/button&gt;
+&lt;button hx-get="/selection" hx-target="#content" hx-headers='{"{{ "{{ selectionHeader }}" }}":"details"}'&gt;
+    Details
+&lt;/button&gt;
+
+&lt;section id="selection-panel"&gt;
+    {{ "{{ selection }}" }}
+&lt;/section&gt;</code></pre>
+
+    <p class="leading-7 text-slate-400">Use connector helpers when the selected key also affects control state.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button class="{{"{{ if selectionIs \"details\" }}active{{ end }}" }}"&gt;
+    Details
+&lt;/button&gt;</code></pre>
+
+    <h2 id="action" class="scroll-mt-8 text-xl font-bold text-slate-50">Action</h2>
+    <p class="leading-7 text-slate-400">Use action when the request should run server logic before choosing output. The callback receives the current partial and runtime, so it can inspect the requested action, mutate application state, or choose a result partial.</p>
+
+    <p class="leading-7 text-slate-400">This snippet maps request action values to different response partials. The action value comes from the configured connector. In Go code, connector packages expose constants such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.HeaderAction</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.HeaderSelect</code> for clients that need to construct requests themselves.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content := partial.NewID("content", "counter.gohtml")
+
+actions.WithTemplateAction(content, func(ctx context.Context, p *partial.Partial, runtime *partial.Runtime) (*partial.Partial, error) {
+    switch runtime.Connector().GetActionValue(runtime.Request()) {
+    case "increment":
+        counter.Increment()
+        return partial.NewID("counter", "counter_value.gohtml").SetDot(CounterView{
+            Count: counter.Value(),
+        }), nil
+    default:
+        return p, nil
+    }
+})</code></pre>
+
+    <p class="leading-7 text-slate-400">The template places the action output exactly where it belongs. The button sends the active action header and targets the same page region.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;button hx-post="/counter" hx-target="#content" hx-headers='{"{{ "{{ actionHeader }}" }}":"increment"}'&gt;
+    Increment
+&lt;/button&gt;
+
+&lt;div id="counter-value"&gt;
+    {{ "{{ action }}" }}
+&lt;/div&gt;</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Choosing between them</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">When</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selection</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The server already knows the finite set of registered partials and only needs a selected key.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">action</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The request should run Go logic before deciding what partial to render.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">selectionValue</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The template needs to read the current selection without rendering it.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">actionValue</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">The template or action callback needs the raw action value.</td></tr>
+        </tbody>
+    </table>
+</article>
+
+

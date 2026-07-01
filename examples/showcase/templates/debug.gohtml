@@ -1,0 +1,43 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.DebugPage
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Diagnostics</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">The <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">debug</code> helper renders a styled diagnostic box by default. Applications can replace the stage to match their own interface.</p>
+    </header>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Default debug stage</h2>
+        <p class="leading-7 text-stone-600">This output comes from the embedded go-partial debug template.</p>
+        {{ debug runtime .Payload }}
+    </article>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Custom debug stage</h2>
+        <p class="leading-7 text-stone-600">This partial uses a <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">RenderStageHooks</code> extension for <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">debug.RenderKindDebug</code> to render the same helper with application-specific markup before the page is written.</p>
+        {{ .CustomDebug }}
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">custom := partial.NewID("custom-debug", "debug_custom.gohtml").
+    SetFunc(debug.FuncMap()).
+    Use(partial.RenderStageHooks{
+        RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
+            if ctx.Kind != debug.RenderKindDebug {
+                return next(ctx)
+            }
+            return template.HTML(customDebugHTML(ctx.Data)), nil
+        },
+    })
+
+html, err := partial.RenderWithRequest(ctx, r, custom)</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ debug runtime .Payload }}" }}</code></pre>
+    </article>
+</section>

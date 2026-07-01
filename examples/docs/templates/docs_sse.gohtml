@@ -1,0 +1,50 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Integration</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Server-sent events</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">SSE is a streaming writer layer. It does not replace connectors; it sends events after your handler decides what changed.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Patch a rendered partial</h2>
+    <p class="leading-7 text-slate-400">Use <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">sse.NewWriter</code> to apply the expected event-stream headers, then render a partial into a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:patch</code> event.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">events := sse.NewWriter(w)
+
+notice := partial.NewID("notice", "templates/notice.gohtml").
+    SetDot(Notice{Message: "Saved"})
+
+_ = events.PatchPartial(r.Context(), r, "#notice", notice)
+_ = events.Signal("saved", true)
+events.Flush()</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Client listener</h2>
+    <p class="leading-7 text-slate-400">The default event names are neutral. Your client can decide whether to replace <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">outerHTML</code>, update state, or hand the HTML to another library.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">const stream = new EventSource("/events")
+
+stream.addEventListener("partial:patch", (event) =&gt; {
+    const patch = JSON.parse(event.data)
+    document.querySelector(patch.target).outerHTML = patch.html
+})
+
+stream.addEventListener("partial:signal", (event) =&gt; {
+    console.log(JSON.parse(event.data))
+})</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Event names and headers</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Constant</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Meaning</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HeaderContentType</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Content-Type</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ContentTypeEventStream</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">text/event-stream</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventPatch</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:patch</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventSignal</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:signal</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">EventError</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial:error</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="text-xl font-bold text-slate-50">Why it is not a connector</h2>
+    <p class="leading-7 text-slate-400">A connector interprets one request and writes one response. SSE keeps the response open and writes many events, so it is better as an explicit writer that can still render normal partials.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Concurrency notes</h2>
+    <p class="leading-7 text-slate-400">An <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">sse.Writer</code> owns one HTTP response stream. If several goroutines produce updates, serialize calls through your own channel or mutex so event frames are not interleaved. Partial rendering can still use the request context for cancellation and request-scoped sinks before each event is written.</p>
+</article>

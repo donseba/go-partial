@@ -8,9 +8,9 @@ func NewPartial(c *Config) Connector {
 	return &Partial{
 		base: base{
 			config:       c,
-			targetHeader: "X-Target",
-			selectHeader: "X-Select",
-			actionHeader: "X-Action",
+			targetHeader: HeaderTarget.String(),
+			selectHeader: HeaderSelect.String(),
+			actionHeader: HeaderAction.String(),
 		},
 	}
 }

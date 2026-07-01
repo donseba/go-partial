@@ -1,0 +1,43 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Request context</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">These values are injected into the template context on every render.</p>
+    </header>
+
+    <dl class="grid grid-cols-[140px_minmax(0,1fr)] gap-x-4 gap-y-2.5">
+        <dt>URL path</dt>
+        <dd>{{ with url }}{{ .Path }}{{ end }}</dd>
+        <dt>Base path</dt>
+        <dd>{{ if basePath }}{{ basePath }}{{ else }}/{{ end }}</dd>
+        <dt>Locale</dt>
+        <dd>{{ locale }}</dd>
+        <dt>CSRF key</dt>
+        <dd>{{ csrf.Key }}</dd>
+        <dt>CSRF token</dt>
+        <dd>{{ csrf.Token ctx.Context }}</dd>
+    </dl>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Available everywhere</h2>
+        <p class="leading-7 text-stone-600">The package builds a consistent render context so templates can read request, localization, base path, and application-provided CSRF values without custom glue per page.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">ctx := localization.WithLocalizer(r.Context(), localizer)
+ctx = csrf.WithToken(ctx, csrfToken)
+partial.Write(ctx, w, r, content)</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ .URL.Path }}" }}
+{{ "{{ basePath }}" }}
+{{ "{{ locale }}" }}
+{{ "{{ csrf.Token ctx.Context }}" }}</code></pre>
+    </article>
+</section>

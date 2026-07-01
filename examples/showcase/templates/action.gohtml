@@ -1,0 +1,36 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.ActionPage
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Request intent</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This page keeps the action deliberately small: a POST increments server state, then re-renders the partial.</p>
+    </header>
+
+    <div class="inline-flex w-fit items-center gap-3.5 rounded-lg border border-stone-300 bg-white p-4 rounded-lg border border-stone-300 bg-white p-4">
+        <span>{{ .Counter }}</span>
+        <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" hx-post="/action" hx-target="#content" hx-headers='{"{{ .ActionHeader }}":"increment"}'>Increment</button>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Action header</h2>
+        <p class="leading-7 text-stone-600">The handler reads <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">{{ .ActionHeader }}</code> to decide what operation was requested before rendering the next state.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">if r.Header.Get(connector.HeaderAction.String()) == "increment" {
+    counter++
+}</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;button hx-post="/action"
+        hx-target="#content"
+        hx-headers='{"{{ actionHeader }}":"increment"}'&gt;
+    Increment
+&lt;/button&gt;</code></pre>
+    </article>
+</section>

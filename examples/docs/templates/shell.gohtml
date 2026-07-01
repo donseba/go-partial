@@ -1,0 +1,40 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/docs.DocsShellPage
+*/}}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ .AppName }} documentation</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <link rel="stylesheet" href="/static/site.css">
+    <script>
+        function scrollToCurrentHash() {
+            if (!window.location.hash) {
+                return;
+            }
+            const target = document.querySelector(window.location.hash);
+            if (target) {
+                target.scrollIntoView({ block: "start" });
+            }
+        }
+        document.addEventListener("htmx:afterSwap", function (event) {
+            if (event.detail && event.detail.target && event.detail.target.id === "content") {
+                requestAnimationFrame(scrollToCurrentHash);
+            }
+        });
+        window.addEventListener("hashchange", scrollToCurrentHash);
+        window.addEventListener("load", scrollToCurrentHash);
+    </script>
+</head>
+<body class="m-0 bg-slate-950 font-sans text-slate-50 [background:linear-gradient(180deg,rgba(27,38,53,.58),transparent_360px),#0d1117]">
+    {{ template "header.gohtml" .Header }}
+    <div class="mx-auto grid max-w-[1480px] grid-cols-[292px_minmax(0,1fr)]">
+        {{ template "sidebar.gohtml" .Sidebar }}
+        <main id="content" class="min-w-0 px-11 py-12 pb-28">
+            {{ content }}
+        </main>
+    </div>
+</body>
+</html>

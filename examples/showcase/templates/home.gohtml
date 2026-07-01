@@ -1,0 +1,47 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Overview</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This application renders normal pages and htmx requests through the same partial tree.</p>
+    </header>
+
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5 rounded-lg border border-stone-300 bg-white p-4">
+        <article>
+            <h2 class="text-lg font-bold text-stone-950">Core render model</h2>
+            <p class="leading-7 text-stone-600">A wrapper partial renders route content. htmx requests target the content partial directly.</p>
+        </article>
+        <article>
+            <h2 class="text-lg font-bold text-stone-950">Template helpers</h2>
+            <p class="leading-7 text-stone-600">Pages demonstrate typed templates, registered regions, selection, actions, OOB swaps, and context helpers.</p>
+        </article>
+        <article>
+            <h2 class="text-lg font-bold text-stone-950">Error fallback</h2>
+            <p class="leading-7 text-stone-600">The error page intentionally renders a broken template so the embedded fallback can take over.</p>
+        </article>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">How to read this showcase</h2>
+        <p class="leading-7 text-stone-600">Each page demonstrates one server-rendering capability with actual template files, HTMX requests, and the same configured root partial.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">content := partial.NewID("content", "templates/home.gohtml")
+page := root.Clone().SetContent(content)
+partial.Write(ctx, w, r, page)</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">&lt;section class="grid gap-5"&gt;
+    &lt;header class="grid max-w-3xl gap-2.5"&gt;
+        &lt;h1&gt;{{ "{{ .Title }}" }}&lt;/h1&gt;
+    &lt;/header&gt;
+&lt;/section&gt;</code></pre>
+    </article>
+</section>
+

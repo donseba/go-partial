@@ -1,0 +1,70 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Target resolver</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> handles DOM targets that are not fixed partial IDs. It is the tool for tables, feeds, cards, and repeated rows.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">The problem</h2>
+    <p class="leading-7 text-slate-400">A table may render one row template many times. Every row needs its own DOM ID so HTMX can replace exactly that row, while the parent still uses native Go template composition.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;table&gt;
+{{ "{{ range .Rows }}" }}
+    {{ "{{ template \"user_row.gohtml\" . }}" }}
+{{ "{{ end }}" }}
+&lt;/table&gt;</code></pre>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;tr id="row-{{ "{{ .ID }}" }}"&gt;
+    &lt;td&gt;{{ "{{ .Name }}" }}&lt;/td&gt;
+    &lt;td&gt;
+        &lt;button hx-post="/users/{{ "{{ .ID }}" }}/refresh"
+                hx-target="#row-{{ "{{ .ID }}" }}"
+                hx-swap="outerHTML"&gt;Refresh&lt;/button&gt;
+    &lt;/td&gt;
+&lt;/tr&gt;</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Wire the resolver</h2>
+    <p class="leading-7 text-slate-400">The connector reads the requested target from the request. For HTMX this is <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target</code>. If the target is not a registered region ID, go-partial asks the resolver whether it can map that target to a partial and fresh dot value.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">rowPartial := partial.NewID("row", "templates/users/user_row.gohtml")
+
+table := partial.NewID("content", "templates/users/table.gohtml").
+    SetDot(UserTablePage{Rows: rows}).
+    With(rowPartial)
+
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+    if !strings.HasPrefix(target, "row-") {
+        return nil, false
+    }
+
+    id, err := strconv.Atoi(strings.TrimPrefix(target, "row-"))
+    if err != nil {
+        return nil, false
+    }
+
+    row, ok := loadUserRow(ctx, id)
+    if !ok {
+        return nil, false
+    }
+
+    return partial.NewID(target, "templates/users/user_row.gohtml").SetDot(row), true
+})</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Request flow</h2>
+    <ol>
+        <li>The browser sends an HTMX request with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target: row-42</code>.</li>
+        <li>The connector marks it as a partial request and exposes the target value.</li>
+        <li>go-partial first checks for a registered region with ID <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
+        <li>If no registered region exists, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> receives <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-42</code>.</li>
+        <li>The resolver returns the row template partial with fresh dot data for row 42.</li>
+        <li>Only that row template is rendered and swapped into <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">#row-42</code>.</li>
+    </ol>
+
+    <h2 class="text-xl font-bold text-slate-50">Rules of thumb</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
+        <li>Keep DOM IDs stable and unique, such as <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">row-{{ "{" }}id{{ "}" }}</code>.</li>
+        <li>Do not cache row HTML when row data can change. Resolve fresh data per request.</li>
+        <li>Return <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">false</code> for unknown target shapes so normal registered-region lookup and errors stay predictable.</li>
+        <li>Use native <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">template</code> calls for repeated rendering, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">target.WithResolver</code> for targeted replacement of one repeated item.</li>
+    </ul>
+</article>
+

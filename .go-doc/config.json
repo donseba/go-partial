@@ -1,0 +1,139 @@
+{
+  "enabled": true,
+  "include": ["/"],
+  "exclude": ["vendor", "references", "node_modules"],
+  "writeIndex": false,
+  "providers": [
+    "github.com/donseba/go-partial/exp/actions",
+    "github.com/donseba/go-partial/exp/csrf",
+    "github.com/donseba/go-partial/exp/flash",
+    "github.com/donseba/go-partial/exp/interactions",
+    "github.com/donseba/go-partial/exp/localization",
+    "github.com/donseba/go-partial/exp/selection",
+    "github.com/donseba/go-partial/exp/slots",
+    "github.com/donseba/go-partial/exp/sse",
+    "github.com/donseba/go-partial/exp/target",
+    "github.com/donseba/go-partial/exp/templatehelpers",
+    "github.com/donseba/go-partial/ext/debug"
+  ],
+  "symbolAnnotations": [
+    {
+      "name": "interaction",
+      "type": "github.com/donseba/go-partial.Interaction"
+    }
+  ],
+  "templateFunctions": [
+    {
+      "name": "async",
+      "path": "github.com/donseba/go-partial/exp/interactions.Async"
+    },
+    {
+      "name": "reveal",
+      "path": "github.com/donseba/go-partial/exp/interactions.Reveal"
+    },
+    {
+      "name": "poll",
+      "path": "github.com/donseba/go-partial/exp/interactions.Poll"
+    },
+    {
+      "name": "on",
+      "path": "github.com/donseba/go-partial/exp/interactions.On"
+    },
+    {
+      "name": "stream",
+      "path": "github.com/donseba/go-partial/exp/interactions.Stream"
+    },
+    {
+      "name": "prefetch",
+      "path": "github.com/donseba/go-partial/exp/interactions.Prefetch"
+    },
+    {
+      "name": "refresh",
+      "path": "github.com/donseba/go-partial/exp/interactions.Refresh"
+    },
+    {
+      "name": "action",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionHTML"
+    },
+    {
+      "name": "actionHeader",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionHeader"
+    },
+    {
+      "name": "actionValue",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionValue"
+    },
+    {
+      "name": "actionIs",
+      "path": "github.com/donseba/go-partial/exp/actions.ActionIs"
+    },
+    {
+      "name": "csrf",
+      "path": "github.com/donseba/go-partial/exp/csrf.CSRF"
+    },
+    {
+      "name": "flash",
+      "path": "github.com/donseba/go-partial/exp/flash.Flash"
+    },
+    {
+      "name": "flashTarget",
+      "path": "github.com/donseba/go-partial/exp/flash.FlashTarget"
+    },
+    {
+      "name": "flashes",
+      "path": "github.com/donseba/go-partial/exp/flash.Flashes"
+    },
+    {
+      "name": "hasFlashes",
+      "path": "github.com/donseba/go-partial/exp/flash.HasFlashes"
+    },
+    {
+      "name": "locale",
+      "path": "github.com/donseba/go-partial/exp/localization.Locale"
+    },
+    {
+      "name": "localizer",
+      "path": "github.com/donseba/go-partial/exp/localization.LocalizerValue"
+    },
+    {
+      "name": "selection",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionHTML"
+    },
+    {
+      "name": "selectionHeader",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionHeader"
+    },
+    {
+      "name": "selectionValue",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionValue"
+    },
+    {
+      "name": "selectionIs",
+      "path": "github.com/donseba/go-partial/exp/selection.SelectionIs"
+    },
+    {
+      "name": "slot",
+      "path": "github.com/donseba/go-partial/exp/slots.Slot"
+    },
+    {
+      "name": "hasSlot",
+      "path": "github.com/donseba/go-partial/exp/slots.HasSlot"
+    },
+    {
+      "name": "targetHeader",
+      "path": "github.com/donseba/go-partial/exp/target.TargetHeader"
+    },
+    {
+      "name": "targetValue",
+      "path": "github.com/donseba/go-partial/exp/target.TargetValue"
+    },
+    {
+      "name": "targetIs",
+      "path": "github.com/donseba/go-partial/exp/target.TargetIs"
+    },
+    {
+      "name": "debug",
+      "path": "github.com/donseba/go-partial/ext/debug.Debug"
+    }
+  ]
+}

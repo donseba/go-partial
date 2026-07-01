@@ -1,0 +1,85 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Guide</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Interaction helpers</h1>
+    <p class="max-w-4xl text-lg leading-8 text-slate-300">Interaction helpers describe how a server-rendered partial should reach the browser. They are delivery hints; your page data can stay on dot.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">The model</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">exp/interactions</code> is experimental helper sugar for client-triggered regions. Each helper accepts either a simple endpoint string or a configured interaction value. The connector turns that interaction into protocol attributes, and the interaction stage owns the final HTML wrapper.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">helper call -&gt; connector.Interaction -&gt; connector attributes -&gt; exp/interactions stage HTML</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Helpers</h2>
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Helper</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Intent</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Example</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">async</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Load after the page shell renders.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ async runtime \"/stats\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">reveal</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Load when the placeholder enters the viewport.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ reveal runtime \"/charts/monthly\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">poll</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Refresh on an interval.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ poll runtime Notifications }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">on</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Refresh when a named browser event is dispatched.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ on runtime CartChanged }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">stream</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Declare an SSE-backed region.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ stream runtime ActivityStream }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">prefetch</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Emit a non-visual prefetch hint.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ prefetch runtime \"/users/42\" }}" }}</code></td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">refresh</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Render a refresh control for a target.</td><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ refresh runtime CartRefresh }}" }}</code></td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="text-xl font-bold text-slate-50">Two forms</h2>
+    <p class="leading-7 text-slate-400">Use a string endpoint when defaults are enough. Use a named go-doc contract when the interaction needs IDs, targets, intervals, placeholders, route params, or swap behavior.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async runtime \"/stats\" }}" }}</code></pre>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{/*" }}
+@interaction Notifications github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction CartChanged github.com/donseba/go-partial/exp/interactions.Interaction
+@interaction CartRefresh github.com/donseba/go-partial/exp/interactions.Interaction
+{{ "*/}}" }}
+
+{{ "{{ poll runtime Notifications }}" }}
+{{ "{{ on runtime CartChanged }}" }}
+{{ "{{ refresh runtime CartRefresh }}" }}</code></pre>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetContract("interaction",
+    interactions.NewPoll("/notifications").As("Notifications").Every(10 * time.Second),
+    interactions.NewOn("cart:changed", "/cart/summary").As("CartChanged").Target("#cart").Placeholder(""),
+    interactions.NewRefresh("/cart/summary").As("CartRefresh").Target("#cart").Swap(interactions.SwapOuterHTML),
+)</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Generic contracts</h2>
+    <p class="leading-7 text-slate-400">Interaction roots use the same contract path as every other go-doc annotation. The interaction builder implements <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">ContractName()</code>, so <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetContract</code> can bind it by name.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">content.SetContract("component", primaryButton)</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Route parameters</h2>
+    <p class="leading-7 text-slate-400">Route parameters can be configured in Go with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Param</code>. The simple template form still accepts key/value pairs for route placeholders when that reads better in a loop.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">row := interactions.NewAsync("/table/row/:row").Param("row", row.ID)</code></pre>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">{{ "{{ async runtime RowLoader }}" }}
+{{ "{{ async runtime \"/table/row/:row\" \"row\" .Row.ID }}" }}</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Custom markup</h2>
+    <p class="leading-7 text-slate-400">The default stage is intentionally simple. Applications can replace it when registering the optional interaction helper functions. The connector still supplies the protocol attributes, so your stage owns the element, classes, loading state, and accessibility text.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.Use(interactions.Stage(func(
+    runtime *partial.Runtime,
+    interaction connector.Interaction,
+    attrs map[string]string,
+) (template.HTML, error) {
+    return template.HTML(renderMyWrapper(interaction, attrs)), nil
+}))</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">HTMX output</h2>
+    <p class="leading-7 text-slate-400">With the HTMX connector, helpers map to normal HTMX attributes. Polling defaults to <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">innerHTML</code> so the wrapper keeps its polling attributes after each response.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;div id="poll-notifications"
+     hx-get="/notifications"
+     hx-trigger="every 10s"
+     hx-target="#poll-notifications"
+     hx-swap="innerHTML"&gt;
+    Loading...
+&lt;/div&gt;</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Reveal and infinite scroll</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">reveal</code> is the primitive behind infinite scroll. Render a sentinel near the bottom of a list, load the next page when it is revealed, and return a chunk that includes the next sentinel.</p>
+</article>
+

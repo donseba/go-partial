@@ -1,0 +1,122 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.PageTitle
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Streaming partials</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">This page opens an <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">EventSource</code> stream. The server renders normal go-partial templates and sends them as <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">partial:patch</code> events.</p>
+    </header>
+
+    <div class="grid grid-cols-[minmax(0,1fr)_320px] items-stretch gap-4">
+        <section class="min-h-64 rounded-lg border border-stone-300 bg-gradient-to-br from-teal-50/40 to-white p-4">
+            <article id="sse-status" class="grid min-h-56 content-center gap-4 bg-transparent p-0">
+                <div class="flex flex-wrap items-center gap-2.5 text-[13px] text-stone-600">
+                    <span class="inline-flex rounded-full border border-teal-200 px-2.5 py-1 text-[13px] font-bold text-teal-900">Idle</span>
+                    <span>Waiting for EventSource</span>
+                </div>
+                <h2 class="text-lg font-bold text-stone-950">Ready to stream</h2>
+                <p class="leading-7 text-stone-600">Start the stream to receive server-rendered patches.</p>
+            </article>
+        </section>
+
+        <aside class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4" aria-label="SSE client state">
+            <h2 class="text-lg font-bold text-stone-950">Client state</h2>
+            <dl class="grid">
+                <div>
+                    <dt>Progress</dt>
+                    <dd><span id="sse-progress">0</span> / 5</dd>
+                </div>
+                <div>
+                    <dt>Connection</dt>
+                    <dd id="sse-connection">Closed</dd>
+                </div>
+            </dl>
+            <div class="flex flex-wrap gap-2">
+                <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button" id="sse-start">Start stream</button>
+                <button class="inline-flex min-h-9 cursor-pointer items-center rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-950 hover:border-teal-700 hover:text-teal-900" type="button" id="sse-stop">Stop stream</button>
+            </div>
+        </aside>
+    </div>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Streamed HTML patches</h2>
+        <p class="leading-7 text-stone-600">SSE is a writer layer. The server can render an ordinary partial and send it as a named event while the client decides how to apply that patch.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">events := sse.NewWriter(w).Use(stages...)
+_ = events.PatchPartial(ctx, r, "#sse-status", statusPartial)
+_ = events.Signal("progress", map[string]any{"step": step})
+events.Flush()</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">source.addEventListener("partial:patch", (event) =&gt; {
+    const patch = JSON.parse(event.data);
+    document.querySelector(patch.target).outerHTML = patch.html;
+});</code></pre>
+    </article>
+</section>
+
+<script>
+(() => {
+    let source;
+    const start = document.getElementById("sse-start");
+    const stop = document.getElementById("sse-stop");
+    const progress = document.getElementById("sse-progress");
+    const connection = document.getElementById("sse-connection");
+
+    const close = () => {
+        if (source) {
+            source.close();
+            source = null;
+        }
+        connection.textContent = "Closed";
+    };
+
+    start.addEventListener("click", () => {
+        close();
+        progress.textContent = "0";
+        connection.textContent = "Opening";
+        source = new EventSource("/sse/stream");
+
+        source.addEventListener("open", () => {
+            connection.textContent = "Open";
+        });
+
+        source.addEventListener("partial:patch", (event) => {
+            const patch = JSON.parse(event.data);
+            const target = document.querySelector(patch.target);
+            if (target) {
+                target.outerHTML = patch.html;
+            }
+        });
+
+        source.addEventListener("partial:signal", (event) => {
+            const signal = JSON.parse(event.data);
+            if (signal.name === "progress") {
+                progress.textContent = signal.value.step;
+                if (signal.value.done) {
+                    close();
+                }
+            }
+        });
+
+        source.addEventListener("partial:error", (event) => {
+            connection.textContent = JSON.parse(event.data).error;
+            close();
+        });
+
+        source.addEventListener("error", () => {
+            if (source) {
+                connection.textContent = "Retrying";
+            }
+        });
+    });
+
+    stop.addEventListener("click", close);
+})();
+</script>

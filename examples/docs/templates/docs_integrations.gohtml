@@ -1,0 +1,34 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Integration</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Integration overview</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">go-partial sits on the server side. Integrations decide how a browser request names a target, selection, or action, and how server response intent is written back to the client.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Request/response shape</h2>
+    <p class="leading-7 text-slate-400">Most integrations follow the same flow: the client sends a target header, go-partial renders the matching partial, and the connector writes protocol-specific response headers when needed.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").SetConnector(connector.NewHTMX(nil)).SetFileSystem(os.DirFS("web"))</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Integration pages</h2>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-3.5">
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/integrations/htmx" hx-get="/docs/integrations/htmx" hx-target="#content" hx-push-url="true">
+            <strong>HTMX</strong>
+            <span>Targeted requests, OOB updates, response headers, and active navigation.</span>
+        </a>
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/integrations/sse" hx-get="/docs/integrations/sse" hx-target="#content" hx-push-url="true">
+            <strong>Server-sent events</strong>
+            <span>Stream server-rendered partials as patch events.</span>
+        </a>
+        <a class="grid min-h-32 gap-2 rounded-lg border border-slate-700 bg-slate-800/90 p-4 no-underline transition hover:-translate-y-px hover:border-sky-400/60" href="/docs/integrations/custom-clients" hx-get="/docs/integrations/custom-clients" hx-target="#content" hx-push-url="true">
+            <strong>Custom clients</strong>
+            <span>Use the neutral connector with fetch, tests, or your own frontend code.</span>
+        </a>
+    </div>
+
+    <h2 class="text-xl font-bold text-slate-50">What belongs in an integration</h2>
+    <ul class="grid list-disc gap-2 pl-6 text-slate-400">
+        <li>Mapping request headers to target, selection, and action values.</li>
+        <li>Writing response instructions such as retarget, reswap, and trigger headers.</li>
+        <li>Leaving template rendering and request-scoped render values in the core package, while optional behavior is installed through render stages.</li>
+    </ul>
+</article>

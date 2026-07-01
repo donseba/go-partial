@@ -1,0 +1,43 @@
+{{/* @dot github.com/donseba/go-partial/examples/docs.DocsPage */}}
+<article class="grid max-w-5xl gap-6">
+    <p class="leading-7 text-slate-400 text-[13px] font-extrabold uppercase text-emerald-300">Integration</p>
+    <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">Custom clients</h1>
+    <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">Use the neutral connector when your frontend is plain fetch, a small controller, tests, or another client that can send predictable headers.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Neutral request headers</h2>
+    <p class="leading-7 text-slate-400">The partial connector uses generic names for the same concepts as framework-specific connectors.</p>
+
+    <table class="w-full overflow-hidden rounded-lg border border-slate-700 bg-slate-800/90 text-left">
+        <thead class="bg-slate-900"><tr><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Header</th><th class="border-b border-slate-700 px-3 py-2.5 text-left font-bold text-slate-50">Use</th></tr></thead>
+        <tbody>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Target</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">DOM target or partial target ID.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Select</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Selected partial key for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">{{ "{{ selection }}" }}</code>.</td></tr>
+            <tr><td class="border-b border-slate-700 px-3 py-2.5 align-middle"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">X-Action</code></td><td class="border-b border-slate-700 px-3 py-2.5 align-middle">Server action name or cursor value.</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="text-xl font-bold text-slate-50">Fetch example</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">const response = await fetch("/settings/profile", {
+    headers: {
+        "X-Target": "profile-card",
+        "X-Action": "refresh"
+    }
+})
+
+document.querySelector("#profile-card").outerHTML = await response.text()</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">Server setup</h2>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").SetConnector(connector.NewPartial(&connector.Config{UseURLQuery: true})).SetFileSystem(os.DirFS("web"))</code></pre>
+
+    <h2 class="text-xl font-bold text-slate-50">When to write your own connector</h2>
+    <p class="leading-7 text-slate-400">If your client already has established headers, implement the connector interface and keep the rest of your rendering code unchanged.</p>
+
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">type Connector interface {
+    RenderPartial(r *http.Request) bool
+    GetTargetValue(r *http.Request) string
+    GetSelectValue(r *http.Request) string
+    GetActionValue(r *http.Request) string
+    ResponseHeaders(response connector.Response) map[string]string
+}</code></pre>
+</article>
+

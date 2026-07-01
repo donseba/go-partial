@@ -1,0 +1,51 @@
+{{/*
+@dot github.com/donseba/go-partial/examples/showcase.RowsPage
+*/}}
+<section class="grid gap-5">
+    <header class="grid max-w-3xl gap-2.5">
+        <span class="text-[13px] font-extrabold uppercase text-teal-900">Template composition</span>
+        <h1 class="text-3xl font-extrabold leading-tight text-stone-950">{{ .Title }}</h1>
+        <p class="leading-7 text-stone-600">Rows are rendered with native <code class="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-sm text-stone-900">template</code> calls and the row partial keeps an ID for HTMX target requests.</p>
+    </header>
+
+    <table class="w-full overflow-hidden rounded-lg border border-stone-300 bg-white text-left">
+        <thead class="bg-stone-50">
+            <tr>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950">ID</th>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950">Name</th>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950">Price</th>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950">Status</th>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950">Owner</th>
+                <th class="border-b border-stone-300 px-3 py-2.5 text-left font-bold text-stone-950"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .Rows }}
+                {{ template "row.gohtml" . }}
+            {{ end }}
+        </tbody>
+    </table>
+
+    <article class="grid gap-2 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Dot row data</h2>
+        <p class="leading-7 text-stone-600">The table owns the loop, while each row receives the row itself as dot. The same row template can render inside the table or as a standalone HTMX target.</p>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Server setup</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">row := partial.NewID("row", "templates/row.gohtml")
+table := partial.NewID("content", "templates/rows.gohtml").SetDot(page)
+table.With(row)
+target.WithResolver(table, func(ctx context.Context, r *http.Request, target string) (*partial.Partial, bool) {
+    row := findRow(target)
+    return partial.NewID(target, "templates/row.gohtml").SetDot(row), true
+})</code></pre>
+    </article>
+
+    <article class="grid gap-4 rounded-lg border border-stone-300 bg-white p-4">
+        <h2 class="text-lg font-bold text-stone-950">Template usage</h2>
+        <pre class="max-w-full overflow-hidden whitespace-pre-wrap break-words rounded-md border border-stone-300 bg-stone-100 p-3"><code class="block bg-transparent p-0 font-mono text-[13px] leading-6 text-stone-950">{{ "{{ range .Rows }}" }}
+    {{ "{{ template \"row.gohtml\" . }}" }}
+{{ "{{ end }}" }}</code></pre>
+    </article>
+</section>
