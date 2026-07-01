@@ -36,7 +36,7 @@ finalize C -> finalize B -> finalize A
 ## Migration Checklist
 
 - [x] Add core render stage lifecycle types.
-- [x] Add render stage chains to `Partial`, `Service`, and `Layout`.
+- [x] Add render stage chains to `Partial`.
 - [x] Move template execution behind the default template render stage.
 - [x] Re-express error rendering as `RenderKindError`.
 - [x] Re-express debug rendering as `RenderKindDebug`.
@@ -56,7 +56,7 @@ finalize C -> finalize B -> finalize A
   parent request IDs.
 - [x] Keep default error markup in `ext/errors`; core only asks the render stage
   chain for a failure response.
-- [x] Make `RenderResponse` real for `WriteWithRequest` so render stages can set
+- [x] Make `RenderResponse` real for `Write` so render stages can set
   generic status and headers without templates controlling HTTP response state.
 
 ## Design Notes
@@ -66,9 +66,9 @@ finalize C -> finalize B -> finalize A
   interaction data, or error data.
 - `RenderContext.Kind` tells generic render stages which task they are handling.
 - `Finalize` may transform the HTML result, not only clean up.
-- Pre-release freedom means compatibility shims can be temporary.
+- Pre-release API cleanup is complete before v1.
 - `RenderResponse` belongs to core as generic render metadata. Templates do not
-  set it; Render stages may set it, and only `WriteWithRequest` applies it.
+  set it; Render stages may set it, and only `Write` applies it.
 - Slots are structured child partials. Native `{{ template }}` remains the
   right tool for local typed component composition that does not need a partial
   lifecycle.

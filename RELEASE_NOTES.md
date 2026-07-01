@@ -9,7 +9,7 @@ github.com/donseba/go-partial/exp/interactions
 ```
 
 These helpers contain the endpoint/interaction parsing logic and are registered
-explicitly with `service.SetFunc(interactions.FuncMap())`. Core go-partial no
+explicitly with `root.SetFunc(interactions.FuncMap())`. Core go-partial no
 longer auto-registers `async`, `poll`, `reveal`, `on`, `stream`, `prefetch`, or
 `refresh`, which keeps the render core decoupled from optional client
 interactions.
@@ -49,17 +49,33 @@ go-partial now includes an experimental flash helper package:
 github.com/donseba/go-partial/exp/flash
 ```
 
-Register it with `service.SetFunc(flash.FuncMap())` and
-`service.Use(flash.Stage())`. Templates can render `{{ flashTarget }}` once
-in a layout and `{{ flash }}` in request or fragment templates. Message and
+Register it with `root.SetFunc(flash.FuncMap())` and
+`root.Use(flash.Stage())`. Templates can render `{{ flashTarget }}` once
+in a wrapper and `{{ flash }}` in request or fragment templates. Message and
 target templates are embedded by default and can be replaced with
 `flash.WithTemplate`, `flash.WithPartial`, `flash.WithTargetTemplate`,
 `flash.WithTargetPartial`, and `flash.WithTargetID`.
 
+## Render Stages
+
+The render pipeline vocabulary now uses render stages. New code should use
+`partial.RenderStage`, `partial.RenderStageHooks`, `Partial.Use`, and
+package constructors such as `metrics.Stage(...)`, `flash.Stage(...)`, and
+`errors.Stage(...)`.
+
+## Package Rendering Functions
+
+Partial rendering and HTTP writing now have package-level entry points:
+`partial.Render(ctx, p)`, `partial.RenderWithRequest(ctx, r, p)`, and
+`partial.Write(ctx, w, r, p)`. `partial.Write` owns response headers, connector
+response instructions, render-stage response metadata, error fragments, and
+out-of-band output. `Partial` no longer has render or write methods; this is an
+intentional pre-v1 break so rendering is owned by package-level functions.
+
 ## Helper Provider Split
 
 The protected helper set has been reduced to go-partial's actual core helpers:
-runtime, layout/content, request/context, OOB, and connector state helpers.
+runtime, wrapper/content, request/context, OOB, and connector state helpers.
 Generic helpers such as `dict`, string helpers, date helpers, and counters are
 ordinary template helpers and can be provided through:
 

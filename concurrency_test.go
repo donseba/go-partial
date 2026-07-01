@@ -442,8 +442,7 @@ func TestRenderWithRequestUsesRequestContextWhenContextIsNil(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = req.WithContext(context.WithValue(req.Context(), requestContextTestKey{}, "from-request"))
 
-	//lint:ignore SA1012 this verifies RenderWithRequest falls back to req.Context when ctx is nil.
-	out, err := RenderWithRequest(nil, req, p)
+	out, err := RenderWithRequest(nil, req, p) //nolint:staticcheck // verifies fallback to req.Context when ctx is nil.
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,8 +471,7 @@ func TestRenderNilContextProvidesDefaultContext(t *testing.T) {
 			},
 		})
 
-	//lint:ignore SA1012 this verifies Render supplies a default context when ctx is nil.
-	out, err := Render(nil, p)
+	out, err := Render(nil, p) //nolint:staticcheck // verifies Render supplies a default context when ctx is nil.
 	if err != nil {
 		t.Fatal(err)
 	}
