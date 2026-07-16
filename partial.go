@@ -45,6 +45,7 @@ type (
 		contracts       []contractInformation
 		extensions      map[any]any
 		responseHeaders map[string]string
+		responseStatus  int
 		response        connector.Response
 		events          EventSink
 		stages          []RenderStage
@@ -148,6 +149,19 @@ func (p *Partial) TemplatePaths() []string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return slices.Clone(p.templates)
+}
+
+// SetTemplates replaces the template paths while preserving the partial's
+// configured filesystem, functions, stages, connector, and cache. It is useful
+// when cloning a configured partial as a request-scoped blueprint.
+func (p *Partial) SetTemplates(templates ...string) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.templates = slices.Clone(templates)
+	return p
 }
 
 // IsOOB reports whether the partial is currently being rendered out-of-band.
@@ -324,6 +338,36 @@ func (p *Partial) getResponseHeaders() map[string]string {
 		return parent.getResponseHeaders()
 	}
 	return nil
+}
+
+// SetStatus configures the HTTP status written by Write. A zero status clears
+// the local value and falls back to the parent partial, then to net/http's
+// default status.
+func (p *Partial) SetStatus(status int) *Partial {
+	if p == nil {
+		return nil
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.responseStatus = status
+	return p
+}
+
+func (p *Partial) getStatus() int {
+	if p == nil {
+		return 0
+	}
+	p.mu.RLock()
+	status := p.responseStatus
+	parent := p.parent
+	p.mu.RUnlock()
+	if status > 0 {
+		return status
+	}
+	if parent != nil {
+		return parent.getStatus()
+	}
+	return 0
 }
 
 // Response returns a builder for connector-specific response instructions.
@@ -1336,6 +1380,7 @@ func (p *Partial) clone() *Partial {
 		contracts:       slices.Clone(p.contracts),
 		extensions:      maps.Clone(p.extensions),
 		responseHeaders: maps.Clone(p.responseHeaders),
+		responseStatus:  p.responseStatus,
 		response:        p.response,
 		events:          p.events,
 		stages:          slices.Clone(p.stages),

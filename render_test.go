@@ -342,9 +342,9 @@ func TestPackageWriteAppliesResponseBehavior(t *testing.T) {
 		SetFileSystem(fsys).
 		SetConnector(connector.NewHTMX(nil)).
 		SetResponseHeaders(map[string]string{"X-Partial": "configured"}).
+		SetStatus(http.StatusAccepted).
 		Use(RenderStageHooks{
 			FinalizeFunc: func(ctx *RenderContext, out template.HTML, err error) (template.HTML, error) {
-				ctx.Response.Status = http.StatusAccepted
 				ctx.Response.Headers["X-Stage"] = "applied"
 				return out, err
 			},

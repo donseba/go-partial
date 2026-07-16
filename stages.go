@@ -154,7 +154,7 @@ func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind Ren
 		Partial:  p,
 		Kind:     kind,
 		Values:   make(RenderValues),
-		Response: &RenderResponse{Headers: make(map[string]string)},
+		Response: &RenderResponse{Headers: make(map[string]string), Status: p.getStatus()},
 		Funcs:    make(template.FuncMap),
 		Events:   mergeEventSinks(p.getEvents(), EventSinkFromContext(ctx)),
 	}
