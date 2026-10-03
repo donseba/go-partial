@@ -39,7 +39,7 @@ func FuncMap() template.FuncMap {
 // go-doc:sig func() string
 func TargetHeader(ctx ...*partial.RenderContext) string {
 	renderCtx := firstRenderContext(ctx)
-	if renderCtx == nil || renderCtx.Runtime == nil || renderCtx.Runtime.Connector() == nil {
+	if renderCtx == nil || renderCtx.Runtime == nil {
 		return ""
 	}
 	return renderCtx.Runtime.Connector().GetTargetHeader()
@@ -50,7 +50,7 @@ func TargetHeader(ctx ...*partial.RenderContext) string {
 // go-doc:sig func() string
 func TargetValue(ctx ...*partial.RenderContext) string {
 	renderCtx := firstRenderContext(ctx)
-	if renderCtx == nil || renderCtx.Runtime == nil || renderCtx.Runtime.Connector() == nil {
+	if renderCtx == nil || renderCtx.Runtime == nil {
 		return ""
 	}
 	return renderCtx.Runtime.Connector().GetTargetValue(renderCtx.Request)

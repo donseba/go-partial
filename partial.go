@@ -877,9 +877,7 @@ func (p *Partial) getFS() fs.FS {
 		return fsys
 	}
 	if parent != nil {
-		if parentFS := parent.getFS(); parentFS != nil {
-			return parentFS
-		}
+		return parent.getFS()
 	}
 	if fsys != nil {
 		return fsys
