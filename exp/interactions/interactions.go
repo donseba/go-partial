@@ -311,9 +311,6 @@ func renderInteraction(runtime *partial.Runtime, interaction connector.Interacti
 		return escapedError(fmt.Errorf("go-partial interaction runtime is not configured"))
 	}
 	conn := runtime.Connector()
-	if conn == nil {
-		conn = connector.NewPartial(nil)
-	}
 	attrs := conn.InteractionAttrs(interaction)
 	data := Data{Runtime: runtime, Interaction: interaction, Attrs: attrs}
 	out, err := runtime.RenderWith(RenderKindInteraction, string(interaction.Kind), data, func(ctx *partial.RenderContext) (template.HTML, error) {

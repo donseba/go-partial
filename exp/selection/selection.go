@@ -51,7 +51,7 @@ func SelectionHTML(ctx ...*partial.RenderContext) template.HTML {
 // go-doc:sig func() string
 func SelectionHeader(ctx ...*partial.RenderContext) string {
 	renderCtx := firstRenderContext(ctx)
-	if renderCtx == nil || renderCtx.Runtime == nil || renderCtx.Runtime.Connector() == nil {
+	if renderCtx == nil || renderCtx.Runtime == nil {
 		return ""
 	}
 	return renderCtx.Runtime.Connector().GetSelectHeader()
