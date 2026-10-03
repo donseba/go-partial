@@ -63,7 +63,7 @@ func ActionHTML(ctx ...*partial.RenderContext) template.HTML {
 // go-doc:sig func() string
 func ActionHeader(ctx ...*partial.RenderContext) string {
 	renderCtx := firstRenderContext(ctx)
-	if renderCtx == nil || renderCtx.Runtime == nil || renderCtx.Runtime.Connector() == nil {
+	if renderCtx == nil || renderCtx.Runtime == nil {
 		return ""
 	}
 	return renderCtx.Runtime.Connector().GetActionHeader()
@@ -74,7 +74,7 @@ func ActionHeader(ctx ...*partial.RenderContext) string {
 // go-doc:sig func() string
 func ActionValue(ctx ...*partial.RenderContext) string {
 	renderCtx := firstRenderContext(ctx)
-	if renderCtx == nil || renderCtx.Runtime == nil || renderCtx.Runtime.Connector() == nil {
+	if renderCtx == nil || renderCtx.Runtime == nil {
 		return ""
 	}
 	return renderCtx.Runtime.Connector().GetActionValue(renderCtx.Request)
