@@ -24,9 +24,8 @@ type (
 	// Writer is bound to a single response stream and is not safe for concurrent
 	// writes unless the caller serializes access.
 	Writer struct {
-		w       http.ResponseWriter
-		flusher http.Flusher
-		stages  []partial.RenderStage
+		w      http.ResponseWriter
+		stages []partial.RenderStage
 	}
 
 	Patch struct {
@@ -74,9 +73,6 @@ func (e EventName) String() string {
 
 func NewWriter(w http.ResponseWriter) *Writer {
 	writer := &Writer{w: w}
-	if flusher, ok := w.(http.Flusher); ok {
-		writer.flusher = flusher
-	}
 	writer.ApplyHeaders()
 	return writer
 }
@@ -192,10 +188,12 @@ func (s *Writer) Error(err error) error {
 }
 
 func (s *Writer) Flush() {
-	if s == nil || s.flusher == nil {
+	if s == nil || s.w == nil {
 		return
 	}
-	s.flusher.Flush()
+	// ResponseController follows Unwrap through middleware and honors wrappers
+	// that implement FlushError without exposing http.Flusher directly.
+	_ = http.NewResponseController(s.w).Flush()
 }
 
 func encodeSSEData(data any) (string, error) {

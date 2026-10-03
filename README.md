@@ -202,6 +202,8 @@ _ = events.Signal("saved", true)
 events.Flush()
 ```
 
+`Flush` follows middleware wrappers that expose `Unwrap() http.ResponseWriter` and honors their `FlushError` methods.
+
 The writer declares constants for expected headers and event names, such as `HeaderContentType`, `ContentTypeEventStream`, `EventPatch`, `EventSignal`, and `EventError`.
 
 ## Basic Usage
@@ -690,4 +692,3 @@ Contributions are welcome! Please open an issue or submit a pull request with yo
 
 This project is licensed under the [MIT License](LICENSE).
 ```
-
