@@ -3,6 +3,8 @@ package connector
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -19,6 +21,7 @@ type Response struct {
 	Trigger            string
 	TriggerAfterSettle string
 	TriggerAfterSwap   string
+	swap               *Swap
 }
 
 // ResponseBuilder mutates a Response through fluent methods.
@@ -63,6 +66,7 @@ func (b *ResponseBuilder) ReplaceURL(value string) *ResponseBuilder {
 
 func (b *ResponseBuilder) Reswap(value string) *ResponseBuilder {
 	b.response.Reswap = value
+	b.response.swap = nil
 	return b
 }
 
@@ -70,7 +74,12 @@ func (b *ResponseBuilder) ReswapWith(swap *Swap) *ResponseBuilder {
 	if swap == nil {
 		return b
 	}
-	b.response.Reswap = swap.String()
+	// Keep a snapshot of the semantic options until the selected connector
+	// serializes the response. String remains the legacy/raw representation.
+	snapshot := *swap
+	snapshot.scrolling = slices.Clone(swap.scrolling)
+	b.response.swap = &snapshot
+	b.response.Reswap = snapshot.String()
 	return b
 }
 
@@ -198,8 +207,10 @@ type Swap struct {
 	transition  *bool
 	ignoreTitle *bool
 	focusScroll *bool
-	scrolling   []string
+	scrolling   []swapScrolling
 }
+
+type swapScrolling struct{ mode, target, direction string }
 
 type SwapStyle string
 
@@ -212,6 +223,11 @@ const (
 	SwapAfterEnd    SwapStyle = "afterend"
 	SwapDelete      SwapStyle = "delete"
 	SwapNone        SwapStyle = "none"
+	// Additional built-in HTMX 4 styles. Morph/sync require an extension in HTMX 2.
+	SwapInnerMorph  SwapStyle = "innerMorph"
+	SwapOuterMorph  SwapStyle = "outerMorph"
+	SwapOuterSync   SwapStyle = "outerSync"
+	SwapTextContent SwapStyle = "textContent"
 )
 
 const (
@@ -259,16 +275,24 @@ func (s *Swap) FocusScroll(enabled bool) *Swap {
 }
 
 func (s *Swap) Scroll(target, direction string) *Swap {
-	s.scrolling = append(s.scrolling, joinSwapOption(SwapModifierScroll, target, direction))
+	s.addScrolling(SwapModifierScroll, target, direction)
 	return s
 }
 
 func (s *Swap) Show(target, direction string) *Swap {
-	s.scrolling = append(s.scrolling, joinSwapOption(SwapModifierShow, target, direction))
+	s.addScrolling(SwapModifierShow, target, direction)
 	return s
 }
 
+func (s *Swap) addScrolling(mode, target, direction string) {
+	s.scrolling = append(s.scrolling, swapScrolling{mode, target, direction})
+}
+
 func (s *Swap) String() string {
+	return s.format(false)
+}
+
+func (s *Swap) format(htmx4 bool) string {
 	if s == nil {
 		return ""
 	}
@@ -287,9 +311,22 @@ func (s *Swap) String() string {
 		parts = append(parts, joinSwapOption(SwapModifierIgnoreTitle, "", boolString(*s.ignoreTitle)))
 	}
 	if s.focusScroll != nil {
-		parts = append(parts, joinSwapOption(SwapModifierFocusScroll, "", boolString(*s.focusScroll)))
+		modifier := SwapModifierFocusScroll
+		if htmx4 {
+			modifier = "focusScroll"
+		}
+		parts = append(parts, joinSwapOption(modifier, "", boolString(*s.focusScroll)))
 	}
-	parts = append(parts, s.scrolling...)
+	for _, option := range s.scrolling {
+		if htmx4 {
+			parts = append(parts, option.mode+":"+option.direction)
+			if option.target != "" {
+				parts = append(parts, option.mode+"Target:"+strconv.Quote(option.target))
+			}
+		} else {
+			parts = append(parts, joinSwapOption(option.mode, option.target, option.direction))
+		}
+	}
 
 	return strings.Join(parts, " ")
 }
