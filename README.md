@@ -722,3 +722,41 @@ Contributions are welcome! Please open an issue or submit a pull request with yo
 
 This project is licensed under the [MIT License](LICENSE).
 ```
+
+### HTMX 4 protocol audit
+
+The connector's complete header/attribute output was checked against the
+[HTMX 4 header reference](https://four.htmx.org/reference/headers/),
+[migration reference](https://four.htmx.org/docs/whats-new-in-htmx-4), and the
+[swap reference](https://four.htmx.org/reference/attributes/hx-swap).
+
+| Definitions | HTMX 4 behavior |
+| --- | --- |
+| `HX-Request`, `HX-Boosted`, `HX-Current-URL`, `HX-History-Restore-Request` | Names unchanged; history restores render the document |
+| `HX-Request-Type` | `full` renders the document; `partial` renders the target |
+| `HX-Target`, `HX-Source` | Browser sends `tagName#id`; target lookup decodes the URI-encoded ID |
+| Request `HX-Trigger`, `HX-Trigger-Name` | Replaced by `HX-Source`; legacy constants remain for HTMX 2 |
+| `HX-Prompt` | Available with the HTMX 4 prompt extension; absent from core |
+| `HX-Location`, `HX-Push-Url`, `HX-Redirect`, `HX-Refresh`, `HX-Replace-Url`, `HX-Reswap`, `HX-Retarget`, `HX-Reselect`, response `HX-Trigger` | Header names unchanged; supported response fields are covered together by a protocol test |
+| `HX-Trigger-After-Swap`, `HX-Trigger-After-Settle` | Omitted by the HTMX 4 connector; retained by HTMX 2 |
+| `hx-get`, `hx-trigger`, `hx-target`, `hx-swap` | Still valid on the request element; async/load, reveal, poll, refresh and custom-event helpers are covered |
+| `hx-ext`, `sse-connect`, `sse-swap` | Legacy only; streams emit `hx-sse:connect`, `hx-target`, `hx-swap` and require the HTMX 4 SSE script |
+| `Swap.FocusScroll()` | `focusScroll` in HTMX 4, `focus-scroll` in HTMX 2 |
+| `Swap.Show()` / `Swap.Scroll()` | HTMX 4 separates direction from quoted `showTarget` / `scrollTarget` |
+
+The attribute constants cover output owned by the interaction helpers, rather
+than every possible template attribute. Application templates must also migrate
+inheritance, renamed attributes, event handlers and extension loading.
+
+HTMX 4 also introduces built-in morph swaps and `outerSync`; typed swap styles
+are available as `SwapInnerMorph`, `SwapOuterMorph`, `SwapOuterSync` and
+`SwapTextContent`. These use the same `NewSwap().Style(...)` builder.
+
+Other new browser features belong in application templates: `hx-action` and
+`hx-method`, body-based `hx-query`, per-element `hx-config`, `hx-ignore`,
+`hx-validate`, status-specific `hx-status:CODE`, explicit inheritance and
+multi-target `<hx-partial>` responses. Existing OOB output remains supported.
+These do not require new connector request/response headers. The rewritten SSE
+integration is covered; WebSockets, streaming multipart responses, reactive
+`hx-live`, download/head/pending/preload and other extensions require their own
+scripts and application endpoints. They are not enabled by `NewHTMX4`.

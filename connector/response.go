@@ -223,6 +223,11 @@ const (
 	SwapAfterEnd    SwapStyle = "afterend"
 	SwapDelete      SwapStyle = "delete"
 	SwapNone        SwapStyle = "none"
+	// Additional built-in HTMX 4 styles. Morph/sync require an extension in HTMX 2.
+	SwapInnerMorph  SwapStyle = "innerMorph"
+	SwapOuterMorph  SwapStyle = "outerMorph"
+	SwapOuterSync   SwapStyle = "outerSync"
+	SwapTextContent SwapStyle = "textContent"
 )
 
 const (
@@ -306,7 +311,11 @@ func (s *Swap) format(htmx4 bool) string {
 		parts = append(parts, joinSwapOption(SwapModifierIgnoreTitle, "", boolString(*s.ignoreTitle)))
 	}
 	if s.focusScroll != nil {
-		parts = append(parts, joinSwapOption(SwapModifierFocusScroll, "", boolString(*s.focusScroll)))
+		modifier := SwapModifierFocusScroll
+		if htmx4 {
+			modifier = "focusScroll"
+		}
+		parts = append(parts, joinSwapOption(modifier, "", boolString(*s.focusScroll)))
 	}
 	for _, option := range s.scrolling {
 		if htmx4 {

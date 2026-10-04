@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestHTMX4RequestProtocol(t *testing.T) {
@@ -101,5 +102,62 @@ func TestHTMX4ResponseAndInteractions(t *testing.T) {
 	builder.Reswap("outerMorph")
 	if got := conn.ResponseHeaders(response)["HX-Reswap"]; got != "outerMorph" {
 		t.Fatalf("raw override = %q", got)
+	}
+}
+
+// Expectations follow the HTMX 4.0 header and attribute references, rather than
+// inheriting expected output from the legacy connector.
+func TestHTMX4CompleteResponseHeaders(t *testing.T) {
+	refresh := true
+	response := Response{Location: "/next", PushURL: "/push", Redirect: "/redirect", Refresh: &refresh, ReplaceURL: "/replace", Reswap: "outerHTML", Retarget: "#next", Reselect: ".selected", Trigger: "saved", TriggerAfterSwap: "legacy-swap", TriggerAfterSettle: "legacy-settle"}
+	want := map[string]string{"HX-Location": "/next", "HX-Push-Url": "/push", "HX-Redirect": "/redirect", "HX-Refresh": "true", "HX-Replace-Url": "/replace", "HX-Reswap": "outerHTML", "HX-Retarget": "#next", "HX-Reselect": ".selected", "HX-Trigger": "saved"}
+	if got := NewHTMX4(nil).ResponseHeaders(response); !reflect.DeepEqual(got, want) {
+		t.Fatalf("headers = %v, want %v", got, want)
+	}
+	if got := NewHTMX4(nil).ResponseHeaders(Response{}); len(got) != 0 {
+		t.Fatalf("empty response emitted headers: %v", got)
+	}
+}
+
+func TestHTMX4InteractionAttributeCatalogue(t *testing.T) {
+	for _, tc := range []struct {
+		kind    InteractionKind
+		trigger string
+	}{
+		{InteractionAsync, "load"}, {InteractionReveal, "revealed"}, {InteractionPoll, "every 3s"}, {InteractionRefresh, "click"}, {InteractionOn, "saved from:body"},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			interaction := Interaction{Kind: tc.kind, ID: "result", URL: "/result", Interval: "3s", Name: "saved", Options: map[string]string{"from": "body"}}
+			want := map[string]string{"hx-get": "/result", "hx-trigger": tc.trigger, "hx-target": "#result", "hx-swap": "innerHTML"}
+			if got := NewHTMX4(nil).InteractionAttrs(interaction); !reflect.DeepEqual(got, want) {
+				t.Fatalf("attributes = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestSwapFocusScrollUsesConnectorProtocol(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		response := Response{}
+		NewResponseBuilder(&response).ReswapWith(NewSwap().Style(SwapOuterHTML).Swap(120 * time.Millisecond).Settle(20 * time.Millisecond).Transition(true).IgnoreTitle(false).FocusScroll(enabled))
+		suffix := boolString(enabled)
+		want4 := "outerHTML swap:120ms settle:20ms transition:true ignoreTitle:false focusScroll:" + suffix
+		want2 := "outerHTML swap:120ms settle:20ms transition:true ignoreTitle:false focus-scroll:" + suffix
+		if got := NewHTMX4(nil).ResponseHeaders(response)["HX-Reswap"]; got != want4 {
+			t.Fatalf("HTMX 4 = %q, want %q", got, want4)
+		}
+		if got := NewHTMX(nil).ResponseHeaders(response)["HX-Reswap"]; got != want2 {
+			t.Fatalf("HTMX 2 = %q, want %q", got, want2)
+		}
+	}
+}
+
+func TestHTMX4NewSwapStyles(t *testing.T) {
+	for style, want := range map[SwapStyle]string{SwapInnerMorph: "innerMorph", SwapOuterMorph: "outerMorph", SwapOuterSync: "outerSync", SwapTextContent: "textContent"} {
+		response := Response{}
+		NewResponseBuilder(&response).ReswapWith(NewSwap().Style(style))
+		if got := NewHTMX4(nil).ResponseHeaders(response)["HX-Reswap"]; got != want {
+			t.Fatalf("style = %q, want %q", got, want)
+		}
 	}
 }
