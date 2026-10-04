@@ -107,11 +107,34 @@ Open http://localhost:8090 to see pages for typed rows, selection partials, acti
 ## Integrations
 Several integrations are available, detailed information can be found in the [INTEGRATIONS.md](INTEGRATIONS.md) file.
 
-- htmx
+- htmx 2 (`connector.NewHTMX`) and htmx 4 (`connector.NewHTMX4`)
 - Turbo
 - Unpoly
 - Partial, for framework-neutral fetch clients and tests
 - SSE writer, for streaming rendered HTML patches
+
+### HTMX 4
+
+Choose `connector.NewHTMX4(nil)` on the root partial. The connector reads
+`HX-Request-Type` and decodes `HX-Target: main#content` into the partial ID
+`content`. Body/select requests and history restoration render the full page.
+Use IDs on fragment targets; the tag name alone cannot identify a partial.
+
+Continue to build responses with `ReswapWith(connector.NewSwap()...)`. The
+response builder snapshots the options, and the selected connector serializes
+scroll/show targets in its own protocol. `NewHTMX` keeps the HTMX 2 syntax;
+`NewHTMX4` emits separate `scrollTarget`/`showTarget` modifiers. Raw `Reswap`
+strings are sent as supplied, so write those in the selected protocol's syntax.
+
+HTMX 4 removed `HX-Trigger-After-Swap` and `HX-Trigger-After-Settle`; its
+connector omits these fields. Use `Trigger` for server events or the browser's
+`htmx:after:swap` / `htmx:after:settle` events when timing matters. Stream
+interactions emit `hx-sse:connect`; load the pinned **hx-sse extension** and send
+unnamed SSE data messages for HTML swaps. Named SSE messages dispatch events.
+
+Browser migration also requires explicit `:inherited` attributes and the new
+fetch-based event context. See the [official migration guide](https://four.htmx.org/docs/whats-new-in-htmx-4).
+
 
 ## Error Output
 `partial.Write` can render an HTML error page when template parsing or execution fails, but only when an error stage is registered. Register `ext/errors` to choose the failure markup. In detailed mode, the page includes the partial ID, template list, request URL, template location, and original error so development and failed htmx requests still return useful output.
