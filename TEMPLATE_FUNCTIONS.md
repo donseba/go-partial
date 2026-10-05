@@ -157,6 +157,22 @@ Arguments:
 - `{{ partial runtime "templates/card.gohtml" .Card }}` renders the path with `.Card` as dot.
 - `{{ partial runtime "templates/card.gohtml" "Title" "Hello" }}` renders the path with a small dot map, so the callee reads `{{ .Title }}`.
 
+A pair whose key names a root the callee declares, such as an `@model`, also binds that root, with its type checked:
+
+```gotemplate
+{{ range .Related }}{{ partial runtime "templates/card.gohtml" "Event" . "Note" "new" }}{{ end }}
+```
+
+```gotemplate
+{{/*
+@model Event github.com/example/app.Event
+*/}}
+
+<article>{{ Event.Title }} {{ .Note }}</article>
+```
+
+The card reads `Event` as a typed root and `Note` from its dot map; the pairs stay in the dot map as well. A value of another type fails the partial. The callee also sees the `SetModel` values of the partials it is rendered in.
+
 For rows and larger fragments, prefer native `template` plus `@dot`, because that gives go-doc the strongest type information. Use `partial` when the nested render should go through go-partial itself.
 
 ## `dict`
