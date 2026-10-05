@@ -13,6 +13,13 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 			child.id = templatePath
 			child.parent = p
 			child.templates = []string{templatePath}
+			// The child inherits p's values through its parent; copies would
+			// match every declaration twice.
+			child.mu.Lock()
+			child.removeContractsLocked(func(existing contractInformation) bool {
+				return existing.Kind == contractRoot
+			})
+			child.mu.Unlock()
 
 			if ok := applyPartialTemplateArgs(state, child, id, args...); !ok {
 				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
@@ -75,7 +82,36 @@ func applyPartialTemplateArgs(state *RenderContext, p *Partial, id string, args 
 		return false
 	}
 	p.SetDot(dot)
+	bindPartialArgs(p, dot)
 	return true
+}
+
+// bindPartialArgs binds the key/value pairs a partial is called with to the
+// typed roots its template declares by those names, so
+// {{partial runtime "card.gohtml" "Event" .}} gives a card that declares
+// "@model Event example.com/app.Event" its Event. The pairs stay in the dot as
+// well.
+func bindPartialArgs(p *Partial, args map[string]any) {
+	contracts, err := p.scanner().RootContracts(p.templates)
+	if err != nil {
+		// Rendering the partial reports the error.
+		return
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for name, value := range args {
+		contract, ok := contracts[name]
+		if !ok {
+			continue
+		}
+		p.contracts = append(p.contracts, contractInformation{
+			Kind:       contractRoot,
+			Annotation: contract.Annotation,
+			Name:       name,
+			Value:      value,
+		})
+	}
 }
 
 func contentFunc(p *Partial, state *RenderContext) func() template.HTML {

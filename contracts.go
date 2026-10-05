@@ -44,8 +44,12 @@ func registerRootContracts(tmpl *template.Template, contracts map[string]templat
 	return nil
 }
 
+// resolveContractValue finds the value for a declared root. bindings run from
+// the root partial to the rendered one; a value bound by name wins, the
+// nearest one first, over values matched by type.
 func resolveContractValue(name string, contract templateutil.RootContract, bindings []contractInformation) (any, error) {
-	for _, binding := range bindings {
+	for i := len(bindings) - 1; i >= 0; i-- {
+		binding := bindings[i]
 		if binding.Kind != "" && binding.Kind != contractRoot {
 			continue
 		}
