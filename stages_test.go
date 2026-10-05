@@ -193,3 +193,51 @@ func TestStageCanHandleRuntimeRenderKind(t *testing.T) {
 }
 
 var _ fs.FS = fstest.MapFS{}
+
+func TestStageFuncResolver(t *testing.T) {
+	fsys := fstest.MapFS{
+		"page.gohtml": &fstest.MapFile{Data: []byte(`{{greet "Ada"}} {{shout "hi"}}`)},
+	}
+
+	var asked []string
+	stage := RenderStageHooks{
+		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			ctx.SetFuncResolver(func(name string) (any, bool) {
+				asked = append(asked, name)
+				switch name {
+				case "greet":
+					return func(name string) string { return "hello " + name }, true
+				case "shout":
+					return func(string) string { return "resolved" }, true
+				}
+				return nil, false
+			})
+			ctx.SetFunc("shout", func(s string) string { return s + "!" })
+			return ctx, nil
+		},
+	}
+
+	for _, useCache := range []bool{true, false} {
+		asked = nil
+		p := New("page.gohtml").
+			SetFileSystem(fsys).
+			UseTemplateCache(useCache).
+			SetFunc(template.FuncMap{
+				"greet": func(string) string { return "stand-in" },
+				"shout": func(string) string { return "stand-in" },
+				"other": func() string { return "unused" },
+			}).
+			Use(stage)
+
+		out, err := Render(context.Background(), p)
+		if err != nil {
+			t.Fatalf("cache %v: Render() error = %v", useCache, err)
+		}
+		if got, want := string(out), "hello Ada hi!"; got != want {
+			t.Fatalf("cache %v: output = %q, want %q", useCache, got, want)
+		}
+		if useCache && !reflect.DeepEqual(asked, []string{"greet"}) {
+			t.Fatalf("cache %v: resolver asked for %v, want only the functions the template calls", useCache, asked)
+		}
+	}
+}

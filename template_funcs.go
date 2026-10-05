@@ -3,7 +3,6 @@ package partial
 import (
 	"fmt"
 	"html/template"
-	"io/fs"
 	"strings"
 )
 
@@ -55,8 +54,7 @@ func partialTemplatePath(p *Partial, name string) (string, bool) {
 		return "", false
 	}
 
-	info, err := fs.Stat(p.getFS(), templatePath)
-	if err != nil || info.IsDir() {
+	if !p.scanner().IsFile(templatePath) {
 		return "", false
 	}
 

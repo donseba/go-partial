@@ -3,11 +3,14 @@ package partial
 import (
 	"context"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"testing/fstest"
 
 	"github.com/donseba/go-partial/connector"
 )
@@ -448,5 +451,73 @@ func testErrorStage(detailed bool) RenderStage {
 
 			return template.HTML(body), nil
 		},
+	}
+}
+
+// countingFS counts the files opened, to show what a render reads.
+type countingFS struct {
+	fs.FS
+	opened atomic.Int64
+}
+
+func (c *countingFS) Open(name string) (fs.File, error) {
+	c.opened.Add(1)
+	return c.FS.Open(name)
+}
+
+func TestCachedRendersReadNoFiles(t *testing.T) {
+	model := `{{/* @model Page github.com/donseba/go-partial.contractPage */}}`
+	files := &countingFS{FS: &inMemoryFS{Files: map[string]string{
+		"layout.gohtml": model + `<title>{{ Page.Title }}</title>{{ content }}`,
+		"page.gohtml":   `<main>{{ range . }}{{ partial runtime "card.gohtml" . }}{{ end }}</main>`,
+		"card.gohtml":   model + `<p>{{ . }} on {{ Page.Title }}</p>`,
+		"menu.gohtml":   `<nav id="menu"{{ oobAttr }}>menu</nav>`,
+	}}}
+	root := NewID("shell", "layout.gohtml").
+		SetFileSystem(files).
+		UseTemplateCache(true).
+		SetModel(contractPage{Title: "Home"})
+
+	render := func() string {
+		// Content and regions are new partials on every render, as an
+		// application builds them per request.
+		page := root.Clone().
+			SetContent(NewID("content", "page.gohtml").UseTemplateCache(true).SetDot([]string{"wheel", "glaze"})).
+			WithOOB(NewID("menu", "menu.gohtml").UseTemplateCache(true).SetAlwaysSwapOOB(true))
+		out, err := Render(context.Background(), page)
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return string(out)
+	}
+
+	first := render()
+	if want := "<title>Home</title><main><p>wheel on Home</p><p>glaze on Home</p></main>"; first != want {
+		t.Fatalf("first render = %q, want %q", first, want)
+	}
+
+	files.opened.Store(0)
+	if second := render(); second != first {
+		t.Fatalf("second render = %q, want %q", second, first)
+	}
+	if opened := files.opened.Load(); opened != 0 {
+		t.Fatalf("a cached render opened %d files, want none", opened)
+	}
+}
+
+func TestMapFileSystemsDoNotShareCachedTemplates(t *testing.T) {
+	render := func(text string) string {
+		files := fstest.MapFS{"page.gohtml": &fstest.MapFile{Data: []byte(text)}}
+		out, err := Render(context.Background(), New("page.gohtml").SetFileSystem(files).UseTemplateCache(true))
+		if err != nil {
+			t.Fatalf("render: %v", err)
+		}
+		return string(out)
+	}
+
+	for _, text := range []string{"first", "second"} {
+		if got := render(text); got != text {
+			t.Fatalf("render = %q, want %q: map file systems must not share cached templates", got, text)
+		}
 	}
 }

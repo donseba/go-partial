@@ -3,7 +3,6 @@ package templateutil
 import (
 	"fmt"
 	"html/template"
-	"io/fs"
 	"regexp"
 	"sort"
 	"strings"
@@ -102,92 +101,6 @@ func DefinedTemplates(name, src string) ([]string, error) {
 	}
 	sort.Strings(names)
 	return names, nil
-}
-
-func RequiredFuncsFromFS(fsys fs.FS, names []string) (map[string]struct{}, error) {
-	found := make(map[string]struct{})
-	for _, name := range names {
-		content, err := fs.ReadFile(fsys, name)
-		if err != nil {
-			return nil, err
-		}
-		funcs, err := RequiredFuncs(name, string(content))
-		if err != nil {
-			return nil, err
-		}
-		for _, fn := range funcs {
-			found[fn] = struct{}{}
-		}
-	}
-	return found, nil
-}
-
-func ReferencedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
-	found := make(map[string]struct{})
-	for _, name := range names {
-		content, err := fs.ReadFile(fsys, name)
-		if err != nil {
-			continue
-		}
-		refs, err := ReferencedTemplates(name, string(content))
-		if err != nil {
-			continue
-		}
-		for _, ref := range refs {
-			found[ref] = struct{}{}
-		}
-	}
-	return found
-}
-
-func DefinedTemplatesFromFS(fsys fs.FS, names []string) map[string]struct{} {
-	found := make(map[string]struct{})
-	for _, name := range names {
-		found[name] = struct{}{}
-		found[PathBase(name)] = struct{}{}
-		for _, alias := range PathAliases(name) {
-			found[alias] = struct{}{}
-		}
-
-		content, err := fs.ReadFile(fsys, name)
-		if err != nil {
-			continue
-		}
-		defined, err := DefinedTemplates(name, string(content))
-		if err != nil {
-			continue
-		}
-		for _, definedName := range defined {
-			found[definedName] = struct{}{}
-		}
-	}
-	return found
-}
-
-func RootContractsFromFS(fsys fs.FS, names []string) (map[string]RootContract, error) {
-	contracts := make(map[string]RootContract)
-	for _, name := range names {
-		content, err := fs.ReadFile(fsys, name)
-		if err != nil {
-			return nil, err
-		}
-		for _, match := range typedRootPattern.FindAllStringSubmatch(contractScanText(string(content)), -1) {
-			annotation := strings.TrimSpace(match[1])
-			if reservedContractAnnotation(annotation) {
-				continue
-			}
-			rootName := strings.TrimSpace(match[2])
-			typeName := NormalizeContractType(strings.TrimSpace(match[3]))
-			if previous, exists := contracts[rootName]; exists && previous.Type != typeName {
-				return nil, fmt.Errorf("@%s %s is declared as both %s and %s", annotation, rootName, previous.Type, typeName)
-			}
-			contracts[rootName] = RootContract{
-				Annotation: annotation,
-				Type:       typeName,
-			}
-		}
-	}
-	return contracts, nil
 }
 
 func NormalizeContractType(typeName string) string {

@@ -625,7 +625,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	}
 }
 
-func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
+func TestProtectedFunctionsDoNotEnterFuncMap(t *testing.T) {
 	svc := newTestBlueprint()
 	svc.SetFunc(template.FuncMap{
 		"partial": func() string {
@@ -636,12 +636,12 @@ func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 		},
 	})
 
-	customFuncs := svc.getCustomFuncMap()
-	if _, ok := customFuncs["partial"]; ok {
-		t.Fatal("protected partial helper should not be stored as a custom function")
+	funcs := svc.getStaticFuncMap()
+	if _, ok := funcs["partial"]; ok {
+		t.Fatal("protected partial helper should not be stored as a function")
 	}
-	if _, ok := customFuncs["label"]; !ok {
-		t.Fatal("allowed label helper should be stored as a custom function")
+	if _, ok := funcs["label"]; !ok {
+		t.Fatal("allowed label helper should be stored as a function")
 	}
 }
 
