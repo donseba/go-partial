@@ -1561,3 +1561,30 @@ func TestSetFunc(t *testing.T) {
 	}
 
 }
+
+func TestTemplateCacheKeepsFileSystemsApart(t *testing.T) {
+	first := &inMemoryFS{Files: map[string]string{"templates/page.gohtml": `first`}}
+	second := &inMemoryFS{Files: map[string]string{"templates/page.gohtml": `second`}}
+
+	content := NewID("content", "templates/page.gohtml").SetFileSystem(first).UseTemplateCache(true)
+	other := content.clone()
+	other.SetFileSystem(second)
+
+	for _, test := range []struct {
+		partial *Partial
+		want    string
+	}{
+		{content, "first"},
+		{other, "second"},
+		{content, "first"},
+	} {
+		out, err := Render(context.Background(), test.partial)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if string(out) != test.want {
+			t.Fatalf("want %q from its own file system, got %q", test.want, out)
+		}
+	}
+}

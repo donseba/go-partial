@@ -13,8 +13,10 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/donseba/go-partial/connector"
 	"github.com/donseba/go-partial/internal/templateutil"
@@ -1404,8 +1406,34 @@ func (p *Partial) generateCacheKey(templates []string, templateFuncSignature str
 		builder.WriteString(";")
 	}
 
-	builder.WriteString("funcs:")
+	builder.WriteString("fs:")
+	builder.WriteString(fileSystemID(p.getFS()))
+	builder.WriteString(";funcs:")
 	builder.WriteString(templateFuncSignature)
 
 	return builder.String()
+}
+
+var (
+	fileSystemIDs  sync.Map
+	nextFileSystem atomic.Uint64
+)
+
+// fileSystemID tells file systems apart in cache keys, so partials that use the
+// same template names from different file systems do not share a cached
+// template. File systems that cannot be map keys fall back to their type name.
+func fileSystemID(fsys fs.FS) (id string) {
+	if fsys == nil {
+		return ""
+	}
+
+	defer func() {
+		if recover() != nil {
+			id = fmt.Sprintf("%T", fsys)
+		}
+	}()
+
+	value, _ := fileSystemIDs.LoadOrStore(fsys, nextFileSystem.Add(1))
+
+	return strconv.FormatUint(value.(uint64), 10)
 }
