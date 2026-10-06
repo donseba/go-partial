@@ -15,6 +15,10 @@ type CachedTemplate struct {
 type Store struct {
 	templates sync.Map
 	mutexes   sync.Map
+	// scans are FileScans and files the paths known to be files, by file
+	// system key and file name; see Scanner.
+	scans sync.Map
+	files sync.Map
 }
 
 func NewStore() *Store {
@@ -59,8 +63,25 @@ func (cached *CachedTemplate) Template(functions template.FuncMap) (*template.Te
 	if cached == nil {
 		return nil, nil, fmt.Errorf("cached template is not configured")
 	}
-	functions = FilterFuncMap(functions, cached.requiredFuncs)
+	return cached.template(FilterFuncMap(functions, cached.requiredFuncs))
+}
 
+// TemplateResolving is Template with the functions the template calls looked
+// up by resolve, rather than filtered from a map of every function.
+func (cached *CachedTemplate) TemplateResolving(resolve func(name string) (any, bool)) (*template.Template, func(), error) {
+	if cached == nil {
+		return nil, nil, fmt.Errorf("cached template is not configured")
+	}
+	functions := make(template.FuncMap, len(cached.requiredFuncs))
+	for name := range cached.requiredFuncs {
+		if fn, ok := resolve(name); ok {
+			functions[name] = fn
+		}
+	}
+	return cached.template(functions)
+}
+
+func (cached *CachedTemplate) template(functions template.FuncMap) (*template.Template, func(), error) {
 	if pooled := cached.pool.Get(); pooled != nil {
 		t, ok := pooled.(*template.Template)
 		if !ok {

@@ -1,5 +1,31 @@
 # go-partial upcoming
 
+## Faster Cached Renders
+
+With the template cache, a render no longer reads template files: each file
+is scanned once per file system for the templates it defines and calls, the
+functions it uses and its `@model` declarations, and `{{ partial }}` paths
+are checked once. Without the cache, files are read on every render as
+before, so edits show.
+
+A partial tree shares its root's template store, so partials built for one
+render, such as regions, reuse earlier parses. A cached template receives only
+the functions it calls instead of a merge of every registered function.
+
+Render stages that offer many functions can use
+`RenderContext.SetFuncResolver`, which is asked only for the names a template
+calls.
+
+## Partial Pairs Bind Declared Models
+
+`{{ partial runtime "card.gohtml" "Event" . }}` also binds the pair to a root
+the card declares by that name, such as `@model Event example.com/app.Event`,
+with its type checked. The pairs stay in the card's dot map.
+
+A partial with its own `SetModel` values can now call `{{ partial }}`; the
+callee no longer sees those values twice and fails with "multiple matching
+values".
+
 ## go-doc Template Function Support
 
 go-partial now publishes optional interaction template helper functions in:

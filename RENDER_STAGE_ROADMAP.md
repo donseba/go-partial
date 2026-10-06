@@ -62,6 +62,10 @@ finalize C -> finalize B -> finalize A
 ## Design Notes
 
 - `RenderContext.Values` is the extension point for exp packages.
+- Render stages add template functions with `RenderContext.SetFunc`, or with
+  `RenderContext.SetFuncResolver` when they offer many functions: a resolver is
+  asked only for the functions the template calls. The names still need
+  stand-ins registered with `Partial.SetFunc` so templates parse.
 - `RenderContext.Data` carries kind-specific payloads such as debug values,
   interaction data, or error data.
 - `RenderContext.Kind` tells generic render stages which task they are handling.

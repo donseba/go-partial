@@ -72,13 +72,6 @@ func (bp *testBlueprint) getStaticFuncMap() template.FuncMap {
 	return bp.root.getStaticFuncMap()
 }
 
-func (bp *testBlueprint) getCustomFuncMap() template.FuncMap {
-	if bp == nil || bp.root == nil {
-		return nil
-	}
-	return bp.root.getCustomFuncMap()
-}
-
 func (bp *testBlueprint) Compose(content *Partial, wrapper *Partial) *Partial {
 	if bp == nil || bp.root == nil {
 		return wrapper.SetContent(content)
@@ -113,6 +106,7 @@ func (bp *testBlueprint) apply(p *Partial) {
 		funcs := maps.Clone(rootFuncs)
 		maps.Copy(funcs, p.staticFuncs)
 		p.staticFuncs = funcs
+		p.funcSet = 0
 	}
 	if len(rootContracts) > 0 {
 		p.contracts = append(rootContracts, p.contracts...)

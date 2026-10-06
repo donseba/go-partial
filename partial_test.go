@@ -131,6 +131,74 @@ func TestSetModelRegistersGoDocModelContractsWithCache(t *testing.T) {
 	}
 }
 
+func TestPartialCalledFromPartialWithModel(t *testing.T) {
+	model := `{{/* @model Page github.com/donseba/go-partial.contractPage */}}`
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": model + `<main>{{ Page.Title }} {{ partial runtime "templates/card.gohtml" "card" }}</main>`,
+		"templates/card.gohtml": model + `<p>{{ . }} of {{ Page.Title }}</p>`,
+	}}
+
+	for _, useCache := range []bool{false, true} {
+		page := NewID("content", "templates/page.gohtml").
+			SetFileSystem(fsys).
+			UseTemplateCache(useCache).
+			SetModel(contractPage{Title: "Home"})
+		out, err := Render(context.Background(), page)
+		if err != nil {
+			t.Fatalf("cache %v: render: %v", useCache, err)
+		}
+		if string(out) != "<main>Home <p>card of Home</p></main>" {
+			t.Fatalf("cache %v: a partial must see its caller's model once, got %q", useCache, out)
+		}
+	}
+}
+
+func TestPartialPairsBindDeclaredModels(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `{{/* @model Page github.com/donseba/go-partial.contractPage */}}` +
+			`<main>{{ range .Related }}{{ partial runtime "templates/card.gohtml" "Card" . "Note" "new" }}{{ end }}</main>`,
+		"templates/card.gohtml": `{{/* @model Card github.com/donseba/go-partial.contractPage */}}` +
+			`<p>{{ Card.Title }} {{ .Note }}</p>`,
+	}}
+
+	for _, useCache := range []bool{false, true} {
+		page := NewID("content", "templates/page.gohtml").
+			SetFileSystem(fsys).
+			UseTemplateCache(useCache).
+			SetModel(contractPage{Title: "Home"}).
+			SetDot(map[string]any{"Related": []contractPage{{Title: "Wheel"}, {Title: "Glaze"}}})
+		out, err := Render(context.Background(), page)
+		if err != nil {
+			t.Fatalf("cache %v: render: %v", useCache, err)
+		}
+		if string(out) != "<main><p>Wheel new</p><p>Glaze new</p></main>" {
+			t.Fatalf("cache %v: pairs should bind the card's Card and stay in its dot, got %q", useCache, out)
+		}
+	}
+}
+
+func TestPartialPairsCheckDeclaredModelTypes(t *testing.T) {
+	fsys := &inMemoryFS{Files: map[string]string{
+		"templates/page.gohtml": `<main>{{ partial runtime "templates/card.gohtml" "Card" "not a page" }}</main>`,
+		"templates/card.gohtml": `{{/* @model Card github.com/donseba/go-partial.contractPage */}}<p>{{ Card.Title }}</p>`,
+	}}
+
+	var failures []Event
+	page := NewID("content", "templates/page.gohtml").
+		SetFileSystem(fsys).
+		SetEvents(EventSinkFunc(func(_ *RenderContext, event Event) {
+			if event.Kind == EventRenderError {
+				failures = append(failures, event)
+			}
+		}))
+	if _, err := Render(context.Background(), page); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if len(failures) == 0 || !strings.Contains(failures[0].Error.Error(), "@model Card expects github.com/donseba/go-partial.contractPage, got string") {
+		t.Fatalf("a pair of the wrong type should fail the partial, got %v", failures)
+	}
+}
+
 func TestSetModelRejectsProtectedHelperCollision(t *testing.T) {
 	fsys := &inMemoryFS{Files: map[string]string{
 		"templates/page.gohtml": `{{/* @model content github.com/donseba/go-partial.contractPage */}}{{ content.Title }}`,
@@ -625,7 +693,7 @@ func TestTemplateCacheInheritsParentCustomFunctions(t *testing.T) {
 	}
 }
 
-func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
+func TestProtectedFunctionsDoNotEnterFuncMap(t *testing.T) {
 	svc := newTestBlueprint()
 	svc.SetFunc(template.FuncMap{
 		"partial": func() string {
@@ -636,12 +704,12 @@ func TestProtectedFunctionsDoNotEnterCustomFuncMap(t *testing.T) {
 		},
 	})
 
-	customFuncs := svc.getCustomFuncMap()
-	if _, ok := customFuncs["partial"]; ok {
-		t.Fatal("protected partial helper should not be stored as a custom function")
+	funcs := svc.getStaticFuncMap()
+	if _, ok := funcs["partial"]; ok {
+		t.Fatal("protected partial helper should not be stored as a function")
 	}
-	if _, ok := customFuncs["label"]; !ok {
-		t.Fatal("allowed label helper should be stored as a custom function")
+	if _, ok := funcs["label"]; !ok {
+		t.Fatal("allowed label helper should be stored as a function")
 	}
 }
 

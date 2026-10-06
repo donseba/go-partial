@@ -132,6 +132,55 @@ func (ctx *RenderContext) SetFunc(name string, fn any) {
 	ctx.Funcs[name] = fn
 }
 
+// SetFuncResolver gives templates functions that are looked up by name, only
+// for the functions a template calls. It suits stages that offer many
+// functions, of which a template calls a few. Functions set with SetFunc come
+// first; a later resolver is asked before an earlier one. As with SetFunc, the
+// names must be known when templates are parsed: register stand-ins for them
+// with Partial.SetFunc.
+func (ctx *RenderContext) SetFuncResolver(resolve func(name string) (fn any, ok bool)) {
+	if ctx == nil || resolve == nil {
+		return
+	}
+	ctx.funcResolvers = append(ctx.funcResolvers, resolve)
+}
+
+func (ctx *RenderContext) hasFuncResolvers() bool {
+	return ctx != nil && len(ctx.funcResolvers) > 0
+}
+
+func (ctx *RenderContext) resolveFunc(name string) (any, bool) {
+	if ctx == nil {
+		return nil, false
+	}
+	for i := len(ctx.funcResolvers) - 1; i >= 0; i-- {
+		if fn, ok := ctx.funcResolvers[i](name); ok && fn != nil {
+			return fn, true
+		}
+	}
+	return nil, false
+}
+
+// resolveFuncs puts the resolvers' functions into funcs, a map of every
+// function, for renders without the template cache. go-partial's own
+// helpers and functions set with SetFunc keep precedence.
+func (ctx *RenderContext) resolveFuncs(funcs template.FuncMap) {
+	if !ctx.hasFuncResolvers() {
+		return
+	}
+	for name := range funcs {
+		if _, core := coreFunctionNames[name]; core {
+			continue
+		}
+		if _, set := ctx.Funcs[name]; set {
+			continue
+		}
+		if fn, ok := ctx.resolveFunc(name); ok {
+			funcs[name] = fn
+		}
+	}
+}
+
 func newRenderContext(ctx context.Context, p *Partial, r *http.Request, kind RenderKind) *RenderContext {
 	if ctx == nil {
 		if r != nil {

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,17 +33,20 @@ var (
 type (
 	// Partial stores reusable template, data, and child-tree configuration.
 	Partial struct {
-		id              string
-		parent          *Partial
-		contentID       string
-		renderOOB       bool
-		alwaysSwapOOB   bool
-		fs              fs.FS
-		fsSet           bool
-		connector       connector.Connector
-		useCache        bool
-		templates       []string
-		staticFuncs     template.FuncMap
+		id            string
+		parent        *Partial
+		contentID     string
+		renderOOB     bool
+		alwaysSwapOOB bool
+		fs            fs.FS
+		fsSet         bool
+		connector     connector.Connector
+		useCache      bool
+		templates     []string
+		staticFuncs   template.FuncMap
+		// funcSet identifies the names of staticFuncs for cache keys; zero
+		// until computed, reset when staticFuncs change. See funcSets.
+		funcSet         uint64
 		basePath        string
 		contracts       []contractInformation
 		extensions      map[any]any
@@ -73,6 +77,9 @@ type (
 		Response *RenderResponse
 		Funcs    template.FuncMap
 		Events   EventSink
+
+		// funcResolvers look up functions by name; see SetFuncResolver.
+		funcResolvers []func(name string) (any, bool)
 	}
 
 	contractKind string
@@ -98,7 +105,6 @@ type (
 const (
 	contractRoot contractKind = "root"
 	contractDot  contractKind = "dot"
-	contractFunc contractKind = "func"
 )
 
 // New creates a root partial with the default ID "root".
@@ -599,29 +605,35 @@ func (p *Partial) getStaticFuncMap() template.FuncMap {
 	return maps.Clone(p.staticFuncs)
 }
 
-func (p *Partial) getCustomFuncMap() template.FuncMap {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	funcs := p.contractFuncMapLocked()
-	if p.parent != nil {
-		parentFuncs := p.parent.getCustomFuncMap()
-		maps.Copy(parentFuncs, funcs)
-		return parentFuncs
+// lookupFunc returns the function registered as name on the partial or,
+// failing that, on its nearest ancestor.
+func (p *Partial) lookupFunc(name string) (any, bool) {
+	for current := p; current != nil; {
+		current.mu.RLock()
+		fn, ok := current.staticFuncs[name]
+		parent := current.parent
+		current.mu.RUnlock()
+		if ok {
+			return fn, true
+		}
+		current = parent
 	}
-
-	return funcs
+	return nil, false
 }
 
-func (p *Partial) contractFuncMapLocked() template.FuncMap {
-	funcs := make(template.FuncMap)
-	for _, contract := range p.contracts {
-		if contract.Kind != contractFunc || contract.Name == "" || contract.Value == nil {
-			continue
+// hasFuncs reports whether the partial or an ancestor registered functions.
+func (p *Partial) hasFuncs() bool {
+	for current := p; current != nil; {
+		current.mu.RLock()
+		count := len(current.staticFuncs)
+		parent := current.parent
+		current.mu.RUnlock()
+		if count > 0 {
+			return true
 		}
-		funcs[contract.Name] = contract.Value
+		current = parent
 	}
-	return funcs
+	return false
 }
 
 func (p *Partial) setFuncMapLocked(funcMap template.FuncMap) {
@@ -631,13 +643,7 @@ func (p *Partial) setFuncMapLocked(funcMap template.FuncMap) {
 		}
 
 		p.staticFuncs[name] = fn
-		p.upsertContractLocked(contractInformation{
-			Kind:  contractFunc,
-			Name:  name,
-			Value: fn,
-		}, func(existing contractInformation) bool {
-			return existing.Kind == contractFunc && existing.Name == name
-		})
+		p.funcSet = 0
 	}
 }
 
@@ -665,19 +671,37 @@ func (p *Partial) getDotContract() (any, bool) {
 	return nil, false
 }
 
-func (p *Partial) getFunctionSignature() string {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+// getFuncSet identifies the names of the functions the partial and its
+// ancestors registered, for template cache keys.
+func (p *Partial) getFuncSet() uint64 {
+	own := p.ownFuncSet()
 
-	signature := templateFuncSignature(p.staticFuncs)
-	if p.parent != nil {
-		signature = templateutil.MergeFunctionSignatures(p.parent.getFunctionSignature(), signature)
+	p.mu.RLock()
+	parent := p.parent
+	p.mu.RUnlock()
+
+	if parent == nil {
+		return own
 	}
-	return signature
+	return registeredFuncSets.merge(parent.getFuncSet(), own)
 }
 
-func (p *Partial) getHasCustomFunctions() bool {
-	return len(p.getCustomFuncMap()) > 0
+// ownFuncSet identifies the names of the partial's own functions, computed
+// once until they change.
+func (p *Partial) ownFuncSet() uint64 {
+	p.mu.RLock()
+	set := p.funcSet
+	p.mu.RUnlock()
+	if set != 0 {
+		return set
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.funcSet == 0 {
+		p.funcSet = registeredFuncSets.intern(templateFuncSignature(p.staticFuncs))
+	}
+	return p.funcSet
 }
 
 func (p *Partial) getContracts() []contractInformation {
@@ -1116,16 +1140,17 @@ func renderTemplate(state *RenderContext) (template.HTML, error) {
 
 	dot, hasDot := p.getDotContract()
 	renderTemplates := p.templateTree()
-	cacheKey := p.generateCacheKey(renderTemplates, p.getFunctionSignature())
+	cacheKey := p.generateCacheKey(renderTemplates, p.getFuncSet())
 	var funcs template.FuncMap
 	if p.useCache {
 		funcs = p.getRequestFuncMap(state)
 	} else {
 		funcs = p.getStaticFuncMap()
 		p.addRequestFuncs(funcs, state)
+		state.resolveFuncs(funcs)
 	}
 
-	tmpl, releaseTemplate, err := p.getTemplateForRender(cacheKey, funcs, p.getHasCustomFunctions(), !p.useCache, renderTemplates)
+	tmpl, releaseTemplate, err := p.getTemplateForRender(state, cacheKey, funcs, p.hasFuncs() || state.hasFuncResolvers(), !p.useCache, renderTemplates)
 	if err != nil {
 		state.EmitForPartial(p, Event{
 			Kind:    EventTemplateParseError,
@@ -1205,10 +1230,10 @@ func renderAllAncestorOOBChildren(ctx context.Context, r *http.Request, p *Parti
 	return out, nil
 }
 
-func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool, renderTemplates []string) (*template.Template, func(), error) {
+func (p *Partial) getTemplateForRender(state *RenderContext, cacheKey string, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool, renderTemplates []string) (*template.Template, func(), error) {
 	store := p.getTemplateStore()
 	if entry, cached := store.Load(cacheKey); cached && p.useCache {
-		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
+		return p.templateFromCacheEntry(state, entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
 	mu := store.Mutex(cacheKey)
@@ -1217,7 +1242,7 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 
 	// Double-check after acquiring lock
 	if entry, cached := store.Load(cacheKey); cached && p.useCache {
-		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
+		return p.templateFromCacheEntry(state, entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
 	functions := funcs
@@ -1229,7 +1254,7 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 		parseFuncs = templateutil.MergeFuncMaps(p.getStaticFuncMap(), placeholderRequestFuncMap())
 	}
 	t := template.New(path.Base(p.templates[0])).Funcs(parseFuncs)
-	contracts, err := templateutil.RootContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := p.scanner().RootContracts(renderTemplates)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error scanning template contracts: %w", err)
 	}
@@ -1252,13 +1277,13 @@ func (p *Partial) getTemplateForRender(cacheKey string, funcs template.FuncMap, 
 	}
 
 	if p.useCache {
-		requiredFuncs, err := templateutil.RequiredFuncsFromFS(p.getFS(), renderTemplates)
+		requiredFuncs, err := p.scanner().RequiredFuncs(renderTemplates)
 		if err != nil {
 			return nil, nil, fmt.Errorf("error scanning template requirements: %w", err)
 		}
 		entry := templateutil.NewCachedTemplate(tmpl, requiredFuncs)
 		store.Store(cacheKey, entry)
-		return p.templateFromCacheEntry(entry, funcs, applyFullFuncs, funcsAreFull)
+		return p.templateFromCacheEntry(state, entry, funcs, applyFullFuncs, funcsAreFull)
 	}
 
 	return tmpl, nil, nil
@@ -1268,7 +1293,7 @@ func (p *Partial) registerContractsForExecution(tmpl *template.Template, renderT
 	if tmpl == nil {
 		return nil
 	}
-	contracts, err := templateutil.RootContractsFromFS(p.getFS(), renderTemplates)
+	contracts, err := p.scanner().RootContracts(renderTemplates)
 	if err != nil {
 		return fmt.Errorf("error scanning template contracts: %w", err)
 	}
@@ -1300,7 +1325,7 @@ func (p *Partial) collectTemplateTree(seen map[string]struct{}, refs map[string]
 		seen[name] = struct{}{}
 		templates = append(templates, name)
 	}
-	maps.Copy(refs, templateutil.ReferencedTemplatesFromFS(p.getFS(), p.templates))
+	maps.Copy(refs, p.scanner().ReferencedTemplates(p.templates))
 
 	p.mu.RLock()
 	children := make([]*Partial, 0, len(p.children))
@@ -1328,7 +1353,7 @@ func (p *Partial) matchesTemplateReference(refs map[string]struct{}) bool {
 		return false
 	}
 
-	defined := templateutil.DefinedTemplatesFromFS(p.getFS(), p.templates)
+	defined := p.scanner().DefinedTemplates(p.templates)
 	for name := range defined {
 		if _, ok := refs[name]; ok {
 			return true
@@ -1337,27 +1362,111 @@ func (p *Partial) matchesTemplateReference(refs map[string]struct{}) bool {
 	return false
 }
 
-func (p *Partial) templateFromCacheEntry(entry *templateutil.CachedTemplate, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
-	functions := funcs
-	if applyFullFuncs && !funcsAreFull {
-		functions = templateutil.MergeFuncMaps(p.getCustomFuncMap(), funcs)
+// templateFromCacheEntry gives a cached template the functions it calls:
+// funcs, the render's own, then those of the render stages' resolvers, and
+// else the partial's registered functions, which may differ from those of
+// the partial that parsed it.
+func (p *Partial) templateFromCacheEntry(state *RenderContext, entry *templateutil.CachedTemplate, funcs template.FuncMap, applyFullFuncs bool, funcsAreFull bool) (*template.Template, func(), error) {
+	if !applyFullFuncs || funcsAreFull {
+		return entry.Template(funcs)
 	}
-	return entry.Template(functions)
+	return entry.TemplateResolving(func(name string) (any, bool) {
+		if fn, ok := funcs[name]; ok {
+			return fn, true
+		}
+		if fn, ok := state.resolveFunc(name); ok {
+			return fn, true
+		}
+		return p.lookupFunc(name)
+	})
+}
+
+// funcSets numbers the function-name signatures of partials, so cache keys
+// stay short and a render merges two numbers instead of two name lists.
+// Signatures are never forgotten: an application has a few function sets.
+type funcSets struct {
+	mu     sync.RWMutex
+	ids    map[string]uint64
+	names  []string
+	merged map[[2]uint64]uint64
+}
+
+var registeredFuncSets = &funcSets{
+	ids:    map[string]uint64{},
+	names:  []string{""},
+	merged: map[[2]uint64]uint64{},
+}
+
+func (sets *funcSets) intern(signature string) uint64 {
+	sets.mu.RLock()
+	id, ok := sets.ids[signature]
+	sets.mu.RUnlock()
+	if ok {
+		return id
+	}
+
+	sets.mu.Lock()
+	defer sets.mu.Unlock()
+	if id, ok := sets.ids[signature]; ok {
+		return id
+	}
+	id = uint64(len(sets.names))
+	sets.ids[signature] = id
+	sets.names = append(sets.names, signature)
+	return id
+}
+
+// merge identifies the union of the two sets.
+func (sets *funcSets) merge(parent, own uint64) uint64 {
+	if parent == own {
+		return parent
+	}
+
+	pair := [2]uint64{parent, own}
+	sets.mu.RLock()
+	id, ok := sets.merged[pair]
+	parentNames, ownNames := sets.names[parent], sets.names[own]
+	sets.mu.RUnlock()
+	if ok {
+		return id
+	}
+
+	id = sets.intern(templateutil.MergeFunctionSignatures(parentNames, ownNames))
+	sets.mu.Lock()
+	sets.merged[pair] = id
+	sets.mu.Unlock()
+	return id
 }
 
 func templateFuncSignature(funcs template.FuncMap) string {
 	return templateutil.MergeFunctionSignatures(templateutil.FunctionNameSignature(funcs), templateutil.FunctionNameSignatureFromSet(coreFunctionNames))
 }
 
+// getTemplateStore returns the store of the tree's root, so partials created
+// for one render, such as regions, share the parses and scans of the tree
+// they render in. Cache keys tell file systems and function sets apart.
 func (p *Partial) getTemplateStore() *templateutil.Store {
-	if p.templateCache != nil {
-		return p.templateCache
-	}
 	if p.parent != nil {
 		return p.parent.getTemplateStore()
 	}
-	p.templateCache = templateutil.NewStore()
+	if p.templateCache == nil {
+		p.templateCache = templateutil.NewStore()
+	}
 	return p.templateCache
+}
+
+// scanner reads the partial's template files. With the template cache, each
+// file is scanned once per file system; without, on every render, so edits
+// show.
+func (p *Partial) scanner() templateutil.Scanner {
+	fsys := p.getFS()
+	key := ""
+	if p.useCache {
+		if id, unique := fileSystemKey(fsys); unique {
+			key = id
+		}
+	}
+	return p.getTemplateStore().Scanner(fsys, key)
 }
 
 func (p *Partial) clone() *Partial {
@@ -1376,6 +1485,7 @@ func (p *Partial) clone() *Partial {
 		useCache:        p.useCache,
 		templates:       slices.Clone(p.templates),
 		staticFuncs:     maps.Clone(p.staticFuncs),
+		funcSet:         p.funcSet,
 		basePath:        p.basePath,
 		contracts:       slices.Clone(p.contracts),
 		extensions:      maps.Clone(p.extensions),
@@ -1398,7 +1508,7 @@ func (p *Partial) clone() *Partial {
 }
 
 // Generate a hash of the template paths and available function names to include in the cache key.
-func (p *Partial) generateCacheKey(templates []string, templateFuncSignature string) string {
+func (p *Partial) generateCacheKey(templates []string, funcSet uint64) string {
 	var builder strings.Builder
 
 	for _, tmpl := range templates {
@@ -1409,7 +1519,7 @@ func (p *Partial) generateCacheKey(templates []string, templateFuncSignature str
 	builder.WriteString("fs:")
 	builder.WriteString(fileSystemID(p.getFS()))
 	builder.WriteString(";funcs:")
-	builder.WriteString(templateFuncSignature)
+	builder.WriteString(strconv.FormatUint(funcSet, 10))
 
 	return builder.String()
 }
@@ -1419,21 +1529,44 @@ var (
 	nextFileSystem atomic.Uint64
 )
 
-// fileSystemID tells file systems apart in cache keys, so partials that use the
-// same template names from different file systems do not share a cached
-// template. File systems that cannot be map keys fall back to their type name.
-func fileSystemID(fsys fs.FS) (id string) {
+// fileSystemID tells file systems apart in cache keys; see fileSystemKey.
+func fileSystemID(fsys fs.FS) string {
+	id, _ := fileSystemKey(fsys)
+	return id
+}
+
+// mapFileSystem identifies a file system that is a map, such as fstest.MapFS,
+// and keeps it, so its address is not reused by another one.
+type mapFileSystem struct {
+	pointer uintptr
+}
+
+type fileSystemEntry struct {
+	id   string
+	fsys fs.FS
+}
+
+// fileSystemKey tells file systems apart in cache keys, so partials that use
+// the same template names from different file systems share neither cached
+// templates nor scans. Comparable file systems are told apart by value, maps
+// by identity. Other file systems fall back to their type name, which is not
+// unique: unique reports whether id is.
+func fileSystemKey(fsys fs.FS) (id string, unique bool) {
 	if fsys == nil {
-		return ""
+		return "", false
 	}
 
-	defer func() {
-		if recover() != nil {
-			id = fmt.Sprintf("%T", fsys)
+	key := any(fsys)
+	value := reflect.ValueOf(fsys)
+	if !value.Comparable() {
+		if value.Kind() != reflect.Map {
+			return fmt.Sprintf("%T", fsys), false
 		}
-	}()
+		key = mapFileSystem{pointer: value.Pointer()}
+	}
 
-	value, _ := fileSystemIDs.LoadOrStore(fsys, nextFileSystem.Add(1))
+	entry := fileSystemEntry{id: strconv.FormatUint(nextFileSystem.Add(1), 10), fsys: fsys}
+	stored, _ := fileSystemIDs.LoadOrStore(key, entry)
 
-	return strconv.FormatUint(value.(uint64), 10)
+	return stored.(fileSystemEntry).id, true
 }
