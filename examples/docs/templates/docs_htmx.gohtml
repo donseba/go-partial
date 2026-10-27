@@ -4,6 +4,8 @@
     <h1 class="max-w-4xl text-5xl font-extrabold leading-tight text-slate-50">HTMX integration</h1>
     <p class="leading-7 text-slate-400 max-w-4xl text-lg leading-8 text-slate-300">The HTMX connector reads request headers and lets go-partial render the requested target instead of the full page.</p>
 
+    <p class="leading-7 text-slate-400">This site runs htmx 4 with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewHTMX4(nil)</code>, which reads htmx 4's <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Target: main#content</code> as the partial ID <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">content</code> and renders the whole page for <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">HX-Request-Type: full</code>. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">connector.NewHTMX(nil)</code> is the connector for htmx 2.</p>
+
     <h2 class="text-xl font-bold text-slate-50">Targeted navigation</h2>
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">&lt;a href="/docs/rendering"
    hx-get="/docs/rendering"

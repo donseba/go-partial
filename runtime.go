@@ -128,6 +128,18 @@ func (r *Runtime) RenderPartialWithFallback(p *Partial) (template.HTML, error) {
 	return fallback, nil
 }
 
+// CheckContracts reports whether p could render here, as a child of the
+// active partial: with the models and contract values of the tree it would
+// render in. See Partial.CheckContracts.
+func (r *Runtime) CheckContracts(p *Partial) error {
+	child, err := r.preparePartial(p)
+	if err != nil {
+		return err
+	}
+
+	return child.CheckContracts()
+}
+
 // RenderWith renders a non-template task through the active render stage chain.
 func (r *Runtime) RenderWith(kind RenderKind, name string, data any, terminal RenderNext) (template.HTML, error) {
 	if r == nil || r.partial == nil || r.state == nil {
@@ -153,7 +165,7 @@ func (r *Runtime) preparePartial(p *Partial) (*Partial, error) {
 	if p == nil {
 		return nil, fmt.Errorf("partial is not initialized")
 	}
-	child := p.clone()
+	child := p.renderCopy()
 	child.parent = r.partial
 	return child, nil
 }

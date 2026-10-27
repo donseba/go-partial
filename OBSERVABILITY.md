@@ -8,7 +8,8 @@ There are two separate observability paths:
 - `exp/metrics` measures render work: duration, size, request IDs, trace IDs,
   slots, partial labels, and render tree shape.
 - `partial.Event` records diagnostic facts: render lifecycle, failures, missing
-  templates, skipped protected functions, target misses, and extension signals.
+  templates, functions templates never call, target misses and fallbacks, and
+  extension signals.
 
 The showcase keeps these separate: `/metrics` shows render measurements, while
 `/logger` shows diagnostic events.
@@ -241,10 +242,13 @@ without coupling core to any backend.
 | `render.error` | `error` | Rendering failed. Includes the error. |
 | `render.write_error` | `error` | Writing the render response failed. |
 | `render.oob_error` | `error` | Rendering an out-of-band child failed. |
-| `template.missing` | `warn` | A template helper referenced a missing template. |
+| `template.missing` | `warn`, `error` | A template the tree or a helper asks for is missing (`warn`), or a partial has no templates (`error`). |
 | `template.parse_error` | `error` | Template parsing or cache lookup failed. |
 | `template.execute_error` | `error` | Template execution failed. |
-| `func.protected` | `warn` | A user function tried to overwrite a protected helper. |
+| `func.protected` | `warn` | `SetFunc` was given a function templates never call: named like a go-partial helper, or like a function a render stage gives templates; or `Use` added a stage that replaces a registered function. Includes `function`. |
+| `ext.errors.template_failed` | `warn` | A custom error template of `ext/errors` failed; the built-in markup answered. |
+| `ext.logger.template` | `info` | A template called `{{ logger }}` of `ext/logger`; its key/value pairs are the fields. |
 | `content.missing` | `warn` | `content` was called without a configured content child. |
-| `target.missing` | `warn` | A requested target could not be resolved. |
+| `target.missing` | `warn`, `info` | A requested target could not be resolved (`warn`). At `info`, a standalone slot of `exp/slots` with the `CheckContracts()` option cannot render here, so the request is treated as one for an unknown target. Includes `target`. |
+| `target.fallback` | `info` | The target fallback (`SetTargetFallback`) answered a request for a target that could not be resolved. Includes `target` and `fallback`. |
 | `contract.invalid` | `warn` | Template contract data or helper arguments were invalid. |

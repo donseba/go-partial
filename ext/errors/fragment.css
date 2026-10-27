@@ -1,0 +1,36 @@
+/* go-partial ext/errors: the built-in error fragment. */
+.go-partial-error {
+  background: #fff;
+  border: 1px solid #d8d5ca;
+  border-left: 4px solid #8a4b12;
+  border-radius: 8px;
+  padding: 16px;
+  color: #252522;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.go-partial-error__title {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.go-partial-error__message {
+  margin: 0 0 12px;
+  color: #55524a;
+}
+
+.go-partial-error__details {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+
+.go-partial-error__details dt {
+  font-weight: 700;
+}
+
+.go-partial-error__details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

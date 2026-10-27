@@ -85,7 +85,7 @@ type EventSinkFunc func(*RenderContext, Event)
 Core also exposes a small fanout helper:
 
 ```go
-func FanoutEvents(sinks ...EventSink) EventSink
+func FanoutEvents(sinks ...EventSink) FanoutEventSink
 ```
 
 ## Emission
@@ -125,22 +125,19 @@ render.write_error
 render.oob_error
 template.missing
 template.parse_error
+template.execute_error
 func.protected
 content.missing
 target.missing
+target.fallback
+contract.invalid
 ```
 
-Extensions should namespace their events:
+Extensions should namespace their events, as those of go-partial do:
 
 ```text
-ext.debug.render
-ext.errors.render
-exp.selection.resolve
-exp.target.resolve
-exp.actions.resolve
-exp.slots.render
-exp.metrics.record
-exp.sse.patch
+ext.errors.template_failed
+ext.logger.template
 ```
 
 ## Logger

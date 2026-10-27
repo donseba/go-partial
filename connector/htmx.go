@@ -44,6 +44,7 @@ const (
 	HTMXAttrTrigger = "hx-trigger"
 	HTMXAttrTarget  = "hx-target"
 	HTMXAttrSwap    = "hx-swap"
+	HTMXAttrSelect  = "hx-select"
 	// HTMX 2 SSE extension attributes. HTMX 4 uses HTMX4AttrSSEConnect.
 	HTMXAttrSSEConnect = "sse-connect"
 	HTMXAttrSSESwap    = "sse-swap"
@@ -67,9 +68,9 @@ func (h *HTMX) RenderPartial(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	hxRequest := r.Header.Get(h.requestHeader)
-	hxBoosted := r.Header.Get(h.boostedHeader)
-	hxHistoryRestoreRequest := r.Header.Get(h.historyRestoreRequestHeader)
+	hxRequest := headerValue(r.Header, h.requestHeader)
+	hxBoosted := headerValue(r.Header, h.boostedHeader)
+	hxHistoryRestoreRequest := headerValue(r.Header, h.historyRestoreRequestHeader)
 
 	return (hxRequest == "true" || hxBoosted == "true") && hxHistoryRestoreRequest != "true"
 }
@@ -137,6 +138,10 @@ func (h *HTMX) InteractionAttrs(interaction Interaction) map[string]string {
 		attrs[HTMXAttrTrigger] = trigger
 		attrs[HTMXAttrTarget] = target
 		attrs[HTMXAttrSwap] = swap
+	case InteractionSubmit:
+		addHTMXSubmit(attrs, interaction, target, swap)
+	case InteractionLive:
+		addHTMXLive(attrs, interaction, target, swap)
 	case InteractionOn:
 		trigger := interaction.Trigger
 		if trigger == "" {
@@ -156,5 +161,82 @@ func (h *HTMX) InteractionAttrs(interaction Interaction) map[string]string {
 		attrs[HTMXAttrSwap] = swap
 	}
 
-	return attrs
+	addHTMXRequestOptions(attrs, interaction)
+
+	return withInteractionAttrs(attrs, interaction)
+}
+
+// addHTMXSubmit adds the htmx attributes of a submit interaction: a request
+// with its method, hx-post by default, swapped into target.
+func addHTMXSubmit(attrs map[string]string, interaction Interaction, target, swap string) {
+	attrs[htmxMethodAttr(interaction.Options[OptionMethod])] = interaction.URL
+	attrs[HTMXAttrTarget] = target
+	attrs[HTMXAttrSwap] = swap
+	setAttr(attrs, HTMXAttrTrigger, interaction.Trigger)
+}
+
+// addHTMXLive adds the htmx attributes of a live interaction: a request as
+// the user types, after a pause, swapped into target.
+func addHTMXLive(attrs map[string]string, interaction Interaction, target, swap string) {
+	trigger := interaction.Trigger
+	if trigger == "" {
+		trigger = "input changed delay:" + liveDelay(interaction) + ", search"
+	}
+
+	attrs[HTMXAttrGet] = interaction.URL
+	attrs[HTMXAttrTrigger] = trigger
+	attrs[HTMXAttrTarget] = target
+	attrs[HTMXAttrSwap] = swap
+}
+
+// addHTMXRequestOptions adds the options of an interaction that requests,
+// such as its hx-select and hx-include, to its htmx attributes.
+func addHTMXRequestOptions(attrs map[string]string, interaction Interaction) {
+	if !requests(attrs) {
+		return
+	}
+
+	setAttr(attrs, HTMXAttrSelect, interaction.Select)
+	setAttr(attrs, "hx-include", interaction.Options[OptionInclude])
+	setAttr(attrs, "hx-push-url", interaction.Options[OptionPushURL])
+	setAttr(attrs, "hx-replace-url", interaction.Options[OptionReplaceURL])
+}
+
+// htmxMethods are the request attributes of htmx, by method.
+var htmxMethods = map[string]string{
+	"get":    HTMXAttrGet,
+	"post":   "hx-post",
+	"put":    "hx-put",
+	"patch":  "hx-patch",
+	"delete": "hx-delete",
+}
+
+// htmxMethodAttr is the htmx attribute that requests with method; hx-post
+// for an empty or unknown one.
+func htmxMethodAttr(method string) string {
+	if attr, ok := htmxMethods[strings.ToLower(strings.TrimSpace(method))]; ok {
+		return attr
+	}
+
+	return "hx-post"
+}
+
+// requests reports whether the htmx attributes make a request.
+func requests(attrs map[string]string) bool {
+	for _, attr := range htmxMethods {
+		if attrs[attr] != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// liveDelay is the pause in typing a live interaction waits for.
+func liveDelay(interaction Interaction) string {
+	if delay := strings.TrimSpace(interaction.Options[OptionDelay]); delay != "" {
+		return delay
+	}
+
+	return "300ms"
 }

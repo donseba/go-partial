@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"reflect"
 	"time"
 
 	partial "github.com/donseba/go-partial"
@@ -16,6 +17,10 @@ const DefaultTokenKey = "X-CSRF-Token"
 var tokenContextKey = contextKey{}
 
 type contextKey struct{}
+
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[contextKey]().PkgPath()
 
 // Token describes the CSRF token exposed to templates.
 type Token interface {
@@ -47,12 +52,20 @@ func CSRF(ctx ...*partial.RenderContext) Token {
 	return FromContext(ctx[0].Context)
 }
 
-// Stage installs the csrf template helper from the render context.
+// Stage gives templates the csrf helper from the render context. It is made
+// only for the templates that call it.
 func Stage() partial.RenderStage {
 	return partial.RenderStageHooks{
-		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
-			ctx.SetFunc("csrf", func() Token { return CSRF(ctx) })
-			return ctx, nil
+		Package:   packagePath,
+		FuncNames: []string{"csrf"},
+		ResolveFunc: func(ctx *partial.RenderContext, name string) (any, bool) {
+			if name != "csrf" {
+				return nil, false
+			}
+
+			return func() Token {
+				return CSRF(ctx)
+			}, true
 		},
 	}
 }

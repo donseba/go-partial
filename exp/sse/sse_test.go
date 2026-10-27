@@ -128,3 +128,66 @@ func TestWriterMultilineData(t *testing.T) {
 		t.Fatalf("expected %q, got %q", expected, rec.Body.String())
 	}
 }
+
+func TestWriterPatchPartialRendersUnderTheParent(t *testing.T) {
+	fsys := fstest.MapFS{
+		"notice.gohtml": &fstest.MapFile{Data: []byte(`<div>{{ shout .Message }}</div>`)},
+	}
+
+	root := partial.New().
+		SetFileSystem(fsys).
+		SetFunc(template.FuncMap{"shout": strings.ToUpper})
+	notice := partial.NewID("notice", "notice.gohtml").SetDot(map[string]any{"Message": "saved"})
+
+	rec := httptest.NewRecorder()
+	writer := NewWriter(rec).SetParent(root)
+
+	// An htmx request for another target still patches the notice itself.
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("HX-Target", "other")
+
+	if err := writer.PatchPartial(context.Background(), req, "#notice", notice); err != nil {
+		t.Fatalf("PatchPartial() error = %v", err)
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `"html":"<div>SAVED</div>"`) {
+		t.Fatalf("expected the patch rendered under the parent, got %q", body)
+	}
+
+	if notice.ParentID() != "" {
+		t.Fatalf("PatchPartial() changed the partial: parent %q", notice.ParentID())
+	}
+}
+
+type viewers struct {
+	Names []string
+}
+
+func TestWriterPatchPartialUsesTheParentsModels(t *testing.T) {
+	fsys := fstest.MapFS{
+		"viewers.gohtml": &fstest.MapFile{Data: []byte(`{{/*
+@model Viewers github.com/donseba/go-partial/exp/sse.viewers
+*/}}<li>{{ shout (index Viewers.Names 0) }}</li>`)},
+	}
+
+	root := partial.New().
+		SetFileSystem(fsys).
+		SetFunc(template.FuncMap{"shout": strings.ToUpper}).
+		SetModel(viewers{Names: []string{"ada"}})
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/events", nil)
+
+	//nolint:staticcheck // A nil context is the request's.
+	err := NewWriter(rec).SetParent(root).PatchPartial(nil, req, "#viewers", partial.NewID("viewers", "viewers.gohtml"))
+	if err != nil {
+		t.Fatalf("PatchPartial() error = %v", err)
+	}
+
+	want := `data: {"target":"#viewers","html":"<li>ADA</li>"}` + "\n\n"
+	if !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("event = %q, want %q", rec.Body.String(), want)
+	}
+}

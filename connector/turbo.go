@@ -1,5 +1,7 @@
 package connector
 
+import "strings"
+
 type Turbo struct {
 	base
 }
@@ -33,6 +35,20 @@ func (t *Turbo) InteractionAttrs(interaction Interaction) map[string]string {
 		attrs["href"] = interaction.URL
 	case InteractionRefresh:
 		attrs["data-turbo-refresh-url"] = interaction.URL
+	case InteractionSubmit:
+		// Turbo submits forms itself; a target names the frame to update.
+		if interaction.Target != "" && interaction.Target != TargetSelf {
+			attrs["data-turbo-frame"] = strings.TrimPrefix(interaction.Target, "#")
+		}
+	case InteractionLive:
+		// Turbo has no live requests: the attributes are left to a script.
+		attrs["data-partial-interaction"] = string(interaction.Kind)
+		attrs["data-url"] = interaction.URL
+
+		attrs["data-delay"] = liveDelay(interaction)
+		if interaction.Target != "" {
+			attrs["data-target"] = interaction.Target
+		}
 	case InteractionOn:
 		attrs["data-partial-interaction"] = string(interaction.Kind)
 		attrs["data-trigger"] = interaction.Trigger
@@ -47,5 +63,5 @@ func (t *Turbo) InteractionAttrs(interaction Interaction) map[string]string {
 			attrs[TurboAttrLoading] = "lazy"
 		}
 	}
-	return attrs
+	return withInteractionAttrs(attrs, interaction)
 }

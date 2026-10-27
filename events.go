@@ -105,12 +105,19 @@ const (
 	EventTemplateParseError = "template.parse_error"
 	// EventTemplateExecuteError is emitted when template execution fails.
 	EventTemplateExecuteError = "template.execute_error"
-	// EventFuncProtected is emitted when a user function tries to overwrite a protected helper.
+	// EventFuncProtected is emitted, as a warning with the name in the
+	// "function" field, when SetFunc is given a function templates never
+	// call: one named like a go-partial helper, or like a function a render
+	// stage of the partial or its ancestors gives templates; and when Use
+	// adds a stage that replaces a registered function.
 	EventFuncProtected = "func.protected"
 	// EventContentMissing is emitted when content is called without a content child.
 	EventContentMissing = "content.missing"
 	// EventTargetMissing is emitted when a requested target cannot be resolved.
 	EventTargetMissing = "target.missing"
+	// EventTargetFallback is emitted when the target fallback answers a
+	// request for a target that cannot be resolved; see SetTargetFallback.
+	EventTargetFallback = "target.fallback"
 	// EventContractInvalid is emitted when contract data or helper arguments are invalid.
 	EventContractInvalid = "contract.invalid"
 )
@@ -261,11 +268,28 @@ func (events *AsyncEvents) Close(ctx context.Context) error {
 
 // Emit sends a diagnostic event through the active render context.
 func (ctx *RenderContext) Emit(event Event) {
-	if ctx == nil || ctx.Events == nil {
+	if ctx == nil {
 		return
 	}
+
+	// A render with the FailResponse policy fails on this event.
+	var failures *renderFailures
+	if isFailureEvent(event) {
+		failures = renderFailuresFrom(ctx.Context)
+	}
+
+	if ctx.Events == nil && failures == nil {
+		return
+	}
+
 	event = ctx.prepareEvent(event)
-	emitSafely(ctx.Events, ctx, event)
+	if failures != nil {
+		failures.record(event)
+	}
+
+	if ctx.Events != nil {
+		emitSafely(ctx.Events, ctx, event)
+	}
 }
 
 // EmitForPartial sends an event for a specific partial while preserving the

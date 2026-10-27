@@ -43,16 +43,13 @@ func (app *App) renderPartial(w http.ResponseWriter, r *http.Request, content *p
 	app.writePartial(w, r, root)
 }
 
+// writeContent answers an htmx request with content on its own, without
+// the wrapper: the target the request names, with the response headers
+// the partial sets, such as HX-Retarget, and the error stage's fragment
+// when the render fails.
 func (app *App) writeContent(w http.ResponseWriter, r *http.Request, content *partial.Partial) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	content = app.configureStandalone(content, connector.NewHTMX(nil))
-	out, err := partial.RenderWithRequest(app.requestContext(r), r, content)
-	if err != nil {
-		log.Printf("render error: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	_, _ = w.Write([]byte(out))
+	content = app.configureStandalone(content, connector.NewHTMX4(nil))
+	app.writePartial(w, r, content)
 }
 
 func (app *App) writePartial(w http.ResponseWriter, r *http.Request, root *partial.Partial) {

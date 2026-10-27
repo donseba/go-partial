@@ -26,7 +26,7 @@ func (h *HTMX4) RenderPartial(r *http.Request) bool {
 	}
 
 	// Body swaps, hx-select and history restoration need the whole document.
-	switch r.Header.Get(HTMXHeaderRequestType.String()) {
+	switch headerValue(r.Header, HTMXHeaderRequestType.String()) {
 	case "", "partial":
 		return true
 	default:
@@ -90,7 +90,8 @@ func (h *HTMX4) InteractionAttrs(interaction Interaction) map[string]string {
 		if interaction.Swap == "" {
 			attrs[HTMXAttrSwap] = string(SwapInnerHTML)
 		}
+		setAttr(attrs, HTMXAttrSelect, interaction.Select)
 	}
 
-	return attrs
+	return withInteractionAttrs(attrs, interaction)
 }

@@ -169,3 +169,91 @@ func benchmarkRequest() *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, "/benchmark", nil)
 	return req
 }
+
+// BenchmarkWritePage writes a page of about 13 KB, a menu of 200 links, as
+// go-webthings does with every public page: to a writer that takes strings,
+// such as net/http's, and to one that takes bytes only.
+func BenchmarkWritePage(b *testing.B) {
+	links := make([]map[string]string, 200)
+	for i := range links {
+		links[i] = map[string]string{"URL": fmt.Sprintf("/en/page-%03d", i), "Title": fmt.Sprintf("Page number %03d", i)}
+	}
+
+	page := NewID("page", "templates/menu.gohtml").
+		SetFileSystem(&inMemoryFS{Files: map[string]string{
+			"templates/menu.gohtml": `<!doctype html><html><body><nav><ul>{{ range .Links }}<li><a href="{{ .URL }}">{{ .Title }}</a></li>{{ end }}</ul></nav></body></html>`,
+		}}).
+		UseTemplateCache(true).
+		SetDot(map[string]any{"Links": links})
+
+	request := benchmarkRequest()
+	ctx := context.Background()
+
+	for _, writer := range []struct {
+		name   string
+		writer http.ResponseWriter
+	}{
+		{"strings", &countingWriter{header: http.Header{}}},
+		{"bytes", &bytesOnlyWriter{countingWriter{header: http.Header{}}}},
+	} {
+		b.Run(writer.name, func(b *testing.B) {
+			if err := Write(ctx, writer.writer, request, page); err != nil {
+				b.Fatalf("prime render: %v", err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for b.Loop() {
+				clear(writer.writer.Header())
+
+				if err := Write(ctx, writer.writer, request, page); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+// countingWriter is a ResponseWriter that counts the body and takes strings
+// as net/http's does.
+type countingWriter struct {
+	header http.Header
+	bytes  int
+}
+
+func (c *countingWriter) Header() http.Header {
+	return c.header
+}
+
+func (c *countingWriter) WriteHeader(int) {}
+
+func (c *countingWriter) Write(data []byte) (int, error) {
+	c.bytes += len(data)
+
+	return len(data), nil
+}
+
+func (c *countingWriter) WriteString(s string) (int, error) {
+	c.bytes += len(s)
+
+	return len(s), nil
+}
+
+// bytesOnlyWriter is a ResponseWriter without WriteString, as most
+// middleware wrappers are.
+type bytesOnlyWriter struct {
+	counting countingWriter
+}
+
+func (w *bytesOnlyWriter) Header() http.Header {
+	return w.counting.Header()
+}
+
+func (w *bytesOnlyWriter) WriteHeader(status int) {
+	w.counting.WriteHeader(status)
+}
+
+func (w *bytesOnlyWriter) Write(data []byte) (int, error) {
+	return w.counting.Write(data)
+}

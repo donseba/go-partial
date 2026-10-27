@@ -26,8 +26,11 @@ type (
 	Writer struct {
 		w      http.ResponseWriter
 		stages []partial.RenderStage
+		parent *partial.Partial
 	}
 
+	// Patch is the data of a partial:patch event: HTML for the elements
+	// that Target selects.
 	Patch struct {
 		Target string        `json:"target"`
 		HTML   template.HTML `json:"html"`
@@ -83,6 +86,20 @@ func (s *Writer) Use(stages ...partial.RenderStage) *Writer {
 		return s
 	}
 	s.stages = append(s.stages, stages...)
+	return s
+}
+
+// SetParent renders the partials PatchPartial patches under parent, as
+// partial.Partial.SetParent does, unless they have a parent of their own:
+// with its functions, render stages, connector, file system, template cache,
+// failure policy and @model values, such as those of an application's
+// configured root partial, without adding them to it.
+func (s *Writer) SetParent(parent *partial.Partial) *Writer {
+	if s == nil {
+		return s
+	}
+
+	s.parent = parent
 	return s
 }
 
@@ -156,18 +173,45 @@ func (s *Writer) PatchHTML(target string, html template.HTML) error {
 	})
 }
 
+// PatchPartial renders p itself (see partial.RenderSelf), with the writer's
+// stages and under its parent (see Use and SetParent), and writes it as a
+// partial:patch event for the elements target selects. p is not changed.
+// A nil ctx is the request's context.
+//
+// Under an application's root partial, a part of a page streams with the
+// root's functions, stages, file system and @model values, such as a list
+// of the viewers of a page, without a render helper of its own:
+//
+//	events := sse.NewWriter(w).SetParent(root)
+//	viewers := partial.NewID("viewers", "viewers.gohtml").SetDot(view)
+//	err := events.PatchPartial(r.Context(), r, "#viewers", viewers)
 func (s *Writer) PatchPartial(ctx context.Context, r *http.Request, target string, p *partial.Partial) error {
+	if s == nil || s.w == nil {
+		return errWriterNotInitialized
+	}
+
 	if p == nil {
 		return fmt.Errorf("partial is not initialized")
 	}
-	if len(s.stages) > 0 {
+
+	if ctx == nil && r != nil {
+		ctx = r.Context()
+	}
+
+	if len(s.stages) > 0 || (s.parent != nil && p.ParentID() == "") {
 		p = p.Clone()
 		p.Use(s.stages...)
+
+		if s.parent != nil && p.ParentID() == "" {
+			p.SetParent(s.parent)
+		}
 	}
-	html, err := partial.RenderWithRequest(ctx, r, p)
+
+	html, err := partial.RenderSelf(ctx, r, p)
 	if err != nil {
 		return err
 	}
+
 	return s.PatchHTML(target, html)
 }
 

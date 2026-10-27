@@ -36,7 +36,24 @@ type (
 		Name        string
 		Params      map[string]string
 		Options     map[string]string
+		// Select picks the part of the response to swap, such as htmx's
+		// hx-select, for connectors that can.
+		Select string
+		// Attrs are attributes written as given, such as hx-indicator or
+		// hx-push-url, after the connector's own: they replace those of the
+		// same name.
+		Attrs map[string]string
 	}
+
+	// The Options of an interaction that connectors write in their own
+	// syntax, where their client library can, such as hx-include,
+	// hx-push-url and hx-replace-url for htmx.
+	//
+	//	OptionInclude:    a selector of elements whose values the request sends
+	//	OptionPushURL:    "true", or the URL pushed to the browser history
+	//	OptionReplaceURL: "true", or the URL that replaces the current one
+	//	OptionMethod:     the method of a submit interaction
+	//	OptionDelay:      the pause in typing a live interaction waits for
 
 	base struct {
 		config       *Config
@@ -54,6 +71,20 @@ const (
 	InteractionPrefetch InteractionKind = "prefetch"
 	InteractionRefresh  InteractionKind = "refresh"
 	InteractionOn       InteractionKind = "on"
+	// InteractionSubmit submits a form and swaps the response into the
+	// target, such as htmx's hx-post. Options["method"] picks another
+	// method, such as "put" or "delete", where the connector can.
+	InteractionSubmit InteractionKind = "submit"
+	// InteractionLive requests the URL as the user types, such as a live
+	// search: Options["delay"] waits for a pause in typing, 300ms by
+	// default.
+	InteractionLive InteractionKind = "live"
+
+	OptionInclude    = "include"
+	OptionPushURL    = "pushURL"
+	OptionReplaceURL = "replaceURL"
+	OptionMethod     = "method"
+	OptionDelay      = "delay"
 
 	HeaderTarget HeaderKey = "X-Target"
 	HeaderSelect HeaderKey = "X-Select"
@@ -80,7 +111,7 @@ func (x *base) RenderPartial(r *http.Request) bool {
 	if r == nil {
 		return false
 	}
-	return r.Header.Get(x.targetHeader) != ""
+	return headerValue(r.Header, x.targetHeader) != ""
 }
 
 func (x *base) GetTargetHeader() string {
@@ -109,6 +140,21 @@ func (x *base) InteractionAttrs(interaction Interaction) map[string]string {
 	if interaction.Trigger != "" {
 		attrs["data-trigger"] = interaction.Trigger
 	}
+	setAttr(attrs, "data-select", interaction.Select)
+	return withInteractionAttrs(attrs, interaction)
+}
+
+// withInteractionAttrs adds the interaction's own attributes to attrs,
+// replacing those of the same name.
+func withInteractionAttrs(attrs map[string]string, interaction Interaction) map[string]string {
+	for name, value := range interaction.Attrs {
+		if name == "" {
+			continue
+		}
+
+		attrs[name] = value
+	}
+
 	return attrs
 }
 
@@ -116,7 +162,8 @@ func (x *base) GetTargetValue(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if targetValue := r.Header.Get(x.targetHeader); targetValue != "" {
+
+	if targetValue := headerValue(r.Header, x.targetHeader); targetValue != "" {
 		return targetValue
 	}
 
@@ -131,7 +178,8 @@ func (x *base) GetSelectValue(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if selectValue := r.Header.Get(x.selectHeader); selectValue != "" {
+
+	if selectValue := headerValue(r.Header, x.selectHeader); selectValue != "" {
 		return selectValue
 	}
 
@@ -146,7 +194,8 @@ func (x *base) GetActionValue(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	if actionValue := r.Header.Get(x.actionHeader); actionValue != "" {
+
+	if actionValue := headerValue(r.Header, x.actionHeader); actionValue != "" {
 		return actionValue
 	}
 

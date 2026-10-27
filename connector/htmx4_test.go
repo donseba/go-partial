@@ -161,3 +161,45 @@ func TestHTMX4NewSwapStyles(t *testing.T) {
 		}
 	}
 }
+
+func TestInteractionSelectAndAttrs(t *testing.T) {
+	interaction := Interaction{
+		Kind:   InteractionAsync,
+		ID:     "stats",
+		URL:    "/stats",
+		Select: "#stats",
+		Attrs:  map[string]string{"hx-indicator": "#spinner", "hx-swap": "outerHTML", "data-x": "1"},
+	}
+
+	for name, conn := range map[string]Connector{"htmx": NewHTMX(nil), "htmx4": NewHTMX4(nil)} {
+		attrs := conn.InteractionAttrs(interaction)
+		if attrs[HTMXAttrSelect] != "#stats" || attrs["hx-indicator"] != "#spinner" || attrs[HTMXAttrSwap] != "outerHTML" ||
+			attrs["data-x"] != "1" {
+			t.Fatalf(
+				"%s: InteractionAttrs() = %v, want the select and the attributes, which replace the connector's",
+				name,
+				attrs,
+			)
+		}
+	}
+
+	stream := interaction
+
+	stream.Kind = InteractionStream
+	if attrs := NewHTMX(nil).InteractionAttrs(stream); attrs[HTMXAttrSelect] != "" {
+		t.Fatalf("htmx stream: InteractionAttrs() = %v, want no hx-select without hx-get", attrs)
+	}
+
+	attrs := NewPartial(nil).InteractionAttrs(interaction)
+	if attrs["data-select"] != "#stats" || attrs["hx-indicator"] != "#spinner" {
+		t.Fatalf("partial: InteractionAttrs() = %v", attrs)
+	}
+
+	if attrs := NewUnpoly(nil).InteractionAttrs(interaction); attrs["data-x"] != "1" {
+		t.Fatalf("unpoly: InteractionAttrs() = %v, want the attributes", attrs)
+	}
+
+	if attrs := NewTurbo(nil).InteractionAttrs(interaction); attrs["data-x"] != "1" {
+		t.Fatalf("turbo: InteractionAttrs() = %v, want the attributes", attrs)
+	}
+}

@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"unicode"
 
 	partial "github.com/donseba/go-partial"
+	"github.com/donseba/go-partial/connector"
+	"github.com/donseba/go-partial/internal/templateutil"
 )
 
 //go:embed *.gohtml
@@ -32,6 +35,33 @@ type (
 	Data struct {
 		Messages []Message
 		TargetID string
+		// RequestErrorAttrs are the attributes of the flash target that
+		// tell the browser client how to show failed requests, as the
+		// stage's WithRequestErrors configures them, each after a space;
+		// empty without. A flash target template writes them on its
+		// element, as the default one does; see also flashTargetAttrs.
+		RequestErrorAttrs template.HTMLAttr
+	}
+
+	// RequestErrors configures how the browser client (ClientScript) shows
+	// requests that fail; see WithRequestErrors.
+	RequestErrors struct {
+		// Text is the error message shown for a failed request, such as
+		// "The request failed. Please try again."; a template gives one of
+		// its own, such as a translated one, as the argument of
+		// {{ flashTargetAttrs }}.
+		Text string
+		// Replace keeps one request error at a time: a new one replaces the
+		// last, and the next request removes it.
+		Replace bool
+		// Body shows the text/plain sentence of a refused request (4xx),
+		// such as Respond writes for requests of no client library,
+		// instead of Text; htmx does not swap that body.
+		Body bool
+		// SkipFlash shows nothing for a failed response that brings its own
+		// flash message, such as those of Respond, RenderOOB and ext/errors'
+		// WithFlash.
+		SkipFlash bool
 	}
 
 	// Store holds flash messages for one request or app-owned session handoff.
@@ -47,6 +77,7 @@ type (
 		partial       *partial.Partial
 		targetPartial *partial.Partial
 		targetID      string
+		requestErrors *RequestErrors
 	}
 
 	// Option configures the flash renderer.
@@ -64,6 +95,10 @@ var storeContextKey = contextKey{}
 
 type contextKey struct{}
 
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[contextKey]().PkgPath()
+
 const defaultTargetID = "flash-messages"
 
 var unsafeTokenChars = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
@@ -71,11 +106,68 @@ var unsafeTokenChars = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 // FuncMap returns placeholders for flash template helpers.
 func FuncMap() template.FuncMap {
 	return template.FuncMap{
-		"flash":       Flash,
-		"flashTarget": FlashTarget,
-		"flashes":     Flashes,
-		"hasFlashes":  HasFlashes,
+		"flash":         Flash,
+		"flashTarget":   FlashTarget,
+		"flashes":       Flashes,
+		"hasFlashes":    HasFlashes,
+		"flashTemplate": Template,
+
+		"flashTargetAttrs": TargetAttrs,
 	}
+}
+
+// Template renders, for each level, the default flash template as a
+// <template data-flash-template="level"> for the browser client, which
+// clones it for the messages it shows itself; see Stage for the template
+// of the application's flash template. It renders nothing in a partial
+// rendered out of band, such as a flash target that a response adds its
+// messages to: the page has the templates already.
+//
+// go-doc:sig func(levels ...string) html/template.HTML
+func Template(args ...any) template.HTML {
+	var ctx *partial.RenderContext
+
+	levels := make([]string, 0, len(args))
+	for _, arg := range args {
+		switch value := arg.(type) {
+		case *partial.RenderContext:
+			ctx = value
+		case string:
+			levels = append(levels, value)
+		case Level:
+			levels = append(levels, string(value))
+		}
+	}
+
+	if ctx == nil {
+		return ""
+	}
+
+	return renderTemplates(ctx, defaultPartial("flash", "default.gohtml"), defaultTargetID, levels)
+}
+
+// TargetAttrs returns the attributes of an element of the template's
+// own that is the flash target: its id and, with the flash Stage's
+// WithRequestErrors, the attributes that tell the browser client how to
+// show failed requests, such as data-flash-request-error="..."; a text
+// argument replaces the stage's text, such as a translated one:
+//
+//	<div {{ flashTargetAttrs (t "The request failed.") }} {{ oobAttr "beforeend" }} class="toasts">
+//
+// Without the stage, the id is the default flash target's and a text
+// argument is the only request error setting.
+//
+// go-doc:sig func(text ...string) html/template.HTMLAttr
+func TargetAttrs(args ...any) template.HTMLAttr {
+	var text []string
+
+	for _, arg := range args {
+		if value, ok := arg.(string); ok {
+			text = append(text, value)
+		}
+	}
+
+	return targetAttrs(defaultTargetID, nil, text)
 }
 
 // Flash renders flash messages for a render context with the default template.
@@ -97,7 +189,7 @@ func FlashTarget(ctx ...*partial.RenderContext) template.HTML {
 	if renderCtx == nil {
 		return ""
 	}
-	return renderTarget(renderCtx, defaultPartial("flash-target", "target.gohtml"), defaultTargetID)
+	return renderTarget(renderCtx, defaultPartial("flash-target", "target.gohtml"), defaultTargetID, nil)
 }
 
 // Flashes returns request-scoped flash messages for a render context.
@@ -118,7 +210,8 @@ func HasFlashes(ctx ...*partial.RenderContext) bool {
 	return len(Flashes(ctx...)) > 0
 }
 
-// Stage installs flash template helpers.
+// Stage gives templates the flash helpers, made only for the templates that
+// call them.
 func Stage(opts ...Option) partial.RenderStage {
 	cfg := options{
 		partial:       defaultPartial("flash", "default.gohtml"),
@@ -141,14 +234,153 @@ func Stage(opts ...Option) partial.RenderStage {
 	}
 
 	return partial.RenderStageHooks{
-		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
-			ctx.SetFunc("flashes", func() []Message { return Messages(ctx.Context) })
-			ctx.SetFunc("hasFlashes", func() bool { return Has(ctx.Context) })
-			ctx.SetFunc("flash", func() template.HTML { return renderMessages(ctx, cfg.partial, cfg.targetID) })
-			ctx.SetFunc("flashTarget", func() template.HTML { return renderTarget(ctx, cfg.targetPartial, cfg.targetID) })
-			return ctx, nil
+		Package:   packagePath,
+		FuncNames: []string{"flash", "flashTarget", "flashes", "hasFlashes", "flashTemplate", "flashTargetAttrs"},
+		// The helpers are made only for the templates that call them.
+		ResolveFunc: func(ctx *partial.RenderContext, name string) (any, bool) {
+			switch name {
+			case "flashes":
+				return func() []Message {
+					return Messages(ctx.Context)
+				}, true
+			case "hasFlashes":
+				return func() bool {
+					return Has(ctx.Context)
+				}, true
+			case "flash":
+				return func() template.HTML {
+					return renderMessages(ctx, cfg.partial, cfg.targetID)
+				}, true
+			case "flashTarget":
+				return func() template.HTML {
+					return renderTarget(ctx, cfg.targetPartial, cfg.targetID, cfg.requestErrors)
+				}, true
+			case "flashTargetAttrs":
+				return func(text ...string) template.HTMLAttr {
+					return targetAttrs(cfg.targetID, cfg.requestErrors, text)
+				}, true
+			case "flashTemplate":
+				return func(levels ...string) template.HTML {
+					return renderTemplates(ctx, cfg.partial, cfg.targetID, levels)
+				}, true
+			case oobFuncName:
+				// For RenderOOB, which code calls: the out-of-band messages
+				// with the stage's template and target.
+				return func(messages []Message) template.HTML {
+					return renderOOB(ctx, cfg.partial, cfg.targetID, messages)
+				}, true
+			default:
+				return nil, false
+			}
 		},
 	}
+}
+
+// oobFuncName is the name under which the stage gives RenderOOB its
+// messages; templates cannot call it, as no template function starts with
+// an underscore.
+const oobFuncName = "_flashOOB"
+
+// textMarker stands for the text of a message in the templates of
+// flashTemplate; the browser client replaces it.
+const textMarker = "__partial_flash_text__"
+
+// renderTemplates renders the message template of each level, with the text
+// marker as its text, as a <template data-flash-template> for the browser
+// client; without levels, those of the four levels. A partial rendered out
+// of band gets none: the page has them.
+func renderTemplates(ctx *partial.RenderContext, p *partial.Partial, targetID string, levels []string) template.HTML {
+	if ctx == nil || ctx.Runtime == nil || p == nil {
+		return ""
+	}
+
+	if ctx.Partial != nil && ctx.Partial.IsOOB() {
+		return ""
+	}
+
+	if len(levels) == 0 {
+		levels = []string{string(LevelSuccess), string(LevelInfo), string(LevelWarn), string(LevelError)}
+	}
+
+	var b strings.Builder
+
+	for _, level := range levels {
+		level := normalizeLevel(Level(level))
+		markup := renderPartial(ctx, p, Data{Messages: []Message{{Level: level, Text: textMarker}}, TargetID: targetID})
+
+		b.WriteString(`<template data-flash-template="`)
+		b.WriteString(template.HTMLEscapeString(string(level)))
+		b.WriteString(`">`)
+		b.WriteString(string(markup))
+		b.WriteString(`</template>`)
+	}
+
+	return template.HTML(b.String())
+}
+
+// renderOOB renders messages with p as an out-of-band addition to the flash
+// target targetID, in the syntax of the render's connector.
+func renderOOB(ctx *partial.RenderContext, p *partial.Partial, targetID string, messages []Message) template.HTML {
+	if ctx == nil || ctx.Runtime == nil || p == nil || len(messages) == 0 {
+		return ""
+	}
+
+	inner := renderPartial(ctx, p, Data{Messages: normalized(messages), TargetID: targetID})
+
+	var b strings.Builder
+
+	b.WriteString(`<div`)
+	templateutil.WriteAttr(&b, "id", targetID)
+	b.WriteString(string(templateutil.HTMLAttrs(connector.OOBAttrs(ctx.Runtime.Connector(), "beforeend"))))
+	b.WriteByte('>')
+	b.WriteString(string(inner))
+	b.WriteString(`</div>`)
+
+	return template.HTML(b.String())
+}
+
+// normalized returns messages with their levels normalized and without
+// those without text, as Store.Add keeps them.
+func normalized(messages []Message) []Message {
+	kept := make([]Message, 0, len(messages))
+	for _, message := range messages {
+		if strings.TrimSpace(message.Text) == "" {
+			continue
+		}
+
+		message.Level = normalizeLevel(message.Level)
+		kept = append(kept, message)
+	}
+
+	return kept
+}
+
+// RenderOOB renders messages as an addition to the flash target, sent out
+// of band with any response, with the flash template and target of the
+// flash Stage of the render: a render stage that answers a request itself,
+// such as ext/errors with WithFlash, adds them to the page the way
+// the page's own flash messages appear. It reports false when the render
+// has no flash stage.
+//
+//	if out, ok := flash.RenderOOB(ctx, flash.Error("The request failed.")); ok {
+//		return out, nil
+//	}
+func RenderOOB(ctx *partial.RenderContext, messages ...Message) (template.HTML, bool) {
+	if ctx == nil {
+		return "", false
+	}
+
+	fn, ok := ctx.ResolveFunc(oobFuncName)
+	if !ok {
+		return "", false
+	}
+
+	render, ok := fn.(func([]Message) template.HTML)
+	if !ok {
+		return "", false
+	}
+
+	return render(messages), true
 }
 
 // WithTemplate renders flash messages with a user template from the active
@@ -192,6 +424,74 @@ func WithTargetTemplate(path string) Option {
 		}
 		opts.targetPartial = partial.NewID("flash-target", path)
 	}
+}
+
+// WithRequestErrors makes the flash target tell the browser client
+// (ClientScript) to show failed requests as errors, as errors configures:
+// {{ flashTarget }} and {{ flashTargetAttrs }} write the attributes the
+// client reads, such as data-flash-request-error="The request failed.", and
+// flash target templates get them as Data.RequestErrorAttrs.
+//
+//	flash.Stage(flash.WithRequestErrors(flash.RequestErrors{
+//		Text:      "The request failed. Please try again.",
+//		Replace:   true,
+//		Body:      true,
+//		SkipFlash: true,
+//	}))
+func WithRequestErrors(errors RequestErrors) Option {
+	return func(opts *options) {
+		opts.requestErrors = &errors
+	}
+}
+
+// requestErrorAttrs writes the attributes of the flash target that
+// configure the request errors of the browser client: none without
+// errors, and data-flash-request-error with the text, which a non-empty
+// text argument replaces, and one attribute for each setting with.
+func requestErrorAttrs(errors *RequestErrors, text []string) template.HTMLAttr {
+	settings := RequestErrors{}
+	if errors != nil {
+		settings = *errors
+	}
+
+	for _, value := range text {
+		if value != "" {
+			settings.Text = value
+		}
+	}
+
+	if errors == nil && settings.Text == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString(` data-flash-request-error="`)
+	b.WriteString(template.HTMLEscapeString(settings.Text))
+	b.WriteByte('"')
+
+	for _, flag := range []struct {
+		set  bool
+		name string
+	}{
+		{settings.Replace, "data-flash-request-error-replace"},
+		{settings.Body, "data-flash-request-error-body"},
+		{settings.SkipFlash, "data-flash-request-error-skip-flash"},
+	} {
+		if flag.set {
+			b.WriteByte(' ')
+			b.WriteString(flag.name)
+		}
+	}
+
+	return template.HTMLAttr(b.String())
+}
+
+// targetAttrs writes the id of the flash target and its request error
+// attributes, after a space.
+func targetAttrs(targetID string, errors *RequestErrors, text []string) template.HTMLAttr {
+	id := ` id="` + template.HTMLEscapeString(targetID) + `"`
+
+	return template.HTMLAttr(id) + requestErrorAttrs(errors, text)
 }
 
 // WithTargetPartial renders flashTarget with a user-provided partial.
@@ -344,11 +644,12 @@ func renderMessages(ctx *partial.RenderContext, p *partial.Partial, targetID str
 	return renderPartial(ctx, p, Data{Messages: messages, TargetID: targetID})
 }
 
-func renderTarget(ctx *partial.RenderContext, p *partial.Partial, targetID string) template.HTML {
+func renderTarget(ctx *partial.RenderContext, p *partial.Partial, targetID string, errors *RequestErrors) template.HTML {
 	if ctx == nil || ctx.Runtime == nil || p == nil {
 		return ""
 	}
-	return renderPartial(ctx, p, Data{TargetID: targetID})
+
+	return renderPartial(ctx, p, Data{TargetID: targetID, RequestErrorAttrs: requestErrorAttrs(errors, nil)})
 }
 
 func renderPartial(ctx *partial.RenderContext, p *partial.Partial, data Data) template.HTML {
