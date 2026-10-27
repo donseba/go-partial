@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"reflect"
 	"slices"
 
 	partial "github.com/donseba/go-partial"
@@ -21,6 +22,10 @@ type (
 
 	extensionKey struct{}
 )
+
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[extensionKey]().PkgPath()
 
 // WithAction configures a partial-level action that may replace the partial
 // before its template is rendered.
@@ -94,20 +99,43 @@ func actionIs(ctx *partial.RenderContext, values ...string) bool {
 	return slices.Contains(values, ActionValue(ctx))
 }
 
-// Stage installs action helpers and executes configured partial actions.
+// Stage gives templates the action helpers, made only for the templates
+// that call them, and executes configured partial actions.
 func Stage() partial.RenderStage {
 	return partial.RenderStageHooks{
+		Package:   packagePath,
+		FuncNames: []string{"action", "actionHeader", "actionValue", "actionIs"},
+		// The helpers are made only for the templates that call them.
+		ResolveFunc: func(ctx *partial.RenderContext, name string) (any, bool) {
+			if ctx == nil || ctx.Partial == nil {
+				return nil, false
+			}
+
+			switch name {
+			case "actionHeader":
+				return func() string {
+					return ActionHeader(ctx)
+				}, true
+			case "actionValue":
+				return func() string {
+					return ActionValue(ctx)
+				}, true
+			case "actionIs":
+				return func(in ...string) bool {
+					return actionIs(ctx, in...)
+				}, true
+			case "action":
+				return func() template.HTML {
+					return ActionHTML(ctx)
+				}, true
+			default:
+				return nil, false
+			}
+		},
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil || ctx.Partial == nil {
 				return ctx, nil
 			}
-
-			ctx.SetFunc("actionHeader", func() string { return ActionHeader(ctx) })
-			ctx.SetFunc("actionValue", func() string { return ActionValue(ctx) })
-			ctx.SetFunc("actionIs", func(in ...string) bool {
-				return actionIs(ctx, in...)
-			})
-			ctx.SetFunc("action", func() template.HTML { return ActionHTML(ctx) })
 
 			cfg := getConfig(ctx.Partial)
 			if cfg.action == nil || ctx.Kind != partial.RenderKindPartial {

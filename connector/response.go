@@ -44,6 +44,38 @@ func (b *ResponseBuilder) Location(value string) *ResponseBuilder {
 	return b
 }
 
+// Location is a client-side navigation with options, such as htmx's
+// HX-Location object: the client fetches Path and swaps it into Target,
+// without a full page load.
+type Location struct {
+	Path   string `json:"path"`
+	Target string `json:"target,omitempty"`
+	Swap   string `json:"swap,omitempty"`
+	Select string `json:"select,omitempty"`
+	// Source and Event name the element and event the navigation is
+	// treated as coming from.
+	Source  string            `json:"source,omitempty"`
+	Event   string            `json:"event,omitempty"`
+	Values  map[string]any    `json:"values,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// String returns the Location as its header value: the path alone when
+// that is all it has, otherwise a JSON object.
+func (l Location) String() string {
+	if l.Target == "" && l.Swap == "" && l.Select == "" && l.Source == "" && l.Event == "" && len(l.Values) == 0 &&
+		len(l.Headers) == 0 {
+		return l.Path
+	}
+
+	out, err := json.Marshal(l)
+	if err != nil {
+		return l.Path
+	}
+
+	return string(out)
+}
+
 func (b *ResponseBuilder) PushURL(value string) *ResponseBuilder {
 	b.response.PushURL = value
 	return b

@@ -8,4 +8,4 @@ go run ./examples/docs
 
 Open http://localhost:8091.
 
-This is a documentation-style site built with `go-partial`, htmx, real template files, and a custom stylesheet.
+This is a documentation-style site built with `go-partial`, htmx 4 (`connector.NewHTMX4`), real template files, and a custom stylesheet.

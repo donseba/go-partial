@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"testing"
 	"testing/fstest"
 )
@@ -239,5 +240,91 @@ func TestStageFuncResolver(t *testing.T) {
 		if useCache && !reflect.DeepEqual(asked, []string{"greet"}) {
 			t.Fatalf("cache %v: resolver asked for %v, want only the functions the template calls", useCache, asked)
 		}
+	}
+}
+
+func TestStageResolveFunc(t *testing.T) {
+	fsys := fstest.MapFS{
+		"page.gohtml": &fstest.MapFile{Data: []byte(`{{greet "Ada"}} {{shout "hi"}} {{kind}}`)},
+	}
+
+	var asked []string
+	resolving := func(label string) RenderStageHooks {
+		return RenderStageHooks{
+			FuncNames: []string{"greet", "shout", "kind", "unused"},
+			ResolveFunc: func(ctx *RenderContext, name string) (any, bool) {
+				asked = append(asked, label+":"+name)
+				switch name {
+				case "greet":
+					return func(name string) string { return label + " " + name }, true
+				case "shout":
+					return func(string) string { return "resolved" }, true
+				case "kind":
+					return func() string { return string(ctx.Kind) }, true
+				case "unused":
+					return func() string { return "unused" }, true
+				}
+
+				return nil, false
+			},
+		}
+	}
+	setting := RenderStageHooks{
+		PrepareFunc: func(ctx *RenderContext) (*RenderContext, error) {
+			ctx.SetFunc("shout", func(s string) string { return s + "!" })
+			return ctx, nil
+		},
+	}
+
+	for _, useCache := range []bool{true, false} {
+		asked = nil
+		p := New("page.gohtml").
+			SetFileSystem(fsys).
+			UseTemplateCache(useCache).
+			SetFunc(template.FuncMap{
+				"greet": func(string) string { return "stand-in" },
+				"shout": func(string) string { return "stand-in" },
+				"kind":  func() string { return "stand-in" },
+			}).
+			Use(resolving("first"), setting, resolving("second"))
+
+		out, err := Render(context.Background(), p)
+		if err != nil {
+			t.Fatalf("cache %v: Render() error = %v", useCache, err)
+		}
+
+		if got, want := string(out), "second Ada hi! partial"; got != want {
+			t.Fatalf("cache %v: output = %q, want %q", useCache, got, want)
+		}
+
+		slices.Sort(asked)
+
+		if useCache && !reflect.DeepEqual(asked, []string{"second:greet", "second:kind"}) {
+			t.Fatalf("cache %v: stages asked for %v, want the later stage, for the functions the template calls", useCache, asked)
+		}
+	}
+}
+
+func TestStageResolveFuncWithoutStandIns(t *testing.T) {
+	fsys := fstest.MapFS{
+		"page.gohtml": &fstest.MapFile{Data: []byte(`{{greet}}`)},
+	}
+
+	p := New("page.gohtml").
+		SetFileSystem(fsys).
+		Use(RenderStageHooks{
+			FuncNames: []string{"greet"},
+			ResolveFunc: func(ctx *RenderContext, name string) (any, bool) {
+				return func() string { return "hello" }, name == "greet"
+			},
+		})
+
+	out, err := Render(context.Background(), p)
+	if err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	if string(out) != "hello" {
+		t.Fatalf("output = %q, want the function the stage declares, as without the template cache SetFunc gave it", out)
 	}
 }

@@ -46,7 +46,7 @@ func main() {
 		app.logs,
 	)
 	app.root = partial.NewID("shell", "templates/shell.gohtml").
-		SetConnector(connector.NewHTMX(nil)).
+		SetConnector(connector.NewHTMX4(nil)).
 		SetEvents(app.events).
 		SetFileSystem(os.DirFS("examples/showcase")).
 		Use(app.showcaseStages()...).

@@ -5,6 +5,7 @@ import (
 	"context"
 	"html/template"
 	"net/http"
+	"reflect"
 	"time"
 
 	partial "github.com/donseba/go-partial"
@@ -50,10 +51,11 @@ type (
 	FanoutSink []Sink
 
 	config struct {
-		sink     Sink
-		now      func() time.Time
-		tags     map[string]string
-		slotName func(*partial.Partial) string
+		sink      Sink
+		now       func() time.Time
+		tags      map[string]string
+		slotName  func(*partial.Partial) string
+		outermost bool
 	}
 
 	// Option configures the metrics renderer.
@@ -64,12 +66,17 @@ type (
 	traceIDKey         struct{}
 	parentRequestIDKey struct{}
 	stateKey           struct{}
+	outermostKey       struct{}
 
 	state struct {
 		startedAt time.Time
 		rendered  bool
 	}
 )
+
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[stateKey]().PkgPath()
 
 const (
 	// HeaderRequestID is the conventional HTTP header used as a metrics request ID fallback.
@@ -208,6 +215,35 @@ func WithSlotName(slotName func(*partial.Partial) string) Option {
 	}
 }
 
+// Outermost records only the outermost render of a context, such as a page's
+// layout with everything rendered inside it, instead of every nested partial.
+// The renders inside it then cost no more than a context lookup, which suits
+// metrics that are always on.
+func Outermost() Option {
+	return func(cfg *config) {
+		cfg.outermost = true
+	}
+}
+
+// enterOutermost marks the context of the render as that of the outermost
+// render, and reports true, unless the render is inside the outermost one
+// already: then it reports false, and the render records nothing; see
+// Outermost.
+func enterOutermost(ctx *partial.RenderContext) bool {
+	if ctx.Context != nil && ctx.Context.Value(outermostKey{}) != nil {
+		return false
+	}
+
+	parent := ctx.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+
+	ctx.Context = context.WithValue(parent, outermostKey{}, true)
+
+	return true
+}
+
 // Stage returns a passive render stage that records render timing and output size.
 func Stage(sink Sink, options ...Option) partial.RenderStage {
 	cfg := config{
@@ -221,10 +257,16 @@ func Stage(sink Sink, options ...Option) partial.RenderStage {
 	}
 
 	return partial.RenderStageHooks{
+		Package: packagePath,
 		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
 			if ctx == nil {
 				return ctx, nil
 			}
+
+			if cfg.outermost && !enterOutermost(ctx) {
+				return ctx, nil
+			}
+
 			ensureValues(ctx).Set(stateKey{}, &state{startedAt: cfg.now()})
 			return ctx, nil
 		},
@@ -235,6 +277,10 @@ func Stage(sink Sink, options ...Option) partial.RenderStage {
 			return next(ctx)
 		},
 		FinalizeFunc: func(ctx *partial.RenderContext, out template.HTML, renderErr error) (template.HTML, error) {
+			if cfg.outermost && getState(ctx) == nil {
+				return out, renderErr
+			}
+
 			if cfg.sink != nil {
 				cfg.sink.Record(buildRecord(ctx, out, renderErr, cfg))
 			}

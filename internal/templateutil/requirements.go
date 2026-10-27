@@ -21,6 +21,7 @@ var builtinFuncs = map[string]bool{
 
 var (
 	typedRootPattern       = regexp.MustCompile(`(?m)^\s*@([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s+([^\s]+)`)
+	dotPattern             = regexp.MustCompile(`(?m)^\s*@dot\s+([^\s]+)`)
 	templateCommentPattern = regexp.MustCompile(`(?s)\{\{/\*(.*?)\*/\}\}`)
 )
 

@@ -40,7 +40,7 @@ type App struct {
 
 func main() {
 	root := partial.NewID("shell", "templates/shell.gohtml").
-		SetConnector(connector.NewHTMX(nil)).
+		SetConnector(connector.NewHTMX4(nil)).
 		SetFileSystem(os.DirFS("examples/docs")).
 		Use(exterrors.Stage(exterrors.WithMode(exterrors.ModeDetailed))).
 		SetFunc(interactions.FuncMap(), templatehelpers.FuncMap())

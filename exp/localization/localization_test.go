@@ -85,3 +85,27 @@ func TestRendererAddsLocaleHelpersConcurrently(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestStageReservesItsFunctionNames(t *testing.T) {
+	for _, name := range []string{"locale", "localizer"} {
+		if !partial.IsReservedFuncName(name, Stage()) {
+			t.Fatalf("IsReservedFuncName(%q) = false", name)
+		}
+	}
+}
+
+func TestFuncsBindALocalizer(t *testing.T) {
+	funcs := Funcs(New("nl"))
+
+	if got := funcs["locale"].(func() string)(); got != "nl" {
+		t.Fatalf("locale() = %q", got)
+	}
+
+	if got := funcs["localizer"].(func() Localizer)().GetLocale(); got != "nl" {
+		t.Fatalf("localizer().GetLocale() = %q", got)
+	}
+
+	if got := Funcs(nil)["locale"].(func() string)(); got != Default.GetLocale() {
+		t.Fatalf("locale() without a localizer = %q", got)
+	}
+}

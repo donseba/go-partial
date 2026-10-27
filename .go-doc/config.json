@@ -19,7 +19,7 @@
   "symbolAnnotations": [
     {
       "name": "interaction",
-      "type": "github.com/donseba/go-partial.Interaction"
+      "type": "github.com/donseba/go-partial/exp/interactions.Interaction"
     }
   ],
   "templateFunctions": [
@@ -88,6 +88,14 @@
       "path": "github.com/donseba/go-partial/exp/flash.HasFlashes"
     },
     {
+      "name": "flashTemplate",
+      "path": "github.com/donseba/go-partial/exp/flash.Template"
+    },
+    {
+      "name": "flashTargetAttrs",
+      "path": "github.com/donseba/go-partial/exp/flash.TargetAttrs"
+    },
+    {
       "name": "locale",
       "path": "github.com/donseba/go-partial/exp/localization.Locale"
     },
@@ -120,6 +128,18 @@
       "path": "github.com/donseba/go-partial/exp/slots.HasSlot"
     },
     {
+      "name": "requiredSlot",
+      "path": "github.com/donseba/go-partial/exp/slots.RequiredSlot"
+    },
+    {
+      "name": "sseAttrs",
+      "path": "github.com/donseba/go-partial/exp/sse.Attrs"
+    },
+    {
+      "name": "deferredSlot",
+      "path": "github.com/donseba/go-partial/exp/slots.DeferredSlot"
+    },
+    {
       "name": "targetHeader",
       "path": "github.com/donseba/go-partial/exp/target.TargetHeader"
     },
@@ -134,6 +154,50 @@
     {
       "name": "debug",
       "path": "github.com/donseba/go-partial/ext/debug.Debug"
+    },
+    {
+      "name": "asyncAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.AsyncAttrs"
+    },
+    {
+      "name": "revealAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.RevealAttrs"
+    },
+    {
+      "name": "pollAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.PollAttrs"
+    },
+    {
+      "name": "onAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.OnAttrs"
+    },
+    {
+      "name": "streamAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.StreamAttrs"
+    },
+    {
+      "name": "refreshAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.RefreshAttrs"
+    },
+    {
+      "name": "submitAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.SubmitAttrs"
+    },
+    {
+      "name": "liveAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.LiveAttrs"
+    },
+    {
+      "name": "clientAttrs",
+      "path": "github.com/donseba/go-partial/exp/interactions.ClientAttrs"
+    },
+    {
+      "name": "noBoost",
+      "path": "github.com/donseba/go-partial/exp/interactions.NoBoost"
+    },
+    {
+      "name": "confirmAttr",
+      "path": "github.com/donseba/go-partial/exp/interactions.ConfirmAttr"
     }
   ]
 }

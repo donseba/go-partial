@@ -93,9 +93,13 @@ func (app *App) liveMetricsStream(w http.ResponseWriter, r *http.Request) {
 				events.Flush()
 				continue
 			}
-			if err = events.Event(sse.EventPatch, html); err != nil {
+
+			// htmx 4's hx-sse swaps a message without an event name into the
+			// feed; a named event would dispatch a DOM event instead.
+			if err = events.Event("", html); err != nil {
 				return
 			}
+
 			events.Flush()
 		}
 	}

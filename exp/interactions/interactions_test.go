@@ -250,3 +250,88 @@ func TestInteractionHelpersRenderConcurrently(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAttrsVariantsDecorateExistingElements(t *testing.T) {
+	tests := []struct {
+		name      string
+		connector connector.Connector
+		template  string
+		want      string
+	}{
+		{
+			name:      "poll targets its own element",
+			connector: connector.NewHTMX4(nil),
+			template:  `<ul {{ pollAttrs runtime "/status" "3s" }}></ul>`,
+			want:      `<ul  hx-get="/status" hx-swap="innerHTML" hx-target="this" hx-trigger="every 3s"></ul>`,
+		},
+		{
+			name:      "async with a target",
+			connector: connector.NewHTMX(nil),
+			template:  `<section {{ asyncAttrs runtime "/stats" "target" "#stats" "swap" "outerHTML" }}></section>`,
+			want:      `<section  hx-get="/stats" hx-swap="outerHTML" hx-target="#stats" hx-trigger="load"></section>`,
+		},
+		{
+			name:      "reveal conditionally",
+			connector: connector.NewHTMX4(nil),
+			template:  `<tr{{ if true }}{{ revealAttrs runtime "/rows" "page" 2 "swap" "afterend" }}{{ end }}></tr>`,
+			want:      `<tr hx-get="/rows" hx-swap="afterend" hx-target="this" hx-trigger="revealed"></tr>`,
+		},
+		{
+			name:      "on an event",
+			connector: connector.NewHTMX4(nil),
+			template:  `<div {{ onAttrs runtime "cart:changed" "/cart" }}></div>`,
+			want:      `<div  hx-get="/cart" hx-swap="innerHTML" hx-target="this" hx-trigger="cart:changed from:body"></div>`,
+		},
+		{
+			name:      "an interaction value",
+			connector: connector.NewHTMX4(nil),
+			template:  `<div {{ pollAttrs runtime Status }}></div>`,
+			want:      `<div  hx-get="/status" hx-swap="innerHTML" hx-target="this" hx-trigger="every 5s"></div>`,
+		},
+		{
+			name:      "select and attributes",
+			connector: connector.NewHTMX4(nil),
+			template:  `<div {{ pollAttrs runtime "/inbox" "every" "10s" "select" "#messages" "hx-indicator" "#spinner" "data-section" "inbox" }}></div>`,
+			want:      `<div  data-section="inbox" hx-get="/inbox" hx-indicator="#spinner" hx-select="#messages" hx-swap="innerHTML" hx-target="this" hx-trigger="every 10s"></div>`,
+		},
+		{
+			name:      "a base connector",
+			connector: connector.NewPartial(nil),
+			template:  `<div {{ streamAttrs runtime "/events" }}></div>`,
+			want:      `<div  data-partial-interaction="stream" data-target="this" data-url="/events"></div>`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := fstest.MapFS{
+				"page.gohtml": &fstest.MapFile{
+					Data: []byte(
+						`{{/* @interaction Status github.com/donseba/go-partial/exp/interactions.Interaction */}}` + test.template,
+					),
+				},
+			}
+			p := partial.NewID("page", "page.gohtml").
+				SetConnector(test.connector).
+				SetFileSystem(fsys).
+				SetFunc(FuncMap()).
+				SetContract("interaction", NewPoll("/status").As("Status"))
+
+			out, err := partial.Render(context.Background(), p)
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+
+			if string(out) != test.want {
+				t.Fatalf("Render() =\n%s\nwant\n%s", out, test.want)
+			}
+		})
+	}
+}
+
+func TestAttrsReportInvalidInteractions(t *testing.T) {
+	out := AsyncAttrs(nil, 42)
+	if !strings.Contains(string(out), `data-partial-error="interaction helper expects`) {
+		t.Fatalf("AsyncAttrs() = %q", out)
+	}
+}

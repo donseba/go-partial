@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"reflect"
 	"slices"
 
 	partial "github.com/donseba/go-partial"
@@ -16,6 +17,10 @@ type config struct {
 }
 
 type extensionKey struct{}
+
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[extensionKey]().PkgPath()
 
 // WithSelectMap configures the named partials that the selection helper can render.
 func WithSelectMap(p *partial.Partial, defaultKey string, partials map[string]*partial.Partial) *partial.Partial {
@@ -82,21 +87,37 @@ func selectionIs(ctx *partial.RenderContext, values ...string) bool {
 	return slices.Contains(values, SelectionValue(ctx))
 }
 
-// Stage installs selection helpers and renders selected child partials.
+// Stage gives templates the selection helpers, which render selected child
+// partials. They are made only for the templates that call them.
 func Stage() partial.RenderStage {
 	return partial.RenderStageHooks{
-		PrepareFunc: func(ctx *partial.RenderContext) (*partial.RenderContext, error) {
+		Package:   packagePath,
+		FuncNames: []string{"selection", "selectionHeader", "selectionValue", "selectionIs"},
+		ResolveFunc: func(ctx *partial.RenderContext, name string) (any, bool) {
 			if ctx == nil || ctx.Partial == nil {
-				return ctx, nil
+				return nil, false
 			}
 
-			ctx.SetFunc("selectionHeader", func() string { return SelectionHeader(ctx) })
-			ctx.SetFunc("selectionValue", func() string { return SelectionValue(ctx) })
-			ctx.SetFunc("selectionIs", func(in ...string) bool {
-				return selectionIs(ctx, in...)
-			})
-			ctx.SetFunc("selection", func() template.HTML { return SelectionHTML(ctx) })
-			return ctx, nil
+			switch name {
+			case "selectionHeader":
+				return func() string {
+					return SelectionHeader(ctx)
+				}, true
+			case "selectionValue":
+				return func() string {
+					return SelectionValue(ctx)
+				}, true
+			case "selectionIs":
+				return func(in ...string) bool {
+					return selectionIs(ctx, in...)
+				}, true
+			case "selection":
+				return func() template.HTML {
+					return SelectionHTML(ctx)
+				}, true
+			default:
+				return nil, false
+			}
 		},
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"html/template"
 	"io/fs"
-	"maps"
 	"slices"
 
 	"github.com/donseba/go-partial/connector"
@@ -89,24 +88,23 @@ func (bp *testBlueprint) apply(p *Partial) {
 		return
 	}
 	root := bp.root
+	root.getTemplateStore()
 	root.mu.RLock()
-	rootFuncs := maps.Clone(root.staticFuncs)
+	rootFuncs := root.funcs
 	rootContracts := slices.Clone(root.contracts)
 	rootStages := slices.Clone(root.stages)
 	rootFS := root.fs
 	rootFSSet := root.fsSet
 	rootConnector := root.connector
 	rootEvents := root.events
-	rootUseCache := root.useCache
+	rootUseCache := root.cache
 	rootCache := root.templateCache
+	rootDot, rootHasDot := root.dot, root.hasDot
 	root.mu.RUnlock()
 
 	p.mu.Lock()
-	if len(rootFuncs) > 0 {
-		funcs := maps.Clone(rootFuncs)
-		maps.Copy(funcs, p.staticFuncs)
-		p.staticFuncs = funcs
-		p.funcSet = 0
+	if rootFuncs != nil {
+		p.funcs = rootFuncs.merged(p.funcs)
 	}
 	if len(rootContracts) > 0 {
 		p.contracts = append(rootContracts, p.contracts...)
@@ -124,8 +122,12 @@ func (bp *testBlueprint) apply(p *Partial) {
 	if rootEvents != nil {
 		p.events = rootEvents
 	}
-	p.useCache = rootUseCache
+	p.cache = rootUseCache
 	p.templateCache = rootCache
+	if rootHasDot && !p.hasDot {
+		p.dot, p.hasDot = rootDot, true
+	}
+
 	p.mu.Unlock()
 
 	for _, child := range p.children {
@@ -141,7 +143,8 @@ func (p *Partial) SetDotFrom(other *Partial) *Partial {
 	if p == nil || other == nil {
 		return p
 	}
-	if dot, ok := other.getDotContract(); ok {
+
+	if dot, _, ok := other.getDot(); ok {
 		p.SetDot(dot)
 	}
 	return p

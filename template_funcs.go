@@ -3,23 +3,15 @@ package partial
 import (
 	"fmt"
 	"html/template"
+	"maps"
+	"slices"
 	"strings"
 )
 
 func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) template.HTML {
 	return func(id string, args ...any) template.HTML {
 		if templatePath, ok := partialTemplatePath(p, id); ok {
-			child := p.clone()
-			child.id = templatePath
-			child.parent = p
-			child.templates = []string{templatePath}
-			// The child inherits p's values through its parent; copies would
-			// match every declaration twice.
-			child.mu.Lock()
-			child.removeContractsLocked(func(existing contractInformation) bool {
-				return existing.Kind == contractRoot
-			})
-			child.mu.Unlock()
+			child := p.templateChild(templatePath)
 
 			if ok := applyPartialTemplateArgs(state, child, id, args...); !ok {
 				return template.HTML(fmt.Sprintf("invalid data for partial '%s'", id))
@@ -52,6 +44,30 @@ func partialFunc(p *Partial, state *RenderContext) func(id string, args ...any) 
 		})
 		return template.HTML(template.HTMLEscapeString(fmt.Sprintf("partial template '%s' not found", id)))
 	}
+}
+
+// templateChild is the partial {{ partial }} renders for templatePath: a
+// child of p that inherits everything from it, its functions, stages,
+// values and dot, as well as its children, which its template can call.
+func (p *Partial) templateChild(templatePath string) *Partial {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	child := &Partial{
+		id:        templatePath,
+		parent:    p,
+		renderOOB: p.renderOOB,
+		contentID: p.contentID,
+	}
+	child.ownTemplate[0] = templatePath
+
+	child.templates = child.ownTemplate[:]
+	if len(p.children) > 0 {
+		child.children = maps.Clone(p.children)
+		child.oobChildren = slices.Clip(p.oobChildren)
+	}
+
+	return child
 }
 
 func partialTemplatePath(p *Partial, name string) (string, bool) {

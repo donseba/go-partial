@@ -27,7 +27,7 @@ _ = partial.Write(ctx, w, r, content)</code></pre>
     <p class="leading-7 text-slate-400">The translation behavior should live in the root partial template function map. go-partial does not own a translation API; add the functions your application wants with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">Partial.SetFunc</code>.</p>
 
     <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root := partial.New("shell.gohtml").
-    SetConnector(connector.NewHTMX(nil)).
+    SetConnector(connector.NewHTMX4(nil)).
     SetFileSystem(os.DirFS("web"))
 root.SetFunc(localization.FuncMap(), myTranslations.FuncMap())
 root.Use(localization.Stage())</code></pre>
@@ -50,7 +50,7 @@ _ = tr.AddLanguage("en_US")
 _ = tr.AddLanguage("nl_NL")
 
 root := partial.New("shell.gohtml").
-    SetConnector(connector.NewHTMX(nil))
+    SetConnector(connector.NewHTMX4(nil))
 root.SetFunc(localization.FuncMap(), tr.FuncMap())
 root.Use(localization.Stage())</code></pre>
 
@@ -65,4 +65,6 @@ root.Use(localization.Stage())</code></pre>
 
     <h2 class="text-xl font-bold text-slate-50">Showcase</h2>
     <p class="leading-7 text-slate-400">The showcase app includes a live localization page with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">en_US</code>, <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">nl_NL</code>, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">fr_FR</code> examples.</p>
+    <h2 class="text-xl font-bold text-slate-50">Templates go-partial does not execute</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localization.Funcs(localization.New("nl"))</code> returns the <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">locale</code> and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">localizer</code> helpers bound to a localizer, for a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">text/template</code> of your own.</p>
 </article>

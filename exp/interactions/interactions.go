@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"maps"
 	"net/url"
 	"reflect"
 	"sort"
@@ -23,6 +24,10 @@ import (
 
 // RenderKindInteraction is the renderer kind used for interaction markup.
 const RenderKindInteraction partial.RenderKind = "interaction"
+
+// packagePath is the import path of this package, which its render stages
+// name as their partial.RenderStageHooks.Package.
+var packagePath = reflect.TypeFor[Interaction]().PkgPath()
 
 // Interaction is an optional builder for connector-aware client interactions.
 // Register values with partial.SetContract("interaction", ...).
@@ -48,9 +53,14 @@ const (
 	SwapOuterHTML = string(connector.SwapOuterHTML)
 )
 
-// FuncMap returns the optional interaction template helpers.
+// FuncMap returns the optional interaction template helpers: those that
+// render an element of their own (async, reveal, poll, on, stream, prefetch
+// and refresh) and those of AttrsFuncMap. The names of the first are
+// generic, so an application that only writes attributes on elements of its
+// own registers AttrsFuncMap instead, leaving names such as "poll" free for
+// its own functions.
 func FuncMap() template.FuncMap {
-	return template.FuncMap{
+	funcs := template.FuncMap{
 		"async":    Async,
 		"reveal":   Reveal,
 		"poll":     Poll,
@@ -58,6 +68,35 @@ func FuncMap() template.FuncMap {
 		"stream":   Stream,
 		"prefetch": Prefetch,
 		"refresh":  Refresh,
+	}
+
+	maps.Copy(funcs, AttrsFuncMap())
+
+	return funcs
+}
+
+// AttrsFuncMap returns the interaction helpers that write attributes on an
+// element of the template's own: asyncAttrs, revealAttrs, pollAttrs,
+// onAttrs, streamAttrs, refreshAttrs, submitAttrs, liveAttrs, clientAttrs,
+// noBoost and confirmAttr. Their names end in Attrs or say what they write,
+// so they do not clash with an application's functions, such as a "poll"
+// of its own, as FuncMap's async, poll or on may.
+//
+//	root.SetFunc(interactions.AttrsFuncMap())
+func AttrsFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"asyncAttrs":   AsyncAttrs,
+		"revealAttrs":  RevealAttrs,
+		"pollAttrs":    PollAttrs,
+		"onAttrs":      OnAttrs,
+		"streamAttrs":  StreamAttrs,
+		"refreshAttrs": RefreshAttrs,
+		"submitAttrs":  SubmitAttrs,
+		"liveAttrs":    LiveAttrs,
+
+		"clientAttrs": ClientAttrs,
+		"noBoost":     NoBoost,
+		"confirmAttr": ConfirmAttr,
 	}
 }
 
@@ -69,6 +108,7 @@ func Stage(markup ...MarkupRenderer) partial.RenderStage {
 	}
 
 	return partial.RenderStageHooks{
+		Package: packagePath,
 		RenderFunc: func(ctx *partial.RenderContext, next partial.RenderNext) (template.HTML, error) {
 			if ctx == nil || ctx.Kind != RenderKindInteraction {
 				return next(ctx)
@@ -290,6 +330,275 @@ func Refresh(runtime *partial.Runtime, value any, args ...any) template.HTML {
 	return Render(connector.InteractionRefresh, value, runtime, args...)
 }
 
+// AsyncAttrs returns the attributes of an async interaction, for an element
+// of the template's own, such as <section {{ asyncAttrs runtime "/stats" }}>.
+// Without a target or id, the element itself is the target. Arguments are
+// those of Async.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func AsyncAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionAsync, value, runtime, args...)
+}
+
+// RevealAttrs returns the attributes of a reveal interaction for an element
+// of the template's own; see AsyncAttrs.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func RevealAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionReveal, value, runtime, args...)
+}
+
+// PollAttrs returns the attributes of a polling interaction for an element
+// of the template's own; see AsyncAttrs. A single argument after an
+// endpoint string is the interval, as with Poll.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func PollAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionPoll, value, runtime, args...)
+}
+
+// OnAttrs returns the attributes of an event-driven interaction for an
+// element of the template's own; see AsyncAttrs and On.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, event string, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func OnAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	interaction, err := on(selfTargeted(value), args...)
+	if err != nil {
+		return attrsError(err)
+	}
+
+	// After the event come the endpoint and its options.
+	targeted := true
+	if _, isEvent := value.(string); isEvent && len(args) > 0 {
+		targeted = hasTargetArg(args[0], args[1:]...)
+	}
+
+	if !targeted {
+		interaction.Target = connector.TargetSelf
+	}
+
+	return renderAttrsFor(runtime, interaction)
+}
+
+// StreamAttrs returns the attributes of an SSE-backed interaction for an
+// element of the template's own; see AsyncAttrs.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func StreamAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionStream, value, runtime, args...)
+}
+
+// RefreshAttrs returns the attributes of a refresh control for an element
+// of the template's own, such as a link; see AsyncAttrs.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func RefreshAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionRefresh, value, runtime, args...)
+}
+
+// SubmitAttrs returns the attributes of a form that submits to the
+// endpoint and swaps the response into its target, such as
+// <form method="post" action="{{ .Action }}" {{ submitAttrs runtime .Action "target" "#comments" "swap" "outerHTML" }}>:
+// hx-post for htmx, up-submit for Unpoly, and a data-turbo-frame for a
+// target with Turbo. Without a target or id, the form itself is the
+// target. "method" picks another method, such as "delete"; "include",
+// "pushURL" and "replaceURL" are written in the connector's syntax.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func SubmitAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionSubmit, value, runtime, args...)
+}
+
+// LiveAttrs returns the attributes of an input that requests the endpoint
+// as the user types, such as a search box:
+// <input type="search" name="q" {{ liveAttrs runtime "/search" "target" "#results" "delay" "300ms" "pushURL" "true" }}>.
+// htmx gets hx-get with an input trigger, Unpoly up-autosubmit with
+// up-watch-delay; Turbo, which has none, data attributes for a script.
+// "include" sends the values of other elements, such as "closest form".
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, endpoint string, params ...any) html/template.HTMLAttr
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, interaction github.com/donseba/go-partial/exp/interactions.Interaction) html/template.HTMLAttr
+func LiveAttrs(runtime *partial.Runtime, value any, args ...any) template.HTMLAttr {
+	return Attrs(connector.InteractionLive, value, runtime, args...)
+}
+
+// ClientAttrs returns the connector's attributes for how its client library
+// treats a link or form of the template's own, or the elements in a body or
+// container (see connector.Attr), from key/value pairs: "confirm" asks a
+// question first, "boost" is "on" or "off", "target" and "swap" say where
+// and how the response is swapped in:
+// <a href="/logout" {{ clientAttrs runtime "confirm" "Log out?" "boost" "off" }}>.
+//
+// For settings of a whole page, "inherit" "true" gives them to the
+// element's descendants, "disableWhileRequest" names the elements disabled
+// while a request is under way, and "keepOnServerError" "true" leaves the
+// page as it is on a 5xx response:
+//
+//	<body {{ clientAttrs runtime "inherit" "true" "boost" "on" "target" "#content" "swap" "outerHTML"
+//	        "disableWhileRequest" "find button[type='submit']" "keepOnServerError" "true" }}>
+//
+// "submitConfirm" asks a question before a submit button sends its form,
+// with the browser client of this package (ClientScript) where the client
+// library cannot: <button type="submit" {{ clientAttrs runtime "submitConfirm" "Delete for good?" }}>.
+//
+// "reloadOnError" "true" makes a link or form whose request gets a 5xx
+// status, or no answer, load as a whole page, so the visitor sees what went
+// wrong rather than nothing, also with "keepOnServerError": a link is
+// followed and a GET form submitted again by the browser itself. A POST,
+// PUT, PATCH or DELETE form is never sent twice: the server's HTML error
+// page replaces the page; without one the page stays and
+// partial:reload-on-error:failed is dispatched on the form. It is the same
+// attribute with every connector (connector.ReloadOnErrorAttr), which the
+// browser client of this package reads; on the body it applies to every
+// link and form.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, pairs ...any) html/template.HTMLAttr
+func ClientAttrs(runtime *partial.Runtime, pairs ...any) template.HTMLAttr {
+	vals, err := values(pairs...)
+	if err != nil {
+		return attrsError(err)
+	}
+
+	attr := connector.Attr{
+		Confirm:             vals["confirm"],
+		Target:              vals["target"],
+		Swap:                vals["swap"],
+		DisableWhileRequest: vals["disableWhileRequest"],
+		SubmitConfirm:       vals["submitConfirm"],
+	}
+
+	for _, flag := range []struct {
+		name  string
+		value *bool
+	}{
+		{"inherit", &attr.Inherit},
+		{"keepOnServerError", &attr.KeepOnServerError},
+		{"reloadOnError", &attr.ReloadOnError},
+	} {
+		switch strings.ToLower(vals[flag.name]) {
+		case "", "false", "off":
+		case "true", "on":
+			*flag.value = true
+		default:
+			return attrsError(fmt.Errorf("clientAttrs: %s must be true or false, got %q", flag.name, vals[flag.name]))
+		}
+	}
+
+	switch strings.ToLower(vals["boost"]) {
+	case "":
+	case "on", "true":
+		attr.Boost = connector.BoostOn
+	case "off", "false":
+		attr.Boost = connector.BoostOff
+	default:
+		return attrsError(fmt.Errorf("clientAttrs: boost must be on or off, got %q", vals["boost"]))
+	}
+
+	return clientAttrs(runtime, attr)
+}
+
+// NoBoost returns the attribute that makes the browser load a link or
+// submit a form itself, such as hx-boost="false" with htmx or
+// data-turbo="false" with Turbo: <a href="/download" {{ noBoost runtime }}>.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime) html/template.HTMLAttr
+func NoBoost(runtime *partial.Runtime) template.HTMLAttr {
+	return clientAttrs(runtime, connector.Attr{Boost: connector.BoostOff})
+}
+
+// ConfirmAttr returns the attribute that asks question before a link is
+// followed or a form submitted, such as hx-confirm with htmx:
+// <button {{ confirmAttr runtime "Delete this page?" }}>.
+//
+// go-doc:sig func(runtime *github.com/donseba/go-partial.Runtime, question string) html/template.HTMLAttr
+func ConfirmAttr(runtime *partial.Runtime, question string) template.HTMLAttr {
+	return clientAttrs(runtime, connector.Attr{Confirm: question})
+}
+
+func clientAttrs(runtime *partial.Runtime, attr connector.Attr) template.HTMLAttr {
+	if runtime == nil {
+		return attrsError(fmt.Errorf("go-partial interaction runtime is not configured"))
+	}
+
+	attrs := connector.Attrs(runtime.Connector(), attr)
+	if len(attrs) == 0 {
+		return ""
+	}
+
+	return template.HTMLAttr(" " + renderAttrs(attrs))
+}
+
+// Attrs returns the connector attributes of an interaction, without the
+// wrapper element Render adds, for an element of the template's own; the
+// attributes start with a space. Without a target or id, the interaction
+// targets the element it is placed on (connector.TargetSelf). An invalid
+// interaction returns a data-partial-error attribute with the error.
+func Attrs(kind connector.InteractionKind, value any, runtime *partial.Runtime, args ...any) template.HTMLAttr {
+	interaction, err := fromValue(kind, selfTargeted(value), args...)
+	if err != nil {
+		return attrsError(err)
+	}
+
+	if !hasTargetArg(value, args...) {
+		interaction.Target = connector.TargetSelf
+	}
+
+	return renderAttrsFor(runtime, interaction)
+}
+
+// selfTargeted is an Interaction value with its own element as the target,
+// unless it names a target or id.
+func selfTargeted(value any) any {
+	interaction, ok := value.(Interaction)
+	if !ok || interaction.interaction.Target != "" || interaction.interaction.ID != "" {
+		return value
+	}
+
+	interaction.interaction.Target = connector.TargetSelf
+	return interaction
+}
+
+// hasTargetArg reports whether an interaction names its target or id, so
+// it does not target its own element.
+func hasTargetArg(value any, args ...any) bool {
+	switch v := value.(type) {
+	case Interaction:
+		return true
+	case string:
+		for i := 0; i+1 < len(args); i += 2 {
+			if key, ok := args[i].(string); ok && (key == "target" || key == "id") {
+				return true
+			}
+		}
+
+		return false
+	case connector.Interaction:
+		return v.Target != "" || v.ID != ""
+	default:
+		return true
+	}
+}
+
+func renderAttrsFor(runtime *partial.Runtime, interaction connector.Interaction) template.HTMLAttr {
+	if runtime == nil {
+		return attrsError(fmt.Errorf("go-partial interaction runtime is not configured"))
+	}
+
+	attrs := runtime.Connector().InteractionAttrs(interaction)
+	return template.HTMLAttr(" " + renderAttrs(attrs))
+}
+
+func attrsError(err error) template.HTMLAttr {
+	return template.HTMLAttr(` data-partial-error="` + escapeAttr(err.Error()) + `"`)
+}
+
 func Render(kind connector.InteractionKind, value any, runtime *partial.Runtime, args ...any) template.HTML {
 	interaction, err := fromValue(kind, value, args...)
 	if err != nil {
@@ -419,10 +728,40 @@ func build(kind connector.InteractionKind, name string, endpoint string, args ..
 		Trigger:     vals["trigger"],
 		Interval:    vals["every"],
 		Placeholder: vals["placeholder"],
+		Select:      vals["select"],
 		Name:        name,
 		Params:      vals,
 		Options:     vals,
+		Attrs:       attributeOptions(vals),
 	}), nil
+}
+
+// attributePrefixes start the option names of the endpoint form that are
+// written on the element as given, such as "hx-indicator" or
+// "data-section".
+var attributePrefixes = []string{"hx-", "up-", "data-", "aria-"}
+
+// attributeOptions returns the options that are attributes; see
+// attributePrefixes.
+func attributeOptions(vals map[string]string) map[string]string {
+	var attrs map[string]string
+
+	for key, value := range vals {
+		for _, prefix := range attributePrefixes {
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
+
+			if attrs == nil {
+				attrs = make(map[string]string)
+			}
+
+			attrs[key] = value
+			break
+		}
+	}
+
+	return attrs
 }
 
 func normalize(interaction connector.Interaction) connector.Interaction {

@@ -7,7 +7,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ .AppName }} documentation</title>
-    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"></script>
     <link rel="stylesheet" href="/static/site.css">
     <script>
         function scrollToCurrentHash() {
@@ -19,8 +19,9 @@
                 target.scrollIntoView({ block: "start" });
             }
         }
-        document.addEventListener("htmx:afterSwap", function (event) {
-            if (event.detail && event.detail.target && event.detail.target.id === "content") {
+        document.addEventListener("htmx:after:swap", function (event) {
+            const ctx = event.detail && event.detail.ctx;
+            if (ctx && ctx.target && ctx.target.id === "content") {
                 requestAnimationFrame(scrollToCurrentHash);
             }
         });

@@ -7,7 +7,7 @@ can stay small and advanced behavior can move into `exp`.
 
 - A render is a request-scoped task described by `RenderContext`.
 - A render stage can prepare context, produce or wrap HTML, and finalize the result.
-- The default core render stage executes the current partial template.
+- The template render ends the render chain; it is not a stage.
 - Official optional behavior should live in `ext` as render stages or
   stage-backed helpers.
 - Experimental behavior should live in `exp`.
@@ -29,7 +29,7 @@ Render order:
 
 ```text
 prepare A -> prepare B -> prepare C
-render A -> render B -> render C -> template render stage
+render A -> render B -> render C -> template render
 finalize C -> finalize B -> finalize A
 ```
 
@@ -37,7 +37,7 @@ finalize C -> finalize B -> finalize A
 
 - [x] Add core render stage lifecycle types.
 - [x] Add render stage chains to `Partial`.
-- [x] Move template execution behind the default template render stage.
+- [x] Move template execution to the end of the render chain.
 - [x] Re-express error rendering as `RenderKindError`.
 - [x] Re-express debug rendering as `RenderKindDebug`.
 - [x] Move default error rendering to `ext/errors`.
@@ -62,10 +62,15 @@ finalize C -> finalize B -> finalize A
 ## Design Notes
 
 - `RenderContext.Values` is the extension point for exp packages.
-- Render stages add template functions with `RenderContext.SetFunc`, or with
-  `RenderContext.SetFuncResolver` when they offer many functions: a resolver is
-  asked only for the functions the template calls. The names still need
-  stand-ins registered with `Partial.SetFunc` so templates parse.
+- Render stages give template functions with `RenderStageHooks.ResolveFunc`
+  (any stage implementing `TemplateFuncResolver`), asked only for the
+  functions a template calls, so a render whose templates call none costs
+  nothing. `RenderContext.SetFunc` and `RenderContext.SetFuncResolver` in
+  `Prepare` still work and come first, but run for every partial. Templates
+  are parsed with stand-ins for the names a stage declares in
+  `RenderStageHooks.FuncNames` or `FallbackFuncNames` (any stage
+  implementing `TemplateFuncNamer`); other names still need stand-ins
+  registered with `Partial.SetFunc`.
 - `RenderContext.Data` carries kind-specific payloads such as debug values,
   interaction data, or error data.
 - `RenderContext.Kind` tells generic render stages which task they are handling.

@@ -452,3 +452,44 @@ func (failingWriter) Write([]byte) (int, error) {
 }
 
 var _ io.Writer = failingWriter{}
+
+func TestOutermostRecordsOnlyTheOutermostRender(t *testing.T) {
+	files := fstest.MapFS{
+		"page.gohtml": &fstest.MapFile{Data: []byte(`{{ range .Items }}{{ partial runtime "item.gohtml" . }}{{ end }}`)},
+		"item.gohtml": &fstest.MapFile{Data: []byte(`<li>{{ . }}</li>`)},
+	}
+
+	count := func(options ...Option) []Record {
+		var records []Record
+		p := partial.NewID("page", "page.gohtml").
+			SetFileSystem(files).
+			SetDot(map[string][]string{"Items": {"a", "b", "c"}}).
+			Use(Stage(SinkFunc(func(record Record) {
+				records = append(records, record)
+			}), options...))
+
+		out, err := partial.RenderWithRequest(context.Background(), httptest.NewRequest("GET", "/", nil), p)
+		if err != nil {
+			t.Fatalf("RenderWithRequest() error = %v", err)
+		}
+
+		if out != "<li>a</li><li>b</li><li>c</li>" {
+			t.Fatalf("RenderWithRequest() = %q", out)
+		}
+
+		return records
+	}
+
+	if records := count(); len(records) < 4 {
+		t.Fatalf("records without Outermost = %d, want one per render", len(records))
+	}
+
+	records := count(Outermost())
+	if len(records) != 1 {
+		t.Fatalf("records with Outermost = %d, want 1", len(records))
+	}
+
+	if records[0].PartialID != "page" || records[0].Size != len("<li>a</li><li>b</li><li>c</li>") {
+		t.Fatalf("record = %+v, want the page", records[0])
+	}
+}

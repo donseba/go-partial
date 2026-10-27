@@ -39,5 +39,18 @@
 
     <h2 class="text-xl font-bold text-slate-50">Caching note</h2>
     <p class="leading-7 text-slate-400">Template caching caches parsed templates, not rendered HTML. Dynamic data should still be loaded per request and passed into the partial. Avoid caching rendered row output unless the data is truly immutable.</p>
+
+    <h2 class="text-xl font-bold text-slate-50">Functions with a context</h2>
+    <p class="leading-7 text-slate-400">A function registered with <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetFunc</code> whose first parameter is a <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">context.Context</code> receives the render's context; templates call it without that parameter. It is bound once per render tree.</p>
+    <pre class="overflow-auto rounded-lg border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl"><code class="block border-0 bg-transparent p-0 font-mono text-sm text-inherit">root.SetFunc(template.FuncMap{
+    "posts": func(ctx context.Context, section string, limit int) ([]Post, error) {
+        return store.Latest(ctx, section, limit)
+    },
+})
+
+{{ "{{ range posts \"news\" 3 }}" }}{{ "{{ .Title }}" }}{{ "{{ end }}" }}</code></pre>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.BindContext(ctx, funcs...)</code> binds such functions for templates go-partial does not execute. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.RuntimeFrom(ctx)</code> returns the runtime of the partial whose template calls the function, so <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">runtime.RenderPartial(component)</code> renders a component as a child of that partial, with its models, functions and stages. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.ReservedFuncNames(stages...)</code> lists the names <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">SetFunc</code> cannot give templates.</p>
+    <h2 class="text-xl font-bold text-slate-50">Checking contracts</h2>
+    <p class="leading-7 text-slate-400"><code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">p.CheckContracts()</code> reports, without rendering, whether every typed root the templates declare finds one value and the dot has the declared <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">@dot</code> type. <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">runtime.CheckContracts(p)</code> checks a partial as a child of the one being rendered, and <code class="rounded border border-sky-400/20 bg-sky-400/10 px-1.5 py-0.5 font-mono text-sm text-sky-100">partial.ParseDeclarations(sources...)</code> lists the declarations of template sources.</p>
 </article>
 
