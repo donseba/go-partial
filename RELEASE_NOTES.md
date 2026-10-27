@@ -1,6 +1,6 @@
 # go-partial release notes
 
-## v0.15.0 (unreleased)
+## v0.15.0
 
 ### Behaviour Changes
 
