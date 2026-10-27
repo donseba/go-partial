@@ -1488,6 +1488,7 @@ which would mean that caching is roughly 9-10 times faster than without caching
 - `ext/errors`: the built-in error fragment has classes instead of `style` attributes, which a Content-Security-Policy without `'unsafe-inline'` blocks: `go-partial-error` (as before), and the new `go-partial-error__title` (`h1`), `go-partial-error__message` (`p`) and `go-partial-error__details` (`dl`). It no longer styles itself: serve and link the stylesheet of `exterrors.StylesheetFS()` (`partial-errors.css`) or style the classes in the application's CSS; unstyled it reads as a heading, a paragraph and a list. The built-in error page keeps its inline `<style>`, whose hash is `exterrors.StyleHash()`.
 - `ext/debug`: the debug box has classes (`go-partial-debug__header`, `__label`, `__partial`, `__value`) and one `<style>` element of its own instead of `style` attributes; it looks the same. Under a strict policy, add `debug.StyleHash()` to `style-src`.
 - `ext/logger`: `logger.Sink(nil)` writes to `slog.Default()` as it is when each event is written; before, to the default logger of the moment `Sink` was called, so a later `slog.SetDefault` now takes effect.
+- `exp/otel`: go-partial requires OpenTelemetry Go v1.45.0, which fixes [GHSA-8wmf-6v46-5gfg](https://github.com/advisories/GHSA-8wmf-6v46-5gfg) (exporter endpoints in verbose internal logs). A module that requires an older version moves up to it.
 
 ## Contributing
 

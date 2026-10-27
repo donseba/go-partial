@@ -63,6 +63,8 @@ can notice, with what to do.
 - `connector.NewUnpoly`: an interaction that targets its own element
   (`this`, `connector.TargetSelf`) is written as `up-target=":origin"`, as
   Unpoly names that element; before, `this` was written as it is.
+- go-partial requires OpenTelemetry Go v1.45.0 (`exp/otel`), which fixes
+  GHSA-8wmf-6v46-5gfg.
 
 ### Content-Security-Policy, Error Responses And Other Additions
 
