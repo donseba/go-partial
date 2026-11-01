@@ -232,7 +232,7 @@ func (i Interaction) From(source string) Interaction {
 
 // Every sets the polling interval.
 func (i Interaction) Every(interval time.Duration) Interaction {
-	i.interaction.Interval = interval.String()
+	i.interaction.Interval = connector.FormatDuration(interval)
 	return i
 }
 
@@ -261,12 +261,13 @@ func (i Interaction) Param(key string, value any) Interaction {
 	return i
 }
 
-// Option sets a connector option.
+// Option sets a connector option. A time.Duration is written as htmx
+// parses it, such as "250ms" or "90s".
 func (i Interaction) Option(key string, value any) Interaction {
 	if i.interaction.Options == nil {
 		i.interaction.Options = make(map[string]string)
 	}
-	i.interaction.Options[key] = fmt.Sprint(value)
+	i.interaction.Options[key] = optionString(value)
 	return i
 }
 
@@ -826,9 +827,18 @@ func values(args ...any) (map[string]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("interaction option key must be string, got %T", args[i])
 		}
-		values[key] = fmt.Sprint(args[i+1])
+		values[key] = optionString(args[i+1])
 	}
 	return values, nil
+}
+
+// optionString writes an option value, a time.Duration as htmx parses it
+// rather than as Go's "1m0s".
+func optionString(value any) string {
+	if duration, ok := value.(time.Duration); ok {
+		return connector.FormatDuration(duration)
+	}
+	return fmt.Sprint(value)
 }
 
 func renderAttrs(attrs map[string]string) string {
