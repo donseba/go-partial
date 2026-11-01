@@ -12,7 +12,7 @@
 [Documentation](https://docs.gowebthings.com/go-partial) · Part of [go-webthings](https://gowebthings.com/components).
 
 This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with wrapper/content composition, connector headers, OOB output, caching, and typed template-friendly data flow.
-`go-partial` supersedes `go-htmx`. The rendering core stays small; connectors and optional extensions add the browser integration your application needs.
+`go-partial` grew out of [`go-htmx`](https://github.com/donseba/go-htmx). If you only need htmx's request and response headers, `go-htmx` is the smaller choice; `go-partial` adds the rendering layer. The rendering core stays small; connectors and optional extensions add the browser integration your application needs.
 
 ## Features
 
