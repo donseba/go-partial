@@ -100,3 +100,101 @@ func TestSetRequestTargetIsTheInverseOfGetTargetValue(t *testing.T) {
 		}
 	}
 }
+
+// TestMergeAttrsReplacesEverySetting checks that each setting of attr takes
+// out the attributes the connector wrote for it before.
+func TestMergeAttrsReplacesEverySetting(t *testing.T) {
+	existing := map[string]string{
+		"hx-boost":             "false",
+		"hx-swap":              "outerHTML",
+		"hx-disabled-elt":      "input",
+		"data-partial-confirm": "Old?",
+		ReloadOnErrorAttr:      "",
+		"class":                "form",
+	}
+
+	attr := Attr{
+		Boost:               BoostOn,
+		Swap:                "innerHTML",
+		DisableWhileRequest: "button",
+		KeepOnServerError:   true,
+		SubmitConfirm:       "Sure?",
+		ReloadOnError:       true,
+	}
+
+	merged := MergeAttrs(NewHTMX(nil), existing, attr)
+
+	want := map[string]string{
+		"hx-boost":             "true",
+		"hx-swap":              "innerHTML",
+		"hx-disabled-elt":      "button",
+		"data-partial-confirm": "Sure?",
+		ReloadOnErrorAttr:      "",
+		"class":                "form",
+	}
+	if !reflect.DeepEqual(merged, want) {
+		t.Fatalf("MergeAttrs() = %v, want %v", merged, want)
+	}
+
+	cleared := MergeAttrs(NewHTMX(nil), merged, Attr{}, AttrBoost, AttrSwap, AttrDisableWhileRequest, AttrSubmitConfirm, AttrReloadOnError)
+	if !reflect.DeepEqual(cleared, map[string]string{"class": "form"}) {
+		t.Fatalf("MergeAttrs(remove all) = %v", cleared)
+	}
+}
+
+// TestAttrsOfPlainConnectorsAreDataAttributes checks that a connector that
+// does not write attributes itself gets the data- attributes.
+func TestAttrsOfPlainConnectorsAreDataAttributes(t *testing.T) {
+	got := Attrs(plainConnector{Connector: NewPartial(nil)}, Attr{Confirm: "Sure?", Boost: BoostOff, Target: "#main", Swap: "outerHTML"})
+
+	want := map[string]string{
+		"data-confirm": "Sure?",
+		"data-boost":   "false",
+		"data-target":  "#main",
+		"data-swap":    "outerHTML",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Attrs() = %v, want %v", got, want)
+	}
+}
+
+// TestSetRequestTargetOfPlainConnectors checks that a connector without
+// RequestTargeter gets the target in its target header, that a request
+// without headers gets them, and that nil connectors and requests are
+// ignored.
+func TestSetRequestTargetOfPlainConnectors(t *testing.T) {
+	conn := plainConnector{Connector: NewPartial(nil)}
+	req := &http.Request{}
+
+	SetRequestTarget(conn, req, "comments")
+
+	if got := req.Header.Get(HeaderTarget.String()); got != "comments" {
+		t.Fatalf("target header = %q", got)
+	}
+
+	SetRequestTarget(nil, req, "other")
+	SetRequestTarget(conn, nil, "other")
+
+	if got := conn.GetTargetValue(req); got != "comments" {
+		t.Fatalf("GetTargetValue() = %q after nil calls", got)
+	}
+}
+
+func TestHTMX4ConfigValueKeepsShortQuotedValues(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{in: "#content", want: "#content"},
+		{in: "outerHTML show:top", want: "'outerHTML show:top'"},
+		{in: "a 'b'", want: `"a 'b'"`},
+		{in: "'already quoted'", want: "'already quoted'"},
+		{in: " ", want: "' '"},
+	}
+
+	for _, tt := range tests {
+		if got := htmx4ConfigValue(tt.in); got != tt.want {
+			t.Errorf("htmx4ConfigValue(%q) = %s, want %s", tt.in, got, tt.want)
+		}
+	}
+}

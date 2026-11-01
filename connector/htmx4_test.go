@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
@@ -201,5 +202,24 @@ func TestInteractionSelectAndAttrs(t *testing.T) {
 
 	if attrs := NewTurbo(nil).InteractionAttrs(interaction); attrs["data-x"] != "1" {
 		t.Fatalf("turbo: InteractionAttrs() = %v, want the attributes", attrs)
+	}
+}
+
+// TestHTMX4TargetValueOfIDsThatDoNotDecode checks that an ID htmx 4 sent
+// with a bad escape is returned as it was sent.
+func TestHTMX4TargetValueOfIDsThatDoNotDecode(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("HX-Target", "div#row%zz")
+
+	if got := NewHTMX4(nil).GetTargetValue(req); got != "row%zz" {
+		t.Fatalf("GetTargetValue() = %q, want the ID as sent", got)
+	}
+}
+
+func TestHTMX4StreamSwapsInnerHTMLByDefault(t *testing.T) {
+	attrs := NewHTMX4(nil).InteractionAttrs(Interaction{Kind: InteractionStream, ID: "feed", URL: "/events"})
+
+	if attrs[HTMXAttrTarget] != "#feed" || attrs[HTMXAttrSwap] != "innerHTML" {
+		t.Fatalf("attrs = %v, want the element's own ID and innerHTML", attrs)
 	}
 }
