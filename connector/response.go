@@ -331,10 +331,10 @@ func (s *Swap) format(htmx4 bool) string {
 
 	parts := []string{string(s.style)}
 	if s.swap > 0 {
-		parts = append(parts, joinSwapOption(SwapModifierSwap, "", formatDuration(s.swap)))
+		parts = append(parts, joinSwapOption(SwapModifierSwap, "", FormatDuration(s.swap)))
 	}
 	if s.settle > 0 {
-		parts = append(parts, joinSwapOption(SwapModifierSettle, "", formatDuration(s.settle)))
+		parts = append(parts, joinSwapOption(SwapModifierSettle, "", FormatDuration(s.settle)))
 	}
 	if s.transition != nil {
 		parts = append(parts, joinSwapOption(SwapModifierTransition, "", boolString(*s.transition)))
@@ -376,11 +376,19 @@ func joinSwapOption(mode, target, direction string) string {
 	return mode + ":" + target + ":" + direction
 }
 
-func formatDuration(duration time.Duration) string {
-	if duration%time.Second == 0 {
-		return duration.String()
+// FormatDuration writes duration as htmx parses it, such as for a swap
+// delay or a polling interval: in seconds from one second up, in
+// milliseconds below, with decimals only where needed. Go's own format
+// cannot be used, as htmx does not read "1m0s" or "500µs".
+func FormatDuration(duration time.Duration) string {
+	if duration >= time.Second {
+		return formatDecimal(duration, time.Second) + "s"
 	}
-	return duration.Truncate(time.Millisecond).String()
+	return formatDecimal(duration, time.Millisecond) + "ms"
+}
+
+func formatDecimal(duration, unit time.Duration) string {
+	return strconv.FormatFloat(float64(duration)/float64(unit), 'f', -1, 64)
 }
 
 func boolString(value bool) string {
