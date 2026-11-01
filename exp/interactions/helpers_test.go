@@ -267,6 +267,32 @@ func TestBuildersOfZeroValues(t *testing.T) {
 	}
 }
 
+// TestDurationsParseInHTMX checks that polling intervals and duration
+// options are written as htmx parses them, not as Go's "1m0s".
+func TestDurationsParseInHTMX(t *testing.T) {
+	interaction := NewPoll("/feed").
+		Every(time.Minute).
+		Option("delay", 90*time.Second).
+		Interaction()
+
+	if interaction.Interval != "60s" || interaction.Options["delay"] != "90s" {
+		t.Fatalf("Interval = %q, delay = %q", interaction.Interval, interaction.Options["delay"])
+	}
+
+	if got := connector.NewHTMX4(nil).InteractionAttrs(interaction)["hx-trigger"]; got != "every 60s" {
+		t.Fatalf("hx-trigger = %q, want every 60s", got)
+	}
+
+	got, err := values("every", 500*time.Microsecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got["every"] != "0.5ms" {
+		t.Fatalf("template value = %q, want 0.5ms", got["every"])
+	}
+}
+
 // TestStageRejectsOtherData checks that the interaction stage reports data
 // of another type than Data, and leaves other render kinds alone.
 func TestStageRejectsOtherData(t *testing.T) {

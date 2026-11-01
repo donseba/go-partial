@@ -188,6 +188,39 @@ func TestSwapString(t *testing.T) {
 	}
 }
 
+// TestSwapDurationsParseInHTMX checks that both connectors write swap and
+// settle durations htmx parses: never Go's "1m0s" or "500µs".
+func TestSwapDurationsParseInHTMX(t *testing.T) {
+	tests := []struct {
+		duration time.Duration
+		want     string
+	}{
+		{20 * time.Millisecond, "20ms"},
+		{time.Second, "1s"},
+		{1500 * time.Millisecond, "1.5s"},
+		{60 * time.Second, "60s"},
+		{90 * time.Second, "90s"},
+		{61500 * time.Millisecond, "61.5s"},
+		{2 * time.Hour, "7200s"},
+		{1500 * time.Microsecond, "1.5ms"},
+		{500 * time.Microsecond, "0.5ms"},
+		{time.Nanosecond, "0.000001ms"},
+	}
+	connectors := map[string]Connector{"htmx 2": NewHTMX(nil), "htmx 4": NewHTMX4(nil)}
+
+	for _, tt := range tests {
+		response := Response{}
+		NewResponseBuilder(&response).ReswapWith(NewSwap().Swap(tt.duration).Settle(tt.duration))
+		want := "innerHTML swap:" + tt.want + " settle:" + tt.want
+
+		for name, conn := range connectors {
+			if got := conn.ResponseHeaders(response)["HX-Reswap"]; got != want {
+				t.Errorf("%s: %v = %q, want %q", name, tt.duration, got, want)
+			}
+		}
+	}
+}
+
 // TestLocationStringFallsBackToThePath checks that a location whose values
 // cannot be encoded is written as its path.
 func TestLocationStringFallsBackToThePath(t *testing.T) {
