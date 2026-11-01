@@ -3,6 +3,7 @@ package templatehelpers
 import (
 	"html/template"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -299,4 +300,47 @@ func sameStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// TestIncDecKeepTheType checks inc and dec for each numeric type they
+// handle, with each type of step, and values they leave as they are.
+func TestIncDecKeepTheType(t *testing.T) {
+	tests := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{name: "inc nothing", got: inc(), want: 1},
+		{name: "dec nothing", got: dec(), want: -1},
+		{name: "inc int64", got: inc(int64(1), int64(2)), want: int64(3)},
+		{name: "dec int64", got: dec(int64(5), 2.9), want: int64(3)},
+		{name: "inc float64", got: inc(1.5, float32(2)), want: 3.5},
+		{name: "dec float64", got: dec(1.5), want: 0.5},
+		{name: "inc float32", got: inc(float32(1.5), uint(1)), want: float32(2.5)},
+		{name: "dec float32", got: dec(float32(1.5), 1), want: float32(0.5)},
+		{name: "inc uint", got: inc(uint(1)), want: uint(2)},
+		{name: "dec uint", got: dec(uint(3), int64(2)), want: uint(1)},
+		{name: "inc with a step that is not a number", got: inc(1, "2"), want: 2},
+		{name: "inc a string", got: inc("a"), want: "a"},
+		{name: "dec a string", got: dec("a"), want: "a"},
+	}
+
+	for _, tt := range tests {
+		if tt.got != tt.want {
+			t.Errorf("%s = %#v, want %#v", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+func TestStringSliceRendersInRange(t *testing.T) {
+	tmpl := template.Must(template.New("list").Funcs(FuncMap()).Parse(`{{ range stringSlice "a" "b" }}[{{ . }}]{{ end }}`))
+
+	var out strings.Builder
+	if err := tmpl.Execute(&out, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := out.String(); got != "[a][b]" {
+		t.Fatalf("output = %q", got)
+	}
 }

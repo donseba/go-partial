@@ -6,6 +6,9 @@
 
 # go-partial
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/donseba/go-partial.svg)](https://pkg.go.dev/github.com/donseba/go-partial)
+[![codecov](https://codecov.io/gh/donseba/go-partial/graph/badge.svg)](https://codecov.io/gh/donseba/go-partial)
+
 [Documentation](https://docs.gowebthings.com/go-partial) · Part of [go-webthings](https://gowebthings.com/components).
 
 This package provides a request-aware rendering layer for Go templates. It lets applications render full pages or targeted partials from the same registered template tree, with wrapper/content composition, connector headers, OOB output, caching, and typed template-friendly data flow.

@@ -131,3 +131,61 @@ func TestCurrentURLHeader(t *testing.T) {
 		}
 	}
 }
+
+// plainConnector has only the methods of Connector, so it implements none of
+// the optional interfaces, such as RequestInspector and HeaderVarier.
+type plainConnector struct {
+	Connector
+}
+
+// TestRequestInspectionOfPlainConnectors checks the answers for connectors
+// that do not inspect requests themselves, and for nil connectors and
+// requests.
+func TestRequestInspectionOfPlainConnectors(t *testing.T) {
+	plain := plainConnector{Connector: NewPartial(nil)}
+
+	targeted := httptest.NewRequest(http.MethodGet, "/", nil)
+	targeted.Header.Set(HeaderTarget.String(), "content")
+
+	if !IsRequest(plain, targeted) {
+		t.Fatal("IsRequest() = false for a request that names a target")
+	}
+
+	if IsBoosted(plain, targeted) || CurrentURL(plain, targeted) != nil {
+		t.Fatal("a plain connector reports boosting or a current URL")
+	}
+
+	if IsRequest(nil, targeted) || IsRequest(plain, nil) || IsBoosted(nil, targeted) || CurrentURL(plain, nil) != nil {
+		t.Fatal("a nil connector or request is inspected")
+	}
+
+	if got := VaryHeaders(plain); !slices.Equal(got, []string{"X-Target", "X-Select", "X-Action"}) {
+		t.Fatalf("VaryHeaders() of a plain connector = %v", got)
+	}
+
+	if got := VaryHeaders(nil); got != nil {
+		t.Fatalf("VaryHeaders(nil) = %v", got)
+	}
+
+	if CurrentURL(NewPartial(nil), targeted) != nil {
+		t.Fatal("the partial connector reports a current URL")
+	}
+}
+
+func TestHTMXCurrentURLOfBadValues(t *testing.T) {
+	htmx, ok := NewHTMX(nil).(*HTMX)
+	if !ok {
+		t.Fatal("NewHTMX() is not an *HTMX")
+	}
+
+	if htmx.CurrentURL(nil) != nil {
+		t.Fatal("CurrentURL(nil) is not nil")
+	}
+
+	bad := httptest.NewRequest(http.MethodGet, "/", nil)
+	bad.Header.Set(HTMXHeaderCurrentURL.String(), "http://[::1")
+
+	if got := htmx.CurrentURL(bad); got != nil {
+		t.Fatalf("CurrentURL() of a URL that does not parse = %v", got)
+	}
+}
